@@ -2,46 +2,46 @@ export const THEME_STORAGE_KEY = 'pentnotes.theme.v1';
 
 export const themes = [
   {
-    id: 'parchment',
-    name: 'Solar Flare',
-    mode: 'light',
-    description: 'Electric orange, cobalt, warm light.',
-    colors: ['#fff7ed', '#ffedd7', '#a83d00', '#075bd8'],
-  },
-  {
-    id: 'glacier',
-    name: 'Ion Blue',
-    mode: 'light',
-    description: 'Cool white, ion blue, laser teal.',
-    colors: ['#edf7ff', '#dcebff', '#0756c9', '#007679'],
-  },
-  {
-    id: 'rosewood',
-    name: 'Prism',
-    mode: 'light',
-    description: 'Iridescent pink, vivid fuchsia, blue.',
-    colors: ['#fff0fa', '#f5dff1', '#a91976', '#075fc7'],
-  },
-  {
     id: 'midnight',
-    name: 'Neon Grid',
+    name: 'Cyber Cyan',
     mode: 'dark',
-    description: 'Deep navy, luminous cyan, hot pink.',
-    colors: ['#070e1d', '#091326', '#28e5ff', '#ff56d9'],
+    description: 'Electric cyan and neon magenta on sleek slate dark.',
+    colors: ['#0b0d13', '#10131c', '#00e5ff', '#f43f5e'],
   },
   {
     id: 'evergreen',
-    name: 'Matrix',
+    name: 'Terminal Green',
     mode: 'dark',
-    description: 'Near-black green, acid lime, mint.',
-    colors: ['#060f0e', '#081714', '#90ff67', '#00e6ca'],
+    description: 'Crisp hacker emerald and mint on sleek slate dark.',
+    colors: ['#0b0d13', '#10131c', '#10b981', '#06b6d4'],
   },
   {
     id: 'ember',
-    name: 'Afterburn',
+    name: 'Flame Ember',
     mode: 'dark',
-    description: 'Black cherry, plasma orange, coral.',
-    colors: ['#170a13', '#1b0c17', '#ff9a52', '#ff567e'],
+    description: 'Warm flame orange and coral rose on sleek slate dark.',
+    colors: ['#0b0d13', '#10131c', '#f97316', '#f43f5e'],
+  },
+  {
+    id: 'parchment',
+    name: 'Solar Amber',
+    mode: 'light',
+    description: 'Solar amber and deep cobalt on crisp minimalist white.',
+    colors: ['#f8fafc', '#ffffff', '#ea580c', '#0284c7'],
+  },
+  {
+    id: 'glacier',
+    name: 'Glacier Blue',
+    mode: 'light',
+    description: 'Oceanic sapphire and teal on crisp minimalist white.',
+    colors: ['#f8fafc', '#ffffff', '#0284c7', '#0d9488'],
+  },
+  {
+    id: 'rosewood',
+    name: 'Prism Berry',
+    mode: 'light',
+    description: 'Vivid berry fuchsia and violet on crisp minimalist white.',
+    colors: ['#f8fafc', '#ffffff', '#be185d', '#6366f1'],
   },
 ] as const;
 
@@ -61,7 +61,7 @@ export function initialTheme(): ThemeId {
 }
 
 export function applyTheme(id: ThemeId): void {
-  const theme = themes.find((item) => item.id === id) ?? themes[3];
+  const theme = themes.find((item) => item.id === id) ?? themes[0];
   document.documentElement.dataset.theme = theme.id;
   document.documentElement.style.colorScheme = theme.mode;
 }

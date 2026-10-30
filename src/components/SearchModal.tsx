@@ -41,9 +41,10 @@ function collectNotes(
 interface SearchModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialQuery?: string;
 }
 
-export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => {
+export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, initialQuery }) => {
   const folders = useNotesStore((s) => s.folders);
   const selectFolder = useNotesStore((s) => s.selectFolder);
   const selectNote = useNotesStore((s) => s.selectNote);
@@ -77,11 +78,16 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
 
   useEffect(() => {
     if (isOpen) {
-      setQuery('');
+      setQuery(initialQuery || '');
       setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => {
+        inputRef.current?.focus();
+        if (initialQuery) {
+          inputRef.current?.select();
+        }
+      }, 50);
     }
-  }, [isOpen]);
+  }, [isOpen, initialQuery]);
 
   useEffect(() => {
     setSelectedIndex(0);

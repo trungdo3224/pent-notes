@@ -33,7 +33,7 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({ theme, onChoose, onClose
         aria-label="Find your atmosphere."
       >
         <div className="modal-heading">
-          <h2>Find your atmosphere.</h2>
+          <h2>Themes & Accents</h2>
           <button
             type="button"
             className="modal-close-btn"
@@ -45,18 +45,18 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({ theme, onChoose, onClose
         </div>
 
         <p className="modal-description">
-          A different mood for your notes. Choose a palette; it will be here next time.
+          Minimalist, high-readability workspaces with vibrant theme color accents.
         </p>
 
-        {(['light', 'dark'] as const).map((mode) => (
+        {(['dark', 'light'] as const).map((mode) => (
           <section
             className="theme-group"
             key={mode}
-            aria-label={`${mode === 'light' ? 'Light' : 'Dark'} themes`}
+            aria-label={`${mode === 'dark' ? 'Dark' : 'Light'} themes`}
           >
             <h3>
-              {mode === 'light' ? <Sun size={16} /> : <Moon size={16} />}
-              <span>{mode === 'light' ? 'Light' : 'Dark'}</span>
+              {mode === 'dark' ? <Moon size={15} /> : <Sun size={15} />}
+              <span>{mode === 'dark' ? 'Dark Minimal' : 'Light Minimal'}</span>
             </h3>
             <div className="theme-options">
               {themes
@@ -69,30 +69,49 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({ theme, onChoose, onClose
                     aria-pressed={theme === option.id}
                     onClick={() => onChoose(option.id)}
                   >
-                    <span
-                      className="theme-preview"
-                      aria-hidden="true"
+                    <div
+                      className="theme-card-preview"
                       style={{
-                        background: option.colors[0],
-                        color: option.colors[2],
+                        backgroundColor: option.colors[0],
                       }}
                     >
-                      <span
-                        className="theme-preview-sidebar"
-                        style={{ background: option.colors[1] }}
-                      />
-                      <span className="theme-preview-content">
-                        <span />
-                        <span />
-                        <span />
-                        <i style={{ background: option.colors[2] }} />
-                        <i style={{ background: option.colors[3] }} />
-                      </span>
-                    </span>
-                    <span className="theme-option-title">
-                      {option.name}
+                      <div className="theme-swatches">
+                        <span
+                          className="theme-swatch-dot is-primary"
+                          style={{
+                            backgroundColor: option.colors[2],
+                            boxShadow: `0 0 10px ${option.colors[2]}40`,
+                          }}
+                          title={`Primary accent: ${option.colors[2]}`}
+                        />
+                        <span
+                          className="theme-swatch-dot is-secondary"
+                          style={{
+                            backgroundColor: option.colors[3],
+                            boxShadow: `0 0 8px ${option.colors[3]}30`,
+                          }}
+                          title={`Secondary accent: ${option.colors[3]}`}
+                        />
+                      </div>
+                      <div className="theme-preview-strip">
+                        <span
+                          className="theme-preview-pill"
+                          style={{
+                            backgroundColor: `${option.colors[2]}22`,
+                            color: option.colors[2],
+                            border: `1px solid ${option.colors[2]}44`,
+                          }}
+                        >
+                          Accent
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="theme-option-title">
+                      <span>{option.name}</span>
                       {theme === option.id && <Check size={16} />}
-                    </span>
+                    </div>
+
                     <span className="theme-description">{option.description}</span>
                   </button>
                 ))}

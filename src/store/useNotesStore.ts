@@ -309,7 +309,10 @@ export interface NotesState {
   viewMode: EditorViewMode;
   isSidebarCollapsed: boolean;
   isNavbarCollapsed: boolean;
+  isRightSidebarCollapsed: boolean;
   sidebarWidth: number;
+  rightSidebarWidth: number;
+  rightSidebarTab: 'outline' | 'tags' | 'info';
   editorSplitRatio: number;
   sortOrder: SortOrder;
   theme: ThemeId;
@@ -366,7 +369,10 @@ export interface NotesState {
   setViewMode: (mode: EditorViewMode) => void;
   toggleSidebar: () => void;
   toggleNavbar: () => void;
+  toggleRightSidebar: () => void;
   setSidebarWidth: (width: number) => void;
+  setRightSidebarWidth: (width: number) => void;
+  setRightSidebarTab: (tab: 'outline' | 'tags' | 'info') => void;
   setEditorSplitRatio: (ratio: number) => void;
   setSortOrder: (order: SortOrder) => void;
   chooseTheme: (theme: ThemeId) => void;
@@ -395,7 +401,10 @@ export const useNotesStore = create<NotesState>()(
       viewMode: 'write',
       isSidebarCollapsed: false,
       isNavbarCollapsed: false,
+      isRightSidebarCollapsed: false,
       sidebarWidth: 280,
+      rightSidebarWidth: 270,
+      rightSidebarTab: 'outline',
       editorSplitRatio: 50,
       sortOrder: 'name-asc',
       theme: initialTheme(),
@@ -929,7 +938,12 @@ export const useNotesStore = create<NotesState>()(
 
       toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
       toggleNavbar: () => set((state) => ({ isNavbarCollapsed: !state.isNavbarCollapsed })),
+      toggleRightSidebar: () =>
+        set((state) => ({ isRightSidebarCollapsed: !state.isRightSidebarCollapsed })),
       setSidebarWidth: (width) => set({ sidebarWidth: Math.min(600, Math.max(180, width)) }),
+      setRightSidebarWidth: (width) =>
+        set({ rightSidebarWidth: Math.min(500, Math.max(180, width)) }),
+      setRightSidebarTab: (tab) => set({ rightSidebarTab: tab }),
       setEditorSplitRatio: (ratio) =>
         set({ editorSplitRatio: Math.min(85, Math.max(15, ratio)) }),
       setSortOrder: (order) => set({ sortOrder: order }),
@@ -968,7 +982,10 @@ export const useNotesStore = create<NotesState>()(
         viewMode: state.viewMode,
         isSidebarCollapsed: state.isSidebarCollapsed,
         isNavbarCollapsed: state.isNavbarCollapsed,
+        isRightSidebarCollapsed: state.isRightSidebarCollapsed,
         sidebarWidth: state.sidebarWidth,
+        rightSidebarWidth: state.rightSidebarWidth,
+        rightSidebarTab: state.rightSidebarTab,
         editorSplitRatio: state.editorSplitRatio,
         sortOrder: state.sortOrder,
         theme: state.theme,

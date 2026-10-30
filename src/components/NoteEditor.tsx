@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  BookOpen,
   Columns2,
   Eye,
   FilePlus,
@@ -27,11 +28,13 @@ export const NoteEditor: React.FC = () => {
   const shouldFocusTitle = useNotesStore((s) => s.shouldFocusNoteTitle);
   const isSidebarCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
+  const isRightSidebarCollapsed = useNotesStore((s) => s.isRightSidebarCollapsed);
   const editorSplitRatio = useNotesStore((s) => s.editorSplitRatio ?? 50);
   const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
 
   const toggleSidebar = useNotesStore((s) => s.toggleSidebar);
   const toggleNavbar = useNotesStore((s) => s.toggleNavbar);
+  const toggleRightSidebar = useNotesStore((s) => s.toggleRightSidebar);
   const setViewMode = useNotesStore((s) => s.setViewMode);
   const setEditorSplitRatio = useNotesStore((s) => s.setEditorSplitRatio);
   const updateNote = useNotesStore((s) => s.updateNote);
@@ -112,34 +115,48 @@ export const NoteEditor: React.FC = () => {
   if (!note) {
     return (
       <main className="editor-pane">
-        {(isSidebarCollapsed || isNavbarCollapsed) && (
-          <div className="editor-topbar">
-            <div className="editor-topbar-left">
-              {isSidebarCollapsed && (
-                <button
-                  type="button"
-                  className="sidebar-expand-btn"
-                  onClick={toggleSidebar}
-                  title="Expand sidebar (Ctrl+\)"
-                  aria-label="Expand sidebar"
-                >
-                  <PanelLeftOpen size={15} strokeWidth={1.8} />
-                </button>
-              )}
-              {isNavbarCollapsed && (
-                <button
-                  type="button"
-                  className="sidebar-expand-btn"
-                  onClick={toggleNavbar}
-                  title="Expand top navbar (Ctrl+Shift+\)"
-                  aria-label="Expand top navbar"
-                >
-                  <PanelTopOpen size={15} strokeWidth={1.8} />
-                </button>
-              )}
-            </div>
+        <div className="editor-topbar">
+          <div className="editor-topbar-left">
+            {isSidebarCollapsed && (
+              <button
+                type="button"
+                className="sidebar-expand-btn"
+                onClick={toggleSidebar}
+                title="Expand sidebar (Ctrl+\)"
+                aria-label="Expand sidebar"
+              >
+                <PanelLeftOpen size={15} strokeWidth={1.8} />
+              </button>
+            )}
+            {isNavbarCollapsed && (
+              <button
+                type="button"
+                className="sidebar-expand-btn"
+                onClick={toggleNavbar}
+                title="Expand top navbar (Ctrl+Shift+\)"
+                aria-label="Expand top navbar"
+              >
+                <PanelTopOpen size={15} strokeWidth={1.8} />
+              </button>
+            )}
           </div>
-        )}
+          <div className="editor-topbar-controls">
+            <button
+              type="button"
+              className={`mode-btn editor-catalog-btn ${!isRightSidebarCollapsed ? 'is-active' : ''}`}
+              onClick={toggleRightSidebar}
+              title={
+                isRightSidebarCollapsed
+                  ? 'Open note catalog & outline (Ctrl+])'
+                  : 'Collapse note catalog (Ctrl+])'
+              }
+              aria-label="Toggle note catalog"
+            >
+              <BookOpen size={13} strokeWidth={1.8} />
+              <span>Catalog</span>
+            </button>
+          </div>
+        </div>
         <div className="editor-empty-wrapper">
           <div className="editor-empty-state">
             <p className="editor-empty-title">
@@ -286,6 +303,23 @@ export const NoteEditor: React.FC = () => {
               <span>Preview</span>
             </button>
           </div>
+
+          <div className="editor-topbar-divider" />
+
+          <button
+            type="button"
+            className={`mode-btn editor-catalog-btn ${!isRightSidebarCollapsed ? 'is-active' : ''}`}
+            onClick={toggleRightSidebar}
+            title={
+              isRightSidebarCollapsed
+                ? 'Open note catalog & outline (Ctrl+])'
+                : 'Collapse note catalog (Ctrl+])'
+            }
+            aria-label="Toggle note catalog"
+          >
+            <BookOpen size={13} strokeWidth={1.8} />
+            <span>Catalog</span>
+          </button>
         </div>
       </div>
 

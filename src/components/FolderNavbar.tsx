@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { sessionApi } from '../lib/sessionManager';
 import { useNotesStore } from '../store/useNotesStore';
+import { themes } from '../themes';
 import { TopLevelFolder } from '../types';
 
 interface FolderNavbarProps {
@@ -48,7 +49,10 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
   const openSessionModal = useNotesStore((s) => s.openSessionModal);
   const currentSessionName = useNotesStore((s) => s.currentSessionName);
+  const theme = useNotesStore((s) => s.theme);
   const openThemeModal = useNotesStore((s) => s.openThemeModal);
+
+  const activeThemeObj = themes.find((t) => t.id === theme);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
@@ -160,12 +164,13 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
             </button>
             <button
               type="button"
-              className="navbar-icon-btn is-compact"
+              className="navbar-icon-btn navbar-theme-btn is-compact"
               onClick={openThemeModal}
-              title="Themes & Styles"
-              aria-label="Themes"
+              title={`Themes & Accents: ${activeThemeObj?.name ?? 'Theme'}`}
+              aria-label="Themes & Accents"
             >
               <Palette size={16} strokeWidth={1.8} />
+              <span className="navbar-theme-dot" />
             </button>
             <button
               type="button"
@@ -353,12 +358,13 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
           {/* Theme palette button */}
           <button
             type="button"
-            className="navbar-icon-btn"
+            className="navbar-icon-btn navbar-theme-btn"
             onClick={openThemeModal}
-            title="Themes & Styles"
-            aria-label="Themes"
+            title={`Themes & Accents: ${activeThemeObj?.name ?? 'Theme'}`}
+            aria-label="Themes & Accents"
           >
             <Palette size={17} strokeWidth={1.8} />
+            <span className="navbar-theme-dot" />
           </button>
 
           {/* Collapse navbar button */}
