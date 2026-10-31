@@ -10,6 +10,7 @@ interface ImportedNote {
   content: string;
   updatedAt: string;
   filePath?: string;
+  fileType?: 'markdown' | 'pdf';
 }
 
 interface ImportedFolder {
@@ -20,7 +21,7 @@ interface ImportedFolder {
   folderPath?: string;
 }
 
-const NOTE_EXT_REGEX = /\.(md|markdown|mdx|txt)$/i;
+const NOTE_EXT_REGEX = /\.(md|markdown|mdx|txt|pdf)$/i;
 const IGNORED_NAMES = new Set([
   'node_modules',
   '.git',
@@ -225,8 +226,9 @@ async function readDirectoryRecursive(
         folderPath: fullPath,
       });
     } else if (entry.isFile() && NOTE_EXT_REGEX.test(entry.name)) {
+      const isPdf = entry.name.toLowerCase().endsWith('.pdf');
       const [content, stat] = await Promise.all([
-        fs.readFile(fullPath, 'utf-8'),
+        isPdf ? Promise.resolve('') : fs.readFile(fullPath, 'utf-8'),
         fs.stat(fullPath),
       ]);
       notes.push({
@@ -236,6 +238,7 @@ async function readDirectoryRecursive(
         content,
         updatedAt: stat.mtime.toISOString().slice(0, 10),
         filePath: fullPath,
+        fileType: isPdf ? 'pdf' : 'markdown',
       });
     }
   }
@@ -533,7 +536,8 @@ function localBackendPlugin(): Plugin {
         }
 
         if (stat.isFile()) {
-          const content = await fs.readFile(resolvedPath, 'utf-8');
+          const isPdf = resolvedPath.toLowerCase().endsWith('.pdf');
+          const content = isPdf ? '' : await fs.readFile(resolvedPath, 'utf-8');
           const fileName = path.basename(resolvedPath);
           const note: ImportedNote = {
             id: makeId('note'),
@@ -541,6 +545,8 @@ function localBackendPlugin(): Plugin {
             title: stripExt(fileName),
             content,
             updatedAt: stat.mtime.toISOString().slice(0, 10),
+            filePath: resolvedPath,
+            fileType: isPdf ? 'pdf' : 'markdown',
           };
           res.statusCode = 200;
           res.setHeader('Content-Type', 'application/json');
@@ -815,6 +821,47 @@ function localBackendPlugin(): Plugin {
             error: err instanceof Error ? err.message : 'Failed to delete path.',
           })
         );
+      }
+    });
+
+    // Stream raw PDF or media binary files directly to the embedded viewer
+    middlewares.use('/api/fs/raw', async (req, res, next) => {
+      if (req.method !== 'GET') {
+        next();
+        return;
+      }
+      try {
+        const reqUrl = new URL(req.url || '', 'http://localhost');
+        const targetPath = reqUrl.searchParams.get('path');
+        if (!targetPath) {
+          res.statusCode = 400;
+          res.end('Missing file path.');
+          return;
+        }
+        const resolved = path.resolve(targetPath);
+        const stat = await fs.stat(resolved);
+        if (!stat.isFile()) {
+          res.statusCode = 404;
+          res.end('File not found.');
+          return;
+        }
+        const ext = path.extname(resolved).toLowerCase();
+        let mimeType = 'application/octet-stream';
+        if (ext === '.pdf') mimeType = 'application/pdf';
+        else if (ext === '.png') mimeType = 'image/png';
+        else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+        else if (ext === '.svg') mimeType = 'image/svg+xml';
+
+        const buffer = await fs.readFile(resolved);
+        res.statusCode = 200;
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader('Content-Disposition', 'inline');
+        res.setHeader('Accept-Ranges', 'bytes');
+        res.end(buffer);
+      } catch (err) {
+        res.statusCode = 500;
+        res.end(err instanceof Error ? err.message : 'Failed to read file.');
       }
     });
   };

@@ -4,6 +4,8 @@ import {
   Columns2,
   Eye,
   FilePlus,
+  FileText,
+  FileUp,
   FolderUp,
   HardDrive,
   PanelLeftOpen,
@@ -12,7 +14,9 @@ import {
   Plus,
 } from 'lucide-react';
 import { findDefaultNoteId, findNoteAndPath, useNotesStore } from '../store/useNotesStore';
+import { PdfViewMode } from '../types';
 import { MilkdownViewer } from './MilkdownViewer';
+import { PdfViewer } from './PdfViewer';
 
 function countWords(text: string): number {
   const trimmed = text.trim();
@@ -44,7 +48,9 @@ export const NoteEditor: React.FC = () => {
   const clearFocusNoteTitle = useNotesStore((s) => s.clearFocusNoteTitle);
 
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const [pdfViewMode, setPdfViewMode] = useState<PdfViewMode>('pdf');
   const splitContainerRef = useRef<HTMLDivElement>(null);
+  const pdfAttachInputRef = useRef<HTMLInputElement>(null);
 
   const activeFolder = useMemo(
     () => folders.find((f) => f.id === selectedFolderId) ?? null,
@@ -220,6 +226,28 @@ export const NoteEditor: React.FC = () => {
 
   const words = countWords(note.content);
 
+  const isPdf = Boolean(
+    note.fileType === 'pdf' ||
+    note.filePath?.toLowerCase().endsWith('.pdf') ||
+    note.pdfData
+  );
+
+  const handleAttachPdf = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !note) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      updateNote(note.id, {
+        fileType: 'pdf',
+        pdfData: dataUrl,
+      });
+      setPdfViewMode('split');
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <main className="editor-pane">
       <div className="editor-topbar">
@@ -263,46 +291,102 @@ export const NoteEditor: React.FC = () => {
         </div>
 
         <div className="editor-topbar-controls">
-          {note.filePath && (
+          {isPdf ? (
+            <span className="editor-pdf-badge" title="Embedded PDF document">
+              <FileText size={12} className="pdf-badge-icon" />
+              <span>PDF Document</span>
+            </span>
+          ) : note.filePath ? (
             <span className="editor-disk-badge" title={`Live disk sync: ${note.filePath}`}>
               <HardDrive size={12} className="disk-badge-icon" />
               <span>Disk file</span>
             </span>
-          )}
+          ) : null}
 
           <span className="editor-meta">
             {words} {words === 1 ? 'word' : 'words'}
           </span>
 
-          <div className="editor-mode-switch" role="group" aria-label="Editor view mode">
+          {isPdf ? (
+            <div className="editor-mode-switch" role="group" aria-label="PDF view mode">
+              <button
+                type="button"
+                className={`mode-btn ${pdfViewMode === 'pdf' ? 'is-active' : ''}`}
+                onClick={() => setPdfViewMode('pdf')}
+                title="View PDF full pane"
+              >
+                <FileText size={13} />
+                <span>PDF View</span>
+              </button>
+              <button
+                type="button"
+                className={`mode-btn ${pdfViewMode === 'split' ? 'is-active' : ''}`}
+                onClick={() => setPdfViewMode('split')}
+                title="Split View (PDF on left, Notes on right)"
+              >
+                <Columns2 size={13} />
+                <span>Split with Notes</span>
+              </button>
+              <button
+                type="button"
+                className={`mode-btn ${pdfViewMode === 'notes' ? 'is-active' : ''}`}
+                onClick={() => setPdfViewMode('notes')}
+                title="Markdown notes only"
+              >
+                <PenLine size={13} />
+                <span>Notes</span>
+              </button>
+            </div>
+          ) : (
+            <div className="editor-mode-switch" role="group" aria-label="Editor view mode">
+              <button
+                type="button"
+                className={`mode-btn ${viewMode === 'write' ? 'is-active' : ''}`}
+                onClick={() => setViewMode('write')}
+                title="Write mode"
+              >
+                <PenLine size={13} />
+                <span>Write</span>
+              </button>
+              <button
+                type="button"
+                className={`mode-btn ${viewMode === 'split' ? 'is-active' : ''}`}
+                onClick={() => setViewMode('split')}
+                title="Split mode"
+              >
+                <Columns2 size={13} />
+                <span>Split</span>
+              </button>
+              <button
+                type="button"
+                className={`mode-btn ${viewMode === 'preview' ? 'is-active' : ''}`}
+                onClick={() => setViewMode('preview')}
+                title="Preview mode"
+              >
+                <Eye size={13} />
+                <span>Preview</span>
+              </button>
+            </div>
+          )}
+
+          <input
+            ref={pdfAttachInputRef}
+            type="file"
+            accept=".pdf"
+            hidden
+            onChange={handleAttachPdf}
+          />
+          {!isPdf && (
             <button
               type="button"
-              className={`mode-btn ${viewMode === 'write' ? 'is-active' : ''}`}
-              onClick={() => setViewMode('write')}
-              title="Write mode"
+              className="mode-btn attach-pdf-btn"
+              onClick={() => pdfAttachInputRef.current?.click()}
+              title="Attach a PDF to view side-by-side with this note"
             >
-              <PenLine size={13} />
-              <span>Write</span>
+              <FileUp size={13} strokeWidth={1.8} />
+              <span>Attach PDF</span>
             </button>
-            <button
-              type="button"
-              className={`mode-btn ${viewMode === 'split' ? 'is-active' : ''}`}
-              onClick={() => setViewMode('split')}
-              title="Split mode"
-            >
-              <Columns2 size={13} />
-              <span>Split</span>
-            </button>
-            <button
-              type="button"
-              className={`mode-btn ${viewMode === 'preview' ? 'is-active' : ''}`}
-              onClick={() => setViewMode('preview')}
-              title="Preview mode"
-            >
-              <Eye size={13} />
-              <span>Preview</span>
-            </button>
-          </div>
+          )}
 
           <div className="editor-topbar-divider" />
 
@@ -323,7 +407,71 @@ export const NoteEditor: React.FC = () => {
         </div>
       </div>
 
-      {viewMode === 'split' ? (
+      {isPdf && pdfViewMode === 'pdf' ? (
+        <div className="editor-pdf-full">
+          <PdfViewer
+            title={note.title}
+            filePath={note.filePath}
+            pdfData={note.pdfData}
+          />
+        </div>
+      ) : isPdf && pdfViewMode === 'split' ? (
+        <div
+          ref={splitContainerRef}
+          className={`editor-split-layout ${isDraggingSplit ? 'is-dragging' : ''}`}
+        >
+          <section
+            className="editor-split-col is-pdf"
+            style={{ width: `calc(${editorSplitRatio}% - 4px)`, flex: 'none' }}
+          >
+            <PdfViewer
+              title={note.title}
+              filePath={note.filePath}
+              pdfData={note.pdfData}
+            />
+          </section>
+
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            tabIndex={0}
+            className={`split-resizer ${isDraggingSplit ? 'is-active' : ''}`}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsDraggingSplit(true);
+            }}
+            onTouchStart={() => setIsDraggingSplit(true)}
+            onDoubleClick={() => setEditorSplitRatio(50)}
+            title="Drag to resize split view (Double-click to reset 50/50)"
+          >
+            <div className="split-resizer-line" />
+          </div>
+
+          <section
+            className="editor-split-col is-write"
+            style={{ width: `calc(${100 - editorSplitRatio}% - 4px)`, flex: 'none' }}
+          >
+            <div className="editor-column">
+              <input
+                ref={titleInputRef}
+                type="text"
+                className="note-title-input"
+                placeholder="Note title..."
+                value={note.title}
+                onChange={(e) => updateNote(note.id, { title: e.target.value })}
+              />
+              <textarea
+                className="note-content-textarea"
+                placeholder="Write notes about this PDF in Markdown..."
+                value={note.content}
+                onChange={(e) => updateNote(note.id, { content: e.target.value })}
+                onKeyDown={handleTextareaKeyDown}
+                spellCheck
+              />
+            </div>
+          </section>
+        </div>
+      ) : viewMode === 'split' ? (
         <div
           ref={splitContainerRef}
           className={`editor-split-layout ${isDraggingSplit ? 'is-dragging' : ''}`}

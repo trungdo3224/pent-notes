@@ -303,6 +303,8 @@ export const FolderExplorer: React.FC = () => {
 
       const isSelected = node.id === selectedNoteId;
 
+      const isPdf = node.fileType === 'pdf' || node.filePath?.toLowerCase().endsWith('.pdf');
+
       return (
         <div
           key={node.id}
@@ -318,8 +320,9 @@ export const FolderExplorer: React.FC = () => {
             }
           }}
         >
-          <FileText size={16} strokeWidth={1.75} className="explorer-item-icon explorer-note-icon" />
+          <FileText size={16} strokeWidth={1.75} className={`explorer-item-icon explorer-note-icon ${isPdf ? 'is-pdf-icon' : ''}`} />
           <span className="explorer-row-label">{node.title.trim() || 'Untitled'}</span>
+          {isPdf && <span className="explorer-pdf-badge" title="PDF Document">PDF</span>}
           <div className="explorer-row-actions">
             <button
               type="button"
@@ -349,7 +352,7 @@ export const FolderExplorer: React.FC = () => {
       <input
         ref={noteFileInputRef}
         type="file"
-        accept=".md,.markdown,.mdx,.txt"
+        accept=".md,.markdown,.mdx,.txt,.pdf"
         multiple
         hidden
         onChange={(e) => {

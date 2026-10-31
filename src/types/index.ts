@@ -5,6 +5,8 @@ export interface NoteItem {
   content: string;
   updatedAt: string;
   filePath?: string;
+  fileType?: 'markdown' | 'pdf';
+  pdfData?: string;
 }
 
 export interface FolderItem {
@@ -25,6 +27,8 @@ export interface TopLevelFolder {
 }
 
 export type EditorViewMode = 'write' | 'split' | 'preview';
+
+export type PdfViewMode = 'pdf' | 'split' | 'notes';
 
 export type SortOrder = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc';
 

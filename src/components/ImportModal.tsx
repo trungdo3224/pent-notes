@@ -17,6 +17,15 @@ interface ImportModalProps {
   ) => void;
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 export const ImportModal: React.FC<ImportModalProps> = ({
   initialMode,
   activeFolderName,
@@ -137,7 +146,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           <input
             ref={noteInputRef}
             type="file"
-            accept=".md,.markdown,.mdx,.txt"
+            accept=".md,.markdown,.mdx,.txt,.pdf"
             multiple
             hidden
             onChange={async (e) => {
@@ -150,13 +159,24 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               try {
                 const notes: NoteItem[] = [];
                 for (const file of selectedFiles) {
-                  const content = await file.text();
+                  const isPdf = file.name.toLowerCase().endsWith('.pdf');
+                  let content = '';
+                  let pdfData: string | undefined = undefined;
+
+                  if (isPdf) {
+                    pdfData = await readFileAsDataUrl(file);
+                  } else {
+                    content = await file.text();
+                  }
+
                   notes.push({
                     id: `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
                     type: 'note',
                     title:
-                      file.name.replace(/\.(md|markdown|mdx|txt)$/i, '').trim() || 'Untitled',
+                      file.name.replace(/\.(md|markdown|mdx|txt|pdf)$/i, '').trim() || 'Untitled',
                     content,
+                    fileType: isPdf ? 'pdf' : 'markdown',
+                    pdfData,
                     updatedAt: file.lastModified
                       ? new Date(file.lastModified).toISOString().slice(0, 10)
                       : new Date().toISOString().slice(0, 10),
@@ -239,11 +259,20 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                     continue;
                   }
                   const fileName = inner[inner.length - 1];
-                  if (!/\.(md|markdown|mdx|txt)$/i.test(fileName)) {
+                  if (!/\.(md|markdown|mdx|txt|pdf)$/i.test(fileName)) {
                     continue;
                   }
 
-                  const content = await file.text();
+                  const isPdf = fileName.toLowerCase().endsWith('.pdf');
+                  let content = '';
+                  let pdfData: string | undefined = undefined;
+
+                  if (isPdf) {
+                    pdfData = await readFileAsDataUrl(file);
+                  } else {
+                    content = await file.text();
+                  }
+
                   const targetContainer = ensureFolder(rootItems, inner.slice(0, -1));
                   targetContainer.push({
                     id: `note-${Date.now().toString(36)}-${Math.random()
@@ -251,8 +280,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                       .slice(2, 6)}`,
                     type: 'note',
                     title:
-                      fileName.replace(/\.(md|markdown|mdx|txt)$/i, '').trim() || 'Untitled',
+                      fileName.replace(/\.(md|markdown|mdx|txt|pdf)$/i, '').trim() || 'Untitled',
                     content,
+                    fileType: isPdf ? 'pdf' : 'markdown',
+                    pdfData,
                     updatedAt: file.lastModified
                       ? new Date(file.lastModified).toISOString().slice(0, 10)
                       : new Date().toISOString().slice(0, 10),
@@ -290,8 +321,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           >
             <FileUp size={18} />
             <div>
-              <strong>Browse Note File(s)...</strong>
-              <span>Select .md or .txt files</span>
+              <strong>Browse Note / PDF File(s)...</strong>
+              <span>Select .md, .txt, or .pdf files</span>
             </div>
           </button>
         </div>
@@ -358,7 +389,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           <div className="folder-explanation">
             <HardDrive size={16} />
             <span>
-              Markdown (<code>.md</code>, <code>.mdx</code>) and text (<code>.txt</code>) files are
+              Markdown (<code>.md</code>, <code>.mdx</code>), text (<code>.txt</code>), and PDF (<code>.pdf</code>) files are
               imported with their nested folder structure intact.
             </span>
           </div>

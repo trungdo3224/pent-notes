@@ -193,7 +193,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
       <input
         ref={noteFileInputRef}
         type="file"
-        accept=".md,.markdown,.mdx,.txt"
+        accept=".md,.markdown,.mdx,.txt,.pdf"
         multiple
         hidden
         onChange={(e) => {
@@ -335,7 +335,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                   }}
                 >
                   <FileUp size={16} strokeWidth={1.8} className="plus-menu-icon" />
-                  <span>Import notes (.md, .txt)</span>
+                  <span>Import notes & PDFs (.md, .txt, .pdf)</span>
                 </button>
 
                 <div className="plus-menu-divider" />

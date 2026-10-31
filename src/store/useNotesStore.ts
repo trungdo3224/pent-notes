@@ -39,22 +39,42 @@ function fileDateString(file: File): string {
 }
 
 function stripNoteExtension(fileName: string): string {
-  return fileName.replace(/\.(md|markdown|mdx|txt)$/i, '').trim() || 'Untitled';
+  return fileName.replace(/\.(md|markdown|mdx|txt|pdf)$/i, '').trim() || 'Untitled';
 }
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'Untitled';
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 async function buildNoteItemsFromFiles(files: File[]): Promise<NoteItem[]> {
   const results: NoteItem[] = [];
   for (const file of files) {
-    const content = await file.text();
+    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+    let content = '';
+    let pdfData: string | undefined = undefined;
+
+    if (isPdf) {
+      pdfData = await readFileAsDataUrl(file);
+    } else {
+      content = await file.text();
+    }
+
     results.push({
       id: createId('note'),
       type: 'note',
       title: stripNoteExtension(file.name),
       content,
+      fileType: isPdf ? 'pdf' : 'markdown',
+      pdfData,
       updatedAt: fileDateString(file),
     });
   }
@@ -184,7 +204,7 @@ function insertIntoTree(
 function updateNoteInTree(
   nodes: ExplorerNode[],
   noteId: string,
-  updates: Partial<Pick<NoteItem, 'title' | 'content' | 'filePath'>>
+  updates: Partial<Pick<NoteItem, 'title' | 'content' | 'filePath' | 'fileType' | 'pdfData'>>
 ): ExplorerNode[] {
   return nodes.map((node) => {
     if (node.type === 'note' && node.id === noteId) {
@@ -345,7 +365,7 @@ export interface NotesState {
   deleteNode: (nodeId: string) => void;
   updateNote: (
     noteId: string,
-    updates: Partial<Pick<NoteItem, 'title' | 'content' | 'filePath'>>
+    updates: Partial<Pick<NoteItem, 'title' | 'content' | 'filePath' | 'fileType' | 'pdfData'>>
   ) => void;
 
   importNotes: (notes: NoteItem[]) => void;
