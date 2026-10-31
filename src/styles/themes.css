@@ -31,6 +31,11 @@
   --accent: #f43f5e;
   --secondary: #f43f5e;
 
+  /* High-Contrast Selection & Caret */
+  --caret: #00e5ff;
+  --selection-bg: rgba(0, 229, 255, 0.36);
+  --selection-text: #ffffff;
+
   /* Code Syntax */
   --code-bg: #090c12;
   --code-header: #111620;
@@ -74,6 +79,11 @@
   --accent: #06b6d4;
   --secondary: #06b6d4;
 
+  /* High-Contrast Selection & Caret */
+  --caret: #10b981;
+  --selection-bg: rgba(16, 185, 129, 0.38);
+  --selection-text: #ffffff;
+
   /* Code Syntax */
   --code-bg: #090c12;
   --code-header: #111620;
@@ -116,6 +126,11 @@
   --button-text: #1f0b03;
   --accent: #f43f5e;
   --secondary: #f43f5e;
+
+  /* High-Contrast Selection & Caret */
+  --caret: #f97316;
+  --selection-bg: rgba(249, 115, 22, 0.40);
+  --selection-text: #ffffff;
 
   /* Code Syntax */
   --code-bg: #090c12;
@@ -164,6 +179,11 @@
   --accent: #0284c7;
   --secondary: #0284c7;
 
+  /* High-Contrast Selection & Caret */
+  --caret: #c2410c;
+  --selection-bg: rgba(234, 88, 12, 0.28);
+  --selection-text: #0f172a;
+
   /* Code Syntax */
   --code-bg: #0f172a;
   --code-header: #1e293b;
@@ -207,6 +227,11 @@
   --accent: #0d9488;
   --secondary: #0d9488;
 
+  /* High-Contrast Selection & Caret */
+  --caret: #0284c7;
+  --selection-bg: rgba(2, 132, 199, 0.28);
+  --selection-text: #082f49;
+
   /* Code Syntax */
   --code-bg: #0f172a;
   --code-header: #1e293b;
@@ -249,6 +274,11 @@
   --button-text: #ffffff;
   --accent: #6366f1;
   --secondary: #6366f1;
+
+  /* High-Contrast Selection & Caret */
+  --caret: #9d174d;
+  --selection-bg: rgba(190, 24, 93, 0.26);
+  --selection-text: #4c0519;
 
   /* Code Syntax */
   --code-bg: #0f172a;

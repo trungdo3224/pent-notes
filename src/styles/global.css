@@ -27,6 +27,10 @@
 
   --danger: #eb6b6b;
 
+  --caret: var(--forest, #00e5ff);
+  --selection-bg: color-mix(in srgb, var(--forest, #00e5ff) 36%, transparent);
+  --selection-text: #ffffff;
+
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial,
     sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
@@ -36,6 +40,42 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* ==========================================================================
+   GLOBAL HIGH-CONTRAST SELECTION & CARET
+   ========================================================================== */
+
+::selection {
+  background-color: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+::-moz-selection {
+  background-color: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+/* Maintain ProseMirror hide-selection behavior when active */
+.ProseMirror-hideselection ::selection,
+.ProseMirror-hideselection *::selection,
+.ProseMirror-hideselection::-moz-selection,
+.ProseMirror-hideselection *::-moz-selection {
+  background: transparent !important;
+}
+
+/* High-contrast Caret for all form inputs & editable surfaces */
+input,
+textarea,
+[contenteditable],
+.note-title-input,
+.note-content-textarea,
+.search-input,
+.catalog-search-input,
+.form-input,
+.explorer-rename-input,
+.folder-tab-input {
+  caret-color: var(--caret);
 }
 
 html,
@@ -1277,6 +1317,12 @@ textarea {
   font-weight: 650;
   letter-spacing: -0.02em;
   outline: none;
+  caret-color: var(--caret);
+}
+
+.note-title-input::selection {
+  background-color: var(--selection-bg) !important;
+  color: var(--selection-text) !important;
 }
 
 .note-title-input::placeholder {
@@ -1300,6 +1346,12 @@ textarea {
   line-height: 1.75;
   resize: none;
   outline: none;
+  caret-color: var(--caret);
+}
+
+.note-content-textarea::selection {
+  background-color: var(--selection-bg) !important;
+  color: var(--selection-text) !important;
 }
 
 .note-content-textarea::placeholder {
@@ -1408,13 +1460,13 @@ body.is-col-resizing * {
   --crepe-color-surface-low: var(--surface);
   --crepe-color-on-surface: var(--ink);
   --crepe-color-on-surface-variant: var(--text-secondary);
-  --crepe-color-outline: var(--border-tab);
+  --crepe-color-outline: var(--caret);
   --crepe-color-primary: var(--forest);
   --crepe-color-secondary: var(--bg-tab);
   --crepe-color-on-secondary: var(--ink);
   --crepe-color-inline-code: var(--accent);
   --crepe-color-hover: var(--bg-row-hover);
-  --crepe-color-selected: var(--bg-row-selected);
+  --crepe-color-selected: var(--selection-bg);
   --crepe-color-inline-area: var(--bg-tab);
   --crepe-font-default: var(--font-sans);
   --crepe-font-title: var(--font-sans);
@@ -1430,6 +1482,54 @@ body.is-col-resizing * {
   font-size: 15.5px;
   line-height: 1.8;
   color: var(--text-secondary);
+  caret-color: var(--caret) !important;
+}
+
+/* Milkdown & ProseMirror High-Contrast Cursor & Selection */
+.milkdown .ProseMirror-focused {
+  --prosemirror-virtual-cursor-color: var(--caret) !important;
+}
+
+.milkdown .prosemirror-virtual-cursor {
+  border-left-width: 2.5px !important;
+  border-left-color: var(--caret) !important;
+  border-color: var(--caret) !important;
+  box-shadow: 0 0 6px var(--glow);
+}
+
+.milkdown .crepe-drop-cursor {
+  background-color: var(--caret) !important;
+  box-shadow: 0 0 6px var(--glow);
+  opacity: 0.85 !important;
+}
+
+.milkdown .ProseMirror-gapcursor:after {
+  border-top-color: var(--caret) !important;
+}
+
+.milkdown .ProseMirror-selectednode {
+  outline: 2px solid var(--forest) !important;
+  box-shadow: 0 0 8px var(--glow);
+}
+
+/* Comprehensive high-contrast selection across Milkdown */
+.milkdown .ProseMirror:not(.ProseMirror-hideselection) ::selection,
+.milkdown .ProseMirror:not(.ProseMirror-hideselection)::selection,
+.milkdown ::selection,
+.milkdown *::selection {
+  background-color: var(--selection-bg) !important;
+  color: var(--selection-text) !important;
+}
+
+/* CodeMirror inside Milkdown code blocks */
+.milkdown .cm-editor .cm-cursor,
+.milkdown .cm-editor .cm-dropCursor {
+  border-left: 2px solid var(--caret) !important;
+}
+
+.milkdown .cm-editor .cm-selectionBackground,
+.milkdown .cm-editor.cm-focused .cm-selectionBackground {
+  background-color: var(--selection-bg) !important;
 }
 
 .milkdown .ProseMirror > *:first-child {
