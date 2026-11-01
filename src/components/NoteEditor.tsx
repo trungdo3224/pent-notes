@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BookOpen,
   Check,
   ChevronDown,
   ChevronRight,
@@ -13,6 +12,7 @@ import {
   HardDrive,
   Link2,
   PanelLeftOpen,
+  PanelRightOpen,
   PanelTopOpen,
   PenLine,
   Plus,
@@ -161,13 +161,12 @@ export const NoteEditor: React.FC = () => {
               onClick={toggleRightSidebar}
               title={
                 isRightSidebarCollapsed
-                  ? 'Open note catalog & outline (Ctrl+])'
-                  : 'Collapse note catalog (Ctrl+])'
+                  ? 'Expand (Ctrl+])'
+                  : 'Collapse (Ctrl+])'
               }
               aria-label="Toggle note catalog"
             >
-              <BookOpen size={13} strokeWidth={1.8} />
-              <span>Catalog</span>
+              <PanelRightOpen size={15} strokeWidth={1.8} />
             </button>
           </div>
         </div>
@@ -271,17 +270,7 @@ export const NoteEditor: React.FC = () => {
               <PanelLeftOpen size={15} strokeWidth={1.8} />
             </button>
           )}
-          {isNavbarCollapsed && (
-            <button
-              type="button"
-              className="sidebar-expand-btn"
-              onClick={toggleNavbar}
-              title="Expand top navbar (Ctrl+Shift+\)"
-              aria-label="Expand top navbar"
-            >
-              <PanelTopOpen size={15} strokeWidth={1.8} />
-            </button>
-          )}
+
           <div className="editor-breadcrumb" aria-label="Note path">
             {breadcrumb.length > 0 && <Folder size={13} strokeWidth={1.9} className="breadcrumb-icon" />}
             {breadcrumb.map((segment, index) => (
@@ -309,7 +298,7 @@ export const NoteEditor: React.FC = () => {
           ) : note.filePath ? (
             <span className="editor-disk-badge" title={`Live disk sync: ${note.filePath}`}>
               <HardDrive size={12} className="disk-badge-icon" />
-              <span>Disk file</span>
+              {/* <span>Disk file</span> */}
             </span>
           ) : null}
 
@@ -400,7 +389,7 @@ export const NoteEditor: React.FC = () => {
               aria-expanded={isLinkPickerOpen}
             >
               <Link2 size={13} strokeWidth={2} />
-              <span>Link & Attach</span>
+              {/* <span>Link & Attach</span> */}
               {connections.linkedNotes.length > 0 && (
                 <span className="editor-link-count-badge">{connections.linkedNotes.length}</span>
               )}
@@ -430,8 +419,8 @@ export const NoteEditor: React.FC = () => {
                 )}
 
                 <div className="editor-link-popover-header">
-                  <span>CONNECT NOTES</span>
-                  <span className="editor-link-popover-hint">or type [[Note Title]]</span>
+                  <span>FIND & CONNECT OTHER NOTES</span>
+                  {/* <span className="editor-link-popover-hint">or type [[Note Title]]</span> */}
                 </div>
                 <div className="editor-link-search">
                   <Search size={12} className="editor-link-search-icon" />
@@ -484,13 +473,12 @@ export const NoteEditor: React.FC = () => {
             onClick={toggleRightSidebar}
             title={
               isRightSidebarCollapsed
-                ? 'Open note catalog & outline (Ctrl+])'
-                : 'Collapse note catalog (Ctrl+])'
+                ? 'Expand (Ctrl+])'
+                : 'Collapse (Ctrl+])'
             }
             aria-label="Toggle note catalog"
           >
-            <BookOpen size={13} strokeWidth={1.8} />
-            <span>Catalog</span>
+            <PanelRightOpen size={15} strokeWidth={1.8} />
           </button>
         </div>
       </div>

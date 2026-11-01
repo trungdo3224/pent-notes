@@ -136,14 +136,14 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px 10px;
-  gap: 12px;
+  padding: 6px 18px;
+  gap: 10px;
 }
 
 .navbar-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   user-select: none;
 }
 
@@ -151,8 +151,8 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border-radius: 6px;
   border: 1px solid transparent;
@@ -179,7 +179,7 @@ textarea {
 }
 
 .navbar-brand-title {
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ink);
@@ -188,17 +188,17 @@ textarea {
 .navbar-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .navbar-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border-radius: 8px;
+  border-radius: 7px;
   border: 1px solid transparent;
   background-color: transparent;
   color: var(--text-muted);
@@ -242,10 +242,10 @@ textarea {
 
 .navbar-theme-dot {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 6px;
-  height: 6px;
+  top: 4px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background-color: var(--forest);
   box-shadow: 0 0 6px var(--forest);
@@ -259,76 +259,20 @@ textarea {
   height: 5px;
 }
 
-/* Collapsed Navbar Strip */
+/* Slim / Collapsed Navbar Mode (keeps slim tabs visible) */
 .navbar.is-collapsed {
   background-color: color-mix(in srgb, var(--bg-navbar) 96%, transparent);
   border-bottom: 1px solid var(--border-tab);
-  height: 34px;
-  overflow: hidden;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.navbar-collapsed-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 34px;
-  padding: 0 14px;
-  gap: 12px;
-}
-
-.navbar-collapsed-expand-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 26px;
-  padding: 0 8px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.12s ease;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.navbar-collapsed-expand-btn:hover {
-  background-color: var(--bg-tab-hover);
-  border-color: var(--border-tab);
-  color: var(--ink);
-}
-
-.navbar-collapsed-expand-btn .navbar-toggle-icon {
-  color: var(--forest);
-  transition: transform 0.15s ease;
-}
-
-.navbar-collapsed-expand-btn:hover .navbar-toggle-icon {
-  transform: translateY(-1px);
-}
-
-.navbar-collapsed-crumb {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 12.5px;
-}
-
-.navbar-collapsed-sep {
-  opacity: 0.5;
-}
-
-.navbar-collapsed-folder-name {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.navbar-collapsed-actions {
+.navbar-slim-controls {
   display: flex;
   align-items: center;
   gap: 4px;
+  padding-left: 10px;
+  margin-left: auto;
+  border-left: 1px solid var(--border-subtle);
+  flex-shrink: 0;
 }
 
 /* Plus Dropdown Menu */
@@ -386,27 +330,42 @@ textarea {
 
 .navbar-tabs {
   display: flex;
-  align-items: stretch;
-  justify-content: flex-start;
-  gap: 12px;
-  padding: 14px 24px 18px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 18px 10px;
   border-top: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-tab);
-  overflow-x: auto;
   position: relative;
   background-color: color-mix(in srgb, var(--paper) 92%, var(--sidebar));
   background-image:
     radial-gradient(ellipse at 50% 0%, var(--glow), transparent 75%),
-    radial-gradient(color-mix(in srgb, var(--forest) 12%, transparent) 1px, transparent 1px);
+    radial-gradient(color-mix(in srgb, var(--forest) 10%, transparent) 1px, transparent 1px);
   background-size: 100% 100%, 16px 16px;
 }
 
+.navbar-tabs.is-slim {
+  padding: 5px 14px;
+  border-top: none;
+  background-image: none;
+}
+
+.navbar-tabs-scroll {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
 .folder-tab {
-  flex: 0 1 200px;
-  min-width: 165px;
-  height: 84px;
-  padding: 14px 16px;
-  border-radius: 12px;
+  flex: 0 1 160px;
+  min-width: 130px;
+  height: 56px;
+  padding: 8px 11px;
+  border-radius: 9px;
   background-color: var(--bg-tab);
   border: 1px solid var(--border-tab);
   display: flex;
@@ -415,15 +374,36 @@ textarea {
   align-items: flex-start;
   cursor: pointer;
   position: relative;
-  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
   backdrop-filter: blur(8px);
+}
+
+/* Slim single-line folder tab when top navbar is collapsed */
+.folder-tab.is-slim {
+  flex: 0 1 auto;
+  min-width: 108px;
+  max-width: 195px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 7px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+}
+
+.folder-tab.is-slim:hover {
+  transform: none;
+}
+
+.folder-tab.is-slim.is-selected {
+  transform: none;
 }
 
 .folder-tab:hover {
   background-color: var(--bg-tab-hover);
   border-color: var(--border-tab-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px var(--shadow);
+  box-shadow: 0 4px 14px var(--shadow);
 }
 
 .folder-tab:focus-visible {
@@ -434,16 +414,15 @@ textarea {
 .folder-tab.is-selected {
   background-color: color-mix(in srgb, var(--forest) 14%, var(--bg-tab));
   border: 1.5px solid var(--forest);
-  box-shadow: 0 0 16px var(--glow), inset 0 0 12px color-mix(in srgb, var(--forest) 8%, transparent);
-  transform: translateY(-1px);
+  box-shadow: 0 0 14px var(--glow), inset 0 0 10px color-mix(in srgb, var(--forest) 8%, transparent);
 }
 
 .folder-tab.is-linked-folder:not(.is-selected) {
   background-color: color-mix(in srgb, var(--link-highlight, #c084fc) 14%, var(--bg-tab));
   border: 1.5px solid color-mix(in srgb, var(--link-highlight, #c084fc) 72%, var(--border-tab));
   box-shadow:
-    0 0 14px color-mix(in srgb, var(--link-highlight, #c084fc) 22%, transparent),
-    inset 0 0 10px color-mix(in srgb, var(--link-highlight, #c084fc) 8%, transparent);
+    0 0 12px color-mix(in srgb, var(--link-highlight, #c084fc) 22%, transparent),
+    inset 0 0 8px color-mix(in srgb, var(--link-highlight, #c084fc) 8%, transparent);
 }
 
 .folder-tab.is-linked-folder:not(.is-selected):hover {
@@ -464,7 +443,6 @@ textarea {
   border-color: var(--forest);
   background-color: var(--bg-tab-hover);
   box-shadow: 0 0 0 3px var(--glow);
-  transform: translateY(-2px);
 }
 
 .folder-tab-top {
@@ -472,6 +450,18 @@ textarea {
   align-items: center;
   justify-content: space-between;
   width: 100%;
+}
+
+.folder-tab.is-slim .folder-tab-top {
+  width: auto;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.folder-tab-indicators {
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .folder-tab-icon {
@@ -493,25 +483,28 @@ textarea {
 .tab-link-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  height: 18px;
-  padding: 0 6px;
+  gap: 2px;
+  height: 16px;
+  padding: 0 5px;
   border-radius: 999px;
   background-color: color-mix(in srgb, var(--link-highlight, #c084fc) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--link-highlight, #c084fc) 45%, transparent);
   color: var(--link-highlight, #c084fc);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 650;
-  margin-left: 2px;
 }
 
 .folder-tab-actions {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   opacity: 0;
   transition: opacity 0.12s ease;
+}
+
+.folder-tab.is-slim .folder-tab-actions {
+  display: none;
 }
 
 .folder-tab:hover .folder-tab-actions,
@@ -523,8 +516,8 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -545,7 +538,7 @@ textarea {
 }
 
 .folder-tab-name {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-primary);
@@ -555,19 +548,26 @@ textarea {
   width: 100%;
 }
 
+.folder-tab.is-slim .folder-tab-name {
+  font-size: 12.5px;
+  width: auto;
+  flex: 1;
+  min-width: 0;
+}
+
 .folder-tab.is-selected .folder-tab-name {
   color: var(--ink);
 }
 
 .folder-tab-input {
   width: 100%;
-  padding: 2px 6px;
-  margin: -2px -6px;
+  padding: 1px 5px;
+  margin: -1px -5px;
   border-radius: 4px;
   border: 1px solid var(--border-selected);
   background-color: var(--bg-navbar);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 600;
   outline: none;
 }
@@ -1580,7 +1580,7 @@ textarea {
 }
 
 .editor-attach-pdf-menu-item:hover {
-  background-color: var(--bg-row-hover);
+  background-color: var(--bg-editor);
   border-color: var(--border-subtle);
 }
 
@@ -1680,7 +1680,7 @@ textarea {
 }
 
 .editor-link-option:hover {
-  background-color: var(--bg-row-hover);
+  background-color: var(--bg-editor);
   color: var(--ink);
 }
 
@@ -1869,7 +1869,7 @@ textarea {
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 15px;
-  line-height: 1.75;
+  line-height: 1.85;
   resize: none;
   outline: none;
   caret-color: var(--caret);
@@ -2006,9 +2006,15 @@ body.is-col-resizing * {
   min-height: 200px;
   outline: none !important;
   font-size: 15.5px;
-  line-height: 1.8;
+  line-height: 1.85;
   color: var(--text-secondary);
   caret-color: var(--caret) !important;
+}
+
+.milkdown .ProseMirror p,
+.milkdown .ProseMirror li,
+.milkdown .ProseMirror blockquote {
+  line-height: 1.85;
 }
 
 /* Milkdown & ProseMirror High-Contrast Cursor & Selection */
@@ -2182,7 +2188,7 @@ body.is-col-resizing * {
 .markdown-body {
   color: var(--text-secondary);
   font-size: 15.5px;
-  line-height: 1.8;
+  line-height: 1.85;
   word-wrap: break-word;
 }
 

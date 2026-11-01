@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ChevronDown,
   FileUp,
   Folder,
   FolderPlus,
@@ -120,75 +121,8 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     [folders, activeNoteId]
   );
 
-  if (isNavbarCollapsed) {
-    return (
-      <header className="navbar is-collapsed" aria-label="Top navigation">
-        <div className="navbar-collapsed-strip">
-          <button
-            type="button"
-            className="navbar-collapsed-expand-btn"
-            onClick={toggleNavbar}
-            title="Expand top navbar (Ctrl+Shift+\)"
-            aria-label="Expand top navbar"
-          >
-            <PanelTopOpen size={16} strokeWidth={1.8} className="navbar-toggle-icon" />
-            <Notebook size={16} strokeWidth={2} className="navbar-brand-icon" />
-            <span className="navbar-brand-title">Notes</span>
-            {activeFolder && (
-              <span className="navbar-collapsed-crumb">
-                <span className="navbar-collapsed-sep">/</span>
-                <span className="navbar-collapsed-folder-name">{activeFolder.name}</span>
-              </span>
-            )}
-          </button>
-
-          <div className="navbar-collapsed-actions">
-            <button
-              type="button"
-              className="session-navbar-pill is-compact"
-              onClick={openSessionModal}
-              title={`Active Session: ${currentSessionName} (Click to manage)`}
-            >
-              <Radio size={10} className="session-pulse-dot" />
-              <span className="session-navbar-name">{currentSessionName}</span>
-            </button>
-
-            <button
-              type="button"
-              className="navbar-icon-btn is-compact"
-              onClick={onOpenSearch}
-              title="Search notes (Ctrl+K)"
-              aria-label="Search notes"
-            >
-              <Search size={16} strokeWidth={1.8} />
-            </button>
-            <button
-              type="button"
-              className="navbar-icon-btn navbar-theme-btn is-compact"
-              onClick={openThemeModal}
-              title={`Themes & Accents: ${activeThemeObj?.name ?? 'Theme'}`}
-              aria-label="Themes & Accents"
-            >
-              <Palette size={16} strokeWidth={1.8} />
-              <span className="navbar-theme-dot" />
-            </button>
-            <button
-              type="button"
-              className="navbar-icon-btn is-compact is-highlight"
-              onClick={toggleNavbar}
-              title="Expand top navbar (Ctrl+Shift+\)"
-              aria-label="Expand top navbar"
-            >
-              <PanelTopOpen size={16} strokeWidth={1.8} />
-            </button>
-          </div>
-        </div>
-      </header>
-    );
-  }
-
   return (
-    <header className="navbar">
+    <header className={`navbar ${isNavbarCollapsed ? 'is-collapsed' : ''}`}>
       {/* Hidden file picker for importing separate note files */}
       <input
         ref={noteFileInputRef}
@@ -205,335 +139,468 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
         }}
       />
 
-      {/* Top row: Brand on left, minimal icon actions on right */}
-      <div className="navbar-top-row">
-        <div className="navbar-brand">
-          {/* <button
-            type="button"
-            className={`navbar-sidebar-toggle ${isSidebarCollapsed ? 'is-collapsed' : ''}`}
-            onClick={toggleSidebar}
-            title={isSidebarCollapsed ? 'Expand sidebar (Ctrl+\\)' : 'Collapse sidebar (Ctrl+\\)'}
-            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {isSidebarCollapsed ? (
-              <PanelLeftOpen size={18} strokeWidth={1.8} />
-            ) : (
-              <PanelLeftClose size={18} strokeWidth={1.8} />
-            )}
-          </button> */}
-          <Notebook size={18} strokeWidth={2} className="navbar-brand-icon" />
-          <span className="navbar-brand-title">Notes</span>
+      {/* Top row: Brand on left, minimal icon actions on right (hidden when navbar is slim/collapsed) */}
+      {!isNavbarCollapsed && (
+        <div className="navbar-top-row">
+          <div className="navbar-brand">
+            <Notebook size={16} strokeWidth={2} className="navbar-brand-icon" />
+            <span className="navbar-brand-title">Notes</span>
 
-          {/* Session Selector Pill */}
-          {/* <button
-            type="button"
-            className="session-navbar-pill"
-            onClick={openSessionModal}
-            title={`Active Session: ${currentSessionName} (Click to manage sessions)`}
-            aria-label="Manage sessions"
-          >
-            <Radio size={11} className="session-pulse-dot" />
-            <span className="session-navbar-name">{currentSessionName}</span>
-            <ChevronDown size={12} className="session-navbar-chevron" />
-          </button> */}
-        </div>
-
-        <div className="navbar-actions">
-          {/* Search button */}
-          <button
-            type="button"
-            className="navbar-icon-btn"
-            onClick={onOpenSearch}
-            title="Search notes (Ctrl+K)"
-            aria-label="Search notes"
-          >
-            <Search size={18} strokeWidth={1.8} />
-          </button>
-
-          {/* Plus button with quick dropdown */}
-          <div className="plus-menu-container" ref={plusMenuRef}>
+            {/* Session Selector Pill */}
             <button
               type="button"
-              className={`navbar-icon-btn ${isPlusMenuOpen ? 'is-active' : ''}`}
-              onClick={() => setIsPlusMenuOpen((v) => !v)}
-              title="Create or sync local folder"
-              aria-label="Create or import"
+              className="session-navbar-pill"
+              onClick={openSessionModal}
+              title={`Active Session: ${currentSessionName} (Click to manage sessions)`}
+              aria-label="Manage sessions"
             >
-              <Plus size={19} strokeWidth={1.9} />
+              <Radio size={10} className="session-pulse-dot" />
+              <span className="session-navbar-name">{currentSessionName}</span>
+              <ChevronDown size={11} className="session-navbar-chevron" />
             </button>
-
-            {isPlusMenuOpen && (
-              <div className="plus-dropdown-menu">
-                <button
-                  type="button"
-                  className="plus-menu-item"
-                  onClick={() => {
-                    closePlusMenu();
-                    sessionApi.openSessionInNewTab();
-                  }}
-                >
-                  <Layers size={16} strokeWidth={1.8} className="plus-menu-icon" />
-                  <span>New session (new tab)...</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="plus-menu-item"
-                  onClick={() => {
-                    closePlusMenu();
-                    openLinkModal();
-                  }}
-                >
-                  <FolderSync size={16} strokeWidth={1.8} className="plus-menu-icon" />
-                  <span>Open local folder (Sync)...</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="plus-menu-item"
-                  onClick={() => {
-                    closePlusMenu();
-                    createTopFolder();
-                  }}
-                >
-                  <FolderPlus size={16} strokeWidth={1.8} className="plus-menu-icon" />
-                  <span>New folder</span>
-                </button>
-
-                <div className="plus-menu-divider" />
-
-                <button
-                  type="button"
-                  className="plus-menu-item"
-                  onClick={() => {
-                    closePlusMenu();
-                    openImportModal('top-folder');
-                  }}
-                >
-                  <FolderUp size={16} strokeWidth={1.8} className="plus-menu-icon" />
-                  <span>Import folder copy...</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="plus-menu-item"
-                  onClick={() => {
-                    closePlusMenu();
-                    noteFileInputRef.current?.click();
-                  }}
-                >
-                  <FileUp size={16} strokeWidth={1.8} className="plus-menu-icon" />
-                  <span>Import notes & PDFs (.md, .txt, .pdf)</span>
-                </button>
-
-                <div className="plus-menu-divider" />
-
-                <button
-                  type="button"
-                  className="plus-menu-item"
-                  onClick={() => {
-                    closePlusMenu();
-                    openThemeModal();
-                  }}
-                >
-                  <Palette size={16} strokeWidth={1.8} className="plus-menu-icon" />
-                  <span>Themes & Colors</span>
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* Theme palette button */}
-          <button
-            type="button"
-            className="navbar-icon-btn navbar-theme-btn"
-            onClick={openThemeModal}
-            title={`Themes & Accents: ${activeThemeObj?.name ?? 'Theme'}`}
-            aria-label="Themes & Accents"
-          >
-            <Palette size={17} strokeWidth={1.8} />
-            <span className="navbar-theme-dot" />
-          </button>
-
-          {/* Collapse navbar button */}
-          <button
-            type="button"
-            className="navbar-icon-btn"
-            onClick={toggleNavbar}
-            title="Collapse top navbar (Ctrl+Shift+\)"
-            aria-label="Collapse top navbar"
-          >
-            <PanelTopClose size={17} strokeWidth={1.8} />
-          </button>
-        </div>
-      </div>
-
-      {/* Tabs Row: Box-shaped card tabs */}
-      <nav className="navbar-tabs" aria-label="Top-level folders">
-        {folders.length === 0 ? (
-          <>
+          <div className="navbar-actions">
+            {/* Search button */}
             <button
               type="button"
-              className="folder-tab is-placeholder"
-              onClick={openLinkModal}
-              title="Open and sync a folder from your computer"
+              className="navbar-icon-btn"
+              onClick={onOpenSearch}
+              title="Search notes (Ctrl+K)"
+              aria-label="Search notes"
             >
-              <div className="folder-tab-top">
-                <FolderSync size={19} strokeWidth={1.8} className="folder-tab-icon" />
-              </div>
-              <span className="folder-tab-name">Open local folder</span>
+              <Search size={16} strokeWidth={1.8} />
             </button>
 
-            <button
-              type="button"
-              className="folder-tab is-placeholder"
-              onClick={createTopFolder}
-            >
-              <div className="folder-tab-top">
-                <Plus size={19} strokeWidth={1.8} className="folder-tab-icon" />
-              </div>
-              <span className="folder-tab-name">New folder</span>
-            </button>
-
-            <button
-              type="button"
-              className="folder-tab is-placeholder"
-              onClick={() => openImportModal('top-folder')}
-            >
-              <div className="folder-tab-top">
-                <FolderUp size={19} strokeWidth={1.8} className="folder-tab-icon" />
-              </div>
-              <span className="folder-tab-name">Import folder</span>
-            </button>
-          </>
-        ) : (
-          folders.map((folder) => {
-            const isSelected = folder.id === selectedFolderId;
-            const isEditing = folder.id === editingId;
-            const linkedNoteCount = !isSelected
-              ? (connections.linkedTopFolderCounts.get(folder.id) ?? 0)
-              : 0;
-            const isLinkedFolder = linkedNoteCount > 0;
-
-            const handleSelectFolderTab = () => {
-              if (isLinkedFolder) {
-                const currentNoteInTarget = resolveActiveNoteData(
-                  folder,
-                  selectedNoteByFolder,
-                  sortOrder
-                )?.note.id;
-                const firstLinkedId = connections.firstLinkedNoteByTopFolder.get(folder.id);
-                if (
-                  firstLinkedId &&
-                  (!currentNoteInTarget || !connections.linkedNoteIds.has(currentNoteInTarget))
-                ) {
-                  navigateToNote(folder.id, firstLinkedId);
-                  return;
-                }
-              }
-              selectFolder(folder.id);
-            };
-
-            return (
-              <div
-                key={folder.id}
-                role="button"
-                tabIndex={0}
-                aria-pressed={isSelected}
-                className={`folder-tab ${isSelected ? 'is-selected' : ''} ${
-                  isLinkedFolder ? 'is-linked-folder' : ''
-                }`}
-                onClick={handleSelectFolderTab}
-                onDoubleClick={(e) => startRename(folder, e)}
-                onKeyDown={(e) => {
-                  if (isEditing) return;
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleSelectFolderTab();
-                  }
-                }}
+            {/* Plus button with quick dropdown */}
+            <div className="plus-menu-container" ref={plusMenuRef}>
+              <button
+                type="button"
+                className={`navbar-icon-btn ${isPlusMenuOpen ? 'is-active' : ''}`}
+                onClick={() => setIsPlusMenuOpen((v) => !v)}
+                title="Create or sync local folder"
+                aria-label="Create or import"
               >
-                {/* Top of card: Folder icon at left, disk indicator and subtle actions at right */}
-                <div className="folder-tab-top">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Folder
-                      size={20}
-                      strokeWidth={1.8}
-                      className={`folder-tab-icon ${isSelected ? 'is-selected-icon' : ''} ${
-                        isLinkedFolder ? 'is-linked-icon' : ''
-                      }`}
-                    />
-                    {folder.localPath && (
-                      <span
-                        className="tab-disk-indicator"
-                        title={`Synced with: ${folder.localPath}`}
-                      >
-                        <HardDrive size={11} />
-                      </span>
-                    )}
-                    {isLinkedFolder && (
-                      <span
-                        className="tab-link-indicator"
-                        title={`${linkedNoteCount} ${
-                          linkedNoteCount === 1 ? 'note' : 'notes'
-                        } in "${folder.name}" connected to current note`}
-                      >
-                        <Link2 size={11} strokeWidth={2.2} />
-                        <span>{linkedNoteCount}</span>
-                      </span>
-                    )}
-                  </div>
+                <Plus size={17} strokeWidth={1.9} />
+              </button>
 
-                  <div className="folder-tab-actions">
-                    <button
-                      type="button"
-                      className="tab-action-btn"
-                      title="Rename folder"
-                      aria-label={`Rename ${folder.name}`}
-                      onClick={(e) => startRename(folder, e)}
-                    >
-                      <Pencil size={12} strokeWidth={2} />
-                    </button>
-                    <button
-                      type="button"
-                      className="tab-action-btn is-danger"
-                      title="Delete folder"
-                      aria-label={`Delete ${folder.name}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteTopFolder(folder.id);
-                      }}
-                    >
-                      <Trash2 size={12} strokeWidth={2} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Bottom of card: Bold folder name */}
-                {isEditing ? (
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    className="folder-tab-input"
-                    value={draftName}
-                    onChange={(e) => setDraftName(e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    onBlur={() => commitRename(folder.id)}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      if (e.key === 'Enter') {
-                        commitRename(folder.id);
-                      } else if (e.key === 'Escape') {
-                        cancelRename();
-                      }
+              {isPlusMenuOpen && (
+                <div className="plus-dropdown-menu">
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      sessionApi.openSessionInNewTab();
                     }}
-                  />
-                ) : (
-                  <span className="folder-tab-name">{folder.name}</span>
-                )}
-              </div>
-            );
-          })
+                  >
+                    <Layers size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>New session (new tab)...</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      openLinkModal();
+                    }}
+                  >
+                    <FolderSync size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Open local folder (Sync)...</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      createTopFolder();
+                    }}
+                  >
+                    <FolderPlus size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>New folder</span>
+                  </button>
+
+                  <div className="plus-menu-divider" />
+
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      openImportModal('top-folder');
+                    }}
+                  >
+                    <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Import folder copy...</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      noteFileInputRef.current?.click();
+                    }}
+                  >
+                    <FileUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Import notes & PDFs (.md, .txt, .pdf)</span>
+                  </button>
+
+                  <div className="plus-menu-divider" />
+
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      openThemeModal();
+                    }}
+                  >
+                    <Palette size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Themes & Colors</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Theme palette button */}
+            <button
+              type="button"
+              className="navbar-icon-btn navbar-theme-btn"
+              onClick={openThemeModal}
+              title={`Themes & Accents: ${activeThemeObj?.name ?? 'Theme'}`}
+              aria-label="Themes & Accents"
+            >
+              <Palette size={16} strokeWidth={1.8} />
+              <span className="navbar-theme-dot" />
+            </button>
+
+            {/* Collapse navbar button */}
+            <button
+              type="button"
+              className="navbar-icon-btn"
+              onClick={toggleNavbar}
+              title="Slim top navbar (Ctrl+Shift+\)"
+              aria-label="Slim top navbar"
+            >
+              <PanelTopClose size={16} strokeWidth={1.8} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs Row: Compact card tabs (or single-line slim tabs when collapsed) */}
+      <nav
+        className={`navbar-tabs ${isNavbarCollapsed ? 'is-slim' : ''}`}
+        aria-label="Top-level folders"
+      >
+        <div className="navbar-tabs-scroll">
+          {folders.length === 0 ? (
+            <>
+              <button
+                type="button"
+                className="folder-tab is-placeholder"
+                onClick={openLinkModal}
+                title="Open and sync a folder from your computer"
+              >
+                <div className="folder-tab-top">
+                  <FolderSync size={16} strokeWidth={1.8} className="folder-tab-icon" />
+                </div>
+                <span className="folder-tab-name">Open local folder</span>
+              </button>
+
+              <button
+                type="button"
+                className="folder-tab is-placeholder"
+                onClick={createTopFolder}
+              >
+                <div className="folder-tab-top">
+                  <Plus size={16} strokeWidth={1.8} className="folder-tab-icon" />
+                </div>
+                <span className="folder-tab-name">New folder</span>
+              </button>
+
+              <button
+                type="button"
+                className="folder-tab is-placeholder"
+                onClick={() => openImportModal('top-folder')}
+              >
+                <div className="folder-tab-top">
+                  <FolderUp size={16} strokeWidth={1.8} className="folder-tab-icon" />
+                </div>
+                <span className="folder-tab-name">Import folder</span>
+              </button>
+            </>
+          ) : (
+            folders.map((folder) => {
+              const isSelected = folder.id === selectedFolderId;
+              const isEditing = folder.id === editingId;
+              const linkedNoteCount = !isSelected
+                ? (connections.linkedTopFolderCounts.get(folder.id) ?? 0)
+                : 0;
+              const isLinkedFolder = linkedNoteCount > 0;
+
+              const handleSelectFolderTab = () => {
+                if (isLinkedFolder) {
+                  const currentNoteInTarget = resolveActiveNoteData(
+                    folder,
+                    selectedNoteByFolder,
+                    sortOrder
+                  )?.note.id;
+                  const firstLinkedId = connections.firstLinkedNoteByTopFolder.get(folder.id);
+                  if (
+                    firstLinkedId &&
+                    (!currentNoteInTarget || !connections.linkedNoteIds.has(currentNoteInTarget))
+                  ) {
+                    navigateToNote(folder.id, firstLinkedId);
+                    return;
+                  }
+                }
+                selectFolder(folder.id);
+              };
+
+              return (
+                <div
+                  key={folder.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  className={`folder-tab ${isSelected ? 'is-selected' : ''} ${
+                    isLinkedFolder ? 'is-linked-folder' : ''
+                  } ${isNavbarCollapsed ? 'is-slim' : ''}`}
+                  onClick={handleSelectFolderTab}
+                  onDoubleClick={(e) => startRename(folder, e)}
+                  onKeyDown={(e) => {
+                    if (isEditing) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSelectFolderTab();
+                    }
+                  }}
+                >
+                  {/* Top of card: Folder icon at left, disk indicator and subtle actions at right */}
+                  <div className="folder-tab-top">
+                    <div className="folder-tab-indicators">
+                      <Folder
+                        size={isNavbarCollapsed ? 14 : 16}
+                        strokeWidth={1.8}
+                        className={`folder-tab-icon ${isSelected ? 'is-selected-icon' : ''} ${
+                          isLinkedFolder ? 'is-linked-icon' : ''
+                        }`}
+                      />
+                      {folder.localPath && (
+                        <span
+                          className="tab-disk-indicator"
+                          title={`Synced with: ${folder.localPath}`}
+                        >
+                          <HardDrive size={10} />
+                        </span>
+                      )}
+                      {isLinkedFolder && (
+                        <span
+                          className="tab-link-indicator"
+                          title={`${linkedNoteCount} ${
+                            linkedNoteCount === 1 ? 'note' : 'notes'
+                          } in "${folder.name}" connected to current note`}
+                        >
+                          <Link2 size={10} strokeWidth={2.2} />
+                          <span>{linkedNoteCount}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="folder-tab-actions">
+                      <button
+                        type="button"
+                        className="tab-action-btn"
+                        title="Rename folder"
+                        aria-label={`Rename ${folder.name}`}
+                        onClick={(e) => startRename(folder, e)}
+                      >
+                        <Pencil size={11} strokeWidth={2} />
+                      </button>
+                      <button
+                        type="button"
+                        className="tab-action-btn is-danger"
+                        title="Delete folder"
+                        aria-label={`Delete ${folder.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteTopFolder(folder.id);
+                        }}
+                      >
+                        <Trash2 size={11} strokeWidth={2} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Folder name */}
+                  {isEditing ? (
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      className="folder-tab-input"
+                      value={draftName}
+                      onChange={(e) => setDraftName(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onBlur={() => commitRename(folder.id)}
+                      onKeyDown={(e) => {
+                        e.stopPropagation();
+                        if (e.key === 'Enter') {
+                          commitRename(folder.id);
+                        } else if (e.key === 'Escape') {
+                          cancelRename();
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="folder-tab-name">{folder.name}</span>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Compact right-side controls when navbar is slim/collapsed */}
+        {isNavbarCollapsed && (
+          <div className="navbar-slim-controls">
+            <button
+              type="button"
+              className="session-navbar-pill is-compact"
+              onClick={openSessionModal}
+              title={`Active Session: ${currentSessionName} (Click to manage sessions)`}
+              aria-label="Manage sessions"
+            >
+              <Radio size={10} className="session-pulse-dot" />
+              <span className="session-navbar-name">{currentSessionName}</span>
+            </button>
+
+            <button
+              type="button"
+              className="navbar-icon-btn is-compact"
+              onClick={onOpenSearch}
+              title="Search notes (Ctrl+K)"
+              aria-label="Search notes"
+            >
+              <Search size={14} strokeWidth={1.9} />
+            </button>
+
+            <div className="plus-menu-container" ref={plusMenuRef}>
+              <button
+                type="button"
+                className={`navbar-icon-btn is-compact ${isPlusMenuOpen ? 'is-active' : ''}`}
+                onClick={() => setIsPlusMenuOpen((v) => !v)}
+                title="Create or sync local folder"
+                aria-label="Create or import"
+              >
+                <Plus size={15} strokeWidth={2} />
+              </button>
+
+              {isPlusMenuOpen && (
+                <div className="plus-dropdown-menu">
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      sessionApi.openSessionInNewTab();
+                    }}
+                  >
+                    <Layers size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>New session (new tab)...</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      openLinkModal();
+                    }}
+                  >
+                    <FolderSync size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Open local folder (Sync)...</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      createTopFolder();
+                    }}
+                  >
+                    <FolderPlus size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>New folder</span>
+                  </button>
+
+                  <div className="plus-menu-divider" />
+
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      openImportModal('top-folder');
+                    }}
+                  >
+                    <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Import folder copy...</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      noteFileInputRef.current?.click();
+                    }}
+                  >
+                    <FileUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Import notes & PDFs (.md, .txt, .pdf)</span>
+                  </button>
+
+                  <div className="plus-menu-divider" />
+
+                  <button
+                    type="button"
+                    className="plus-menu-item"
+                    onClick={() => {
+                      closePlusMenu();
+                      openThemeModal();
+                    }}
+                  >
+                    <Palette size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Themes & Colors</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              className="navbar-icon-btn navbar-theme-btn is-compact"
+              onClick={openThemeModal}
+              title={`Themes & Accents: ${activeThemeObj?.name ?? 'Theme'}`}
+              aria-label="Themes & Accents"
+            >
+              <Palette size={14} strokeWidth={1.9} />
+              <span className="navbar-theme-dot" />
+            </button>
+
+            <button
+              type="button"
+              className="navbar-icon-btn is-compact is-highlight"
+              onClick={toggleNavbar}
+              title="Expand top navbar (Ctrl+Shift+\)"
+              aria-label="Expand top navbar"
+            >
+              <PanelTopOpen size={14} strokeWidth={1.9} />
+            </button>
+          </div>
         )}
       </nav>
     </header>
