@@ -215,7 +215,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
       {/* Top row: Brand on left, minimal icon actions on right */}
       <div className="navbar-top-row">
         <div className="navbar-brand">
-          <button
+          {/* <button
             type="button"
             className={`navbar-sidebar-toggle ${isSidebarCollapsed ? 'is-collapsed' : ''}`}
             onClick={toggleSidebar}
@@ -227,12 +227,12 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
             ) : (
               <PanelLeftClose size={18} strokeWidth={1.8} />
             )}
-          </button>
+          </button> */}
           <Notebook size={18} strokeWidth={2} className="navbar-brand-icon" />
           <span className="navbar-brand-title">Notes</span>
 
           {/* Session Selector Pill */}
-          <button
+          {/* <button
             type="button"
             className="session-navbar-pill"
             onClick={openSessionModal}
@@ -242,7 +242,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
             <Radio size={11} className="session-pulse-dot" />
             <span className="session-navbar-name">{currentSessionName}</span>
             <ChevronDown size={12} className="session-navbar-chevron" />
-          </button>
+          </button> */}
         </div>
 
         <div className="navbar-actions">
