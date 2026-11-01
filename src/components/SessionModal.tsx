@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Check,
   Copy,
@@ -14,6 +14,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { useCopyFeedback, useEscapeKey } from '../hooks/useDomInteractions';
 import { SessionInfo, sessionApi } from '../lib/sessionManager';
 import { useNotesStore } from '../store/useNotesStore';
 
@@ -28,10 +29,10 @@ export const SessionModal: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftName, setDraftName] = useState(currentSessionName);
-  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedLink, copyToClipboard] = useCopyFeedback();
   const [error, setError] = useState('');
 
-  const loadSessionsList = async () => {
+  const loadSessionsList = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -42,26 +43,16 @@ export const SessionModal: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
       setDraftName(currentSessionName);
       void loadSessionsList();
     }
-  }, [isOpen, currentSessionName]);
+  }, [isOpen, currentSessionName, loadSessionsList]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeSessionModal();
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen, closeSessionModal]);
+  useEscapeKey(isOpen, closeSessionModal);
 
   if (!isOpen) return null;
 
@@ -82,10 +73,7 @@ export const SessionModal: React.FC = () => {
   const handleCopyLink = () => {
     const url = new URL(window.location.href);
     url.searchParams.set('session', currentSessionId);
-    navigator.clipboard.writeText(url.toString()).then(() => {
-      setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
-    });
+    copyToClipboard(url.toString());
   };
 
   const handleDuplicateToNewTab = async () => {
@@ -112,7 +100,6 @@ export const SessionModal: React.FC = () => {
     try {
       await sessionApi.deleteSession(id);
       if (id === currentSessionId) {
-        // Switch to the first available remaining session
         const remaining = sessions.filter((s) => s.id !== id);
         if (remaining.length > 0) {
           sessionApi.switchSessionInCurrentTab(remaining[0].id);
@@ -348,4 +335,3 @@ export const SessionModal: React.FC = () => {
     </div>
   );
 };
-

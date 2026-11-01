@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
+  ChevronRight,
   Columns2,
   Eye,
   FilePlus,
   FileText,
   FileUp,
+  Folder,
   FolderUp,
   HardDrive,
   PanelLeftOpen,
@@ -13,16 +15,17 @@ import {
   PenLine,
   Plus,
 } from 'lucide-react';
-import { findDefaultNoteId, findNoteAndPath, useNotesStore } from '../store/useNotesStore';
+import { usePointerDrag } from '../hooks/useDomInteractions';
+import { countWords } from '../lib/catalogUtils';
+import { isPdfNote, readFileAsDataUrl } from '../lib/fileUtils';
+import {
+  DEFAULT_SPLIT_RATIO,
+  resolveActiveNoteData,
+  useNotesStore,
+} from '../store/useNotesStore';
 import { PdfViewMode } from '../types';
 import { MilkdownViewer } from './MilkdownViewer';
 import { PdfViewer } from './PdfViewer';
-
-function countWords(text: string): number {
-  const trimmed = text.trim();
-  if (!trimmed) return 0;
-  return trimmed.split(/\s+/).length;
-}
 
 export const NoteEditor: React.FC = () => {
   const folders = useNotesStore((s) => s.folders);
@@ -33,7 +36,7 @@ export const NoteEditor: React.FC = () => {
   const isSidebarCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
   const isRightSidebarCollapsed = useNotesStore((s) => s.isRightSidebarCollapsed);
-  const editorSplitRatio = useNotesStore((s) => s.editorSplitRatio ?? 50);
+  const editorSplitRatio = useNotesStore((s) => s.editorSplitRatio ?? DEFAULT_SPLIT_RATIO);
   const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
 
   const toggleSidebar = useNotesStore((s) => s.toggleSidebar);
@@ -51,31 +54,21 @@ export const NoteEditor: React.FC = () => {
   const [pdfViewMode, setPdfViewMode] = useState<PdfViewMode>('pdf');
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const pdfAttachInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   const activeFolder = useMemo(
     () => folders.find((f) => f.id === selectedFolderId) ?? null,
     [folders, selectedFolderId]
   );
 
-  const activeNoteData = useMemo(() => {
-    if (!activeFolder) return null;
-    const preferredId = selectedNoteByFolder[activeFolder.id];
-    if (preferredId) {
-      const found = findNoteAndPath(activeFolder.items, preferredId, [activeFolder.name]);
-      if (found) return found;
-    }
-    const fallbackId = findDefaultNoteId(activeFolder.items, sortOrder);
-    if (fallbackId) {
-      return findNoteAndPath(activeFolder.items, fallbackId, [activeFolder.name]);
-    }
-    return null;
-  }, [activeFolder, selectedNoteByFolder, sortOrder]);
+  const activeNoteData = useMemo(
+    () => resolveActiveNoteData(activeFolder, selectedNoteByFolder, sortOrder),
+    [activeFolder, selectedNoteByFolder, sortOrder]
+  );
 
   const note = activeNoteData?.note ?? null;
   const breadcrumb = activeNoteData?.path ?? (activeFolder ? [activeFolder.name] : []);
   const hasActiveFolder = Boolean(activeFolder);
-
-  const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (shouldFocusTitle && note && titleInputRef.current) {
@@ -85,38 +78,19 @@ export const NoteEditor: React.FC = () => {
     }
   }, [shouldFocusTitle, note, clearFocusNoteTitle]);
 
-  // Handle dragging the split view divider
-  useEffect(() => {
-    if (!isDraggingSplit) return;
-
-    const handlePointerMove = (e: MouseEvent | TouchEvent) => {
+  const handleSplitDragMove = useCallback(
+    (clientX: number) => {
       if (!splitContainerRef.current) return;
-      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const rect = splitContainerRef.current.getBoundingClientRect();
       const offsetX = clientX - rect.left;
       const ratio = (offsetX / rect.width) * 100;
       setEditorSplitRatio(ratio);
-    };
+    },
+    [setEditorSplitRatio]
+  );
 
-    const handlePointerUp = () => {
-      setIsDraggingSplit(false);
-      document.body.classList.remove('is-col-resizing');
-    };
-
-    document.body.classList.add('is-col-resizing');
-    window.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
-    window.addEventListener('touchmove', handlePointerMove);
-    window.addEventListener('touchend', handlePointerUp);
-
-    return () => {
-      document.body.classList.remove('is-col-resizing');
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-      window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('touchend', handlePointerUp);
-    };
-  }, [isDraggingSplit, setEditorSplitRatio]);
+  const stopSplitDrag = useCallback(() => setIsDraggingSplit(false), []);
+  usePointerDrag(isDraggingSplit, handleSplitDragMove, stopSplitDrag);
 
   if (!note) {
     return (
@@ -177,7 +151,7 @@ export const NoteEditor: React.FC = () => {
               <button
                 type="button"
                 className="primary-subtle-btn"
-                onClick={() => createNote(null)}
+                onClick={() => void createNote(null)}
               >
                 <FilePlus size={15} />
                 <span>New note</span>
@@ -225,28 +199,37 @@ export const NoteEditor: React.FC = () => {
   };
 
   const words = countWords(note.content);
+  const isPdf = isPdfNote(note);
 
-  const isPdf = Boolean(
-    note.fileType === 'pdf' ||
-    note.filePath?.toLowerCase().endsWith('.pdf') ||
-    note.pdfData
-  );
-
-  const handleAttachPdf = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAttachPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file || !note) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      updateNote(note.id, {
-        fileType: 'pdf',
-        pdfData: dataUrl,
-      });
-      setPdfViewMode('split');
-    };
-    reader.readAsDataURL(file);
+    const dataUrl = await readFileAsDataUrl(file);
+    updateNote(note.id, {
+      fileType: 'pdf',
+      pdfData: dataUrl,
+    });
+    setPdfViewMode('split');
   };
+
+  const renderSplitDivider = () => (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      tabIndex={0}
+      className={`split-resizer ${isDraggingSplit ? 'is-active' : ''}`}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        setIsDraggingSplit(true);
+      }}
+      onTouchStart={() => setIsDraggingSplit(true)}
+      onDoubleClick={() => setEditorSplitRatio(DEFAULT_SPLIT_RATIO)}
+      title="Drag to resize split view (Double-click to reset 50/50)"
+    >
+      <div className="split-resizer-line" />
+    </div>
+  );
 
   return (
     <main className="editor-pane">
@@ -275,13 +258,15 @@ export const NoteEditor: React.FC = () => {
             </button>
           )}
           <div className="editor-breadcrumb" aria-label="Note path">
+            {breadcrumb.length > 0 && <Folder size={13} strokeWidth={1.9} className="breadcrumb-icon" />}
             {breadcrumb.map((segment, index) => (
               <React.Fragment key={`${segment}-${index}`}>
-                {index > 0 && <span className="breadcrumb-sep">/</span>}
+                {index > 0 && <ChevronRight size={12} strokeWidth={2} className="breadcrumb-sep" />}
                 <span
                   className={
                     index === breadcrumb.length - 1 ? 'breadcrumb-current' : 'breadcrumb-part'
                   }
+                  title={segment}
                 >
                   {segment}
                 </span>
@@ -374,7 +359,7 @@ export const NoteEditor: React.FC = () => {
             type="file"
             accept=".pdf"
             hidden
-            onChange={handleAttachPdf}
+            onChange={(e) => void handleAttachPdf(e)}
           />
           {!isPdf && (
             <button
@@ -431,21 +416,7 @@ export const NoteEditor: React.FC = () => {
             />
           </section>
 
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            tabIndex={0}
-            className={`split-resizer ${isDraggingSplit ? 'is-active' : ''}`}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              setIsDraggingSplit(true);
-            }}
-            onTouchStart={() => setIsDraggingSplit(true)}
-            onDoubleClick={() => setEditorSplitRatio(50)}
-            title="Drag to resize split view (Double-click to reset 50/50)"
-          >
-            <div className="split-resizer-line" />
-          </div>
+          {renderSplitDivider()}
 
           <section
             className="editor-split-col is-write"
@@ -500,21 +471,7 @@ export const NoteEditor: React.FC = () => {
             </div>
           </section>
 
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            tabIndex={0}
-            className={`split-resizer ${isDraggingSplit ? 'is-active' : ''}`}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              setIsDraggingSplit(true);
-            }}
-            onTouchStart={() => setIsDraggingSplit(true)}
-            onDoubleClick={() => setEditorSplitRatio(50)}
-            title="Drag to resize split view (Double-click to reset 50/50)"
-          >
-            <div className="split-resizer-line" />
-          </div>
+          {renderSplitDivider()}
 
           <section
             className="editor-split-col is-preview"

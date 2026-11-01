@@ -1,8 +1,23 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { FileUp, FolderOpen, FolderUp, HardDrive, LoaderCircle, Plus, X } from 'lucide-react';
-import { ExplorerNode, NoteItem } from '../types';
+import { useEscapeKey } from '../hooks/useDomInteractions';
+import {
+  buildExplorerTreeFromFiles,
+  buildNoteItemsFromFiles,
+  NOTE_FILE_ACCEPT,
+} from '../lib/fileUtils';
+import { postJson } from '../lib/httpClient';
+import { ExplorerNode, ImportTargetMode, NoteItem } from '../types';
 
-export type ImportTargetMode = 'top-folder' | 'subfolder' | 'note';
+export type { ImportTargetMode };
+
+interface ImportPathResponse {
+  kind: 'file' | 'folder';
+  note?: NoteItem;
+  rootName?: string;
+  rootPath?: string;
+  items?: ExplorerNode[];
+}
 
 interface ImportModalProps {
   initialMode: ImportTargetMode;
@@ -15,15 +30,6 @@ interface ImportModalProps {
     asTopLevel: boolean,
     localPath?: string
   ) => void;
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 export const ImportModal: React.FC<ImportModalProps> = ({
@@ -53,15 +59,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     }
   }, []);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [busy, onClose]);
+  useEscapeKey(!busy, onClose);
 
   const handleSubmitPath = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,16 +68,11 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     setBusy(true);
     setError('');
     try {
-      const response = await fetch('/api/import-path', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: inputPath.trim() }),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Could not import from the specified path.');
-      }
+      const data = await postJson<ImportPathResponse>(
+        '/api/import-path',
+        { path: inputPath.trim() },
+        'Could not import from the specified path.'
+      );
 
       if (data.kind === 'file' && data.note) {
         const note: NoteItem = {
@@ -101,6 +94,42 @@ export const ImportModal: React.FC<ImportModalProps> = ({
       throw new Error('Unexpected response when reading path.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to import from path.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleNoteFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = '';
+    if (selectedFiles.length === 0) return;
+
+    setBusy(true);
+    setError('');
+    try {
+      const notes = await buildNoteItemsFromFiles(selectedFiles);
+      onImportedNotes(notes);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to read selected files.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleFolderFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = '';
+    if (selectedFiles.length === 0) return;
+
+    setBusy(true);
+    setError('');
+    try {
+      const { rootName, items } = await buildExplorerTreeFromFiles(selectedFiles, customName);
+      onImportedFolder(rootName, items, asTopLevel);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to read selected folder.');
     } finally {
       setBusy(false);
     }
@@ -146,50 +175,10 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           <input
             ref={noteInputRef}
             type="file"
-            accept=".md,.markdown,.mdx,.txt,.pdf"
+            accept={NOTE_FILE_ACCEPT}
             multiple
             hidden
-            onChange={async (e) => {
-              const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
-              e.target.value = '';
-              if (selectedFiles.length === 0) return;
-
-              setBusy(true);
-              setError('');
-              try {
-                const notes: NoteItem[] = [];
-                for (const file of selectedFiles) {
-                  const isPdf = file.name.toLowerCase().endsWith('.pdf');
-                  let content = '';
-                  let pdfData: string | undefined = undefined;
-
-                  if (isPdf) {
-                    pdfData = await readFileAsDataUrl(file);
-                  } else {
-                    content = await file.text();
-                  }
-
-                  notes.push({
-                    id: `note-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-                    type: 'note',
-                    title:
-                      file.name.replace(/\.(md|markdown|mdx|txt|pdf)$/i, '').trim() || 'Untitled',
-                    content,
-                    fileType: isPdf ? 'pdf' : 'markdown',
-                    pdfData,
-                    updatedAt: file.lastModified
-                      ? new Date(file.lastModified).toISOString().slice(0, 10)
-                      : new Date().toISOString().slice(0, 10),
-                  });
-                }
-                onImportedNotes(notes);
-                onClose();
-              } catch (err) {
-                setError(err instanceof Error ? err.message : 'Failed to read selected files.');
-              } finally {
-                setBusy(false);
-              }
-            }}
+            onChange={(e) => void handleNoteFilesSelected(e)}
           />
 
           <input
@@ -197,107 +186,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             type="file"
             multiple
             hidden
-            onChange={async (e) => {
-              const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
-              e.target.value = '';
-              if (selectedFiles.length === 0) return;
-
-              setBusy(true);
-              setError('');
-              try {
-                const firstRel = (
-                  selectedFiles[0].webkitRelativePath || selectedFiles[0].name
-                ).replace(/\\/g, '/');
-                const firstParts = firstRel.split('/').filter(Boolean);
-                const detectedRoot =
-                  firstParts.length > 1 ? firstParts[0] : 'Imported Folder';
-                const rootName = customName.trim() || detectedRoot;
-
-                const rootItems: ExplorerNode[] = [];
-                const ignoredDirs = new Set([
-                  'node_modules',
-                  '.git',
-                  '.obsidian',
-                  '.vscode',
-                  '.idea',
-                  'dist',
-                  'build',
-                ]);
-
-                const ensureFolder = (
-                  container: ExplorerNode[],
-                  segments: string[]
-                ): ExplorerNode[] => {
-                  let current = container;
-                  for (const seg of segments) {
-                    let existing = current.find(
-                      (n): n is Extract<ExplorerNode, { type: 'folder' }> =>
-                        n.type === 'folder' && n.name === seg
-                    );
-                    if (!existing) {
-                      existing = {
-                        id: `sub-${Date.now().toString(36)}-${Math.random()
-                          .toString(36)
-                          .slice(2, 6)}`,
-                        type: 'folder',
-                        name: seg,
-                        children: [],
-                      };
-                      current.push(existing);
-                    }
-                    current = existing.children;
-                  }
-                  return current;
-                };
-
-                for (const file of selectedFiles) {
-                  const rel = (file.webkitRelativePath || file.name).replace(/\\/g, '/');
-                  const parts = rel.split('/').filter(Boolean);
-                  const inner = parts.length > 1 ? parts.slice(1) : parts;
-
-                  if (inner.some((seg) => seg.startsWith('.') || ignoredDirs.has(seg))) {
-                    continue;
-                  }
-                  const fileName = inner[inner.length - 1];
-                  if (!/\.(md|markdown|mdx|txt|pdf)$/i.test(fileName)) {
-                    continue;
-                  }
-
-                  const isPdf = fileName.toLowerCase().endsWith('.pdf');
-                  let content = '';
-                  let pdfData: string | undefined = undefined;
-
-                  if (isPdf) {
-                    pdfData = await readFileAsDataUrl(file);
-                  } else {
-                    content = await file.text();
-                  }
-
-                  const targetContainer = ensureFolder(rootItems, inner.slice(0, -1));
-                  targetContainer.push({
-                    id: `note-${Date.now().toString(36)}-${Math.random()
-                      .toString(36)
-                      .slice(2, 6)}`,
-                    type: 'note',
-                    title:
-                      fileName.replace(/\.(md|markdown|mdx|txt|pdf)$/i, '').trim() || 'Untitled',
-                    content,
-                    fileType: isPdf ? 'pdf' : 'markdown',
-                    pdfData,
-                    updatedAt: file.lastModified
-                      ? new Date(file.lastModified).toISOString().slice(0, 10)
-                      : new Date().toISOString().slice(0, 10),
-                  });
-                }
-
-                onImportedFolder(rootName, rootItems, asTopLevel);
-                onClose();
-              } catch (err) {
-                setError(err instanceof Error ? err.message : 'Failed to read selected folder.');
-              } finally {
-                setBusy(false);
-              }
-            }}
+            onChange={(e) => void handleFolderFilesSelected(e)}
           />
 
           <button
@@ -389,8 +278,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           <div className="folder-explanation">
             <HardDrive size={16} />
             <span>
-              Markdown (<code>.md</code>, <code>.mdx</code>), text (<code>.txt</code>), and PDF (<code>.pdf</code>) files are
-              imported with their nested folder structure intact.
+              Markdown (<code>.md</code>, <code>.mdx</code>), text (<code>.txt</code>), and PDF (
+              <code>.pdf</code>) files are imported with their nested folder structure intact.
             </span>
           </div>
 
@@ -423,4 +312,3 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     </div>
   );
 };
-

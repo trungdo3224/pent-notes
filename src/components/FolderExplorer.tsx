@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown01,
   ArrowUp10,
@@ -24,14 +24,21 @@ import {
   Trash2,
   Unlink,
 } from 'lucide-react';
+import { useClickOutside } from '../hooks/useDomInteractions';
+import { isPdfNote, NOTE_FILE_ACCEPT } from '../lib/fileUtils';
 import { getBasename } from '../lib/pathUtils';
 import {
-  findDefaultNoteId,
-  findNoteAndPath,
+  DEFAULT_SIDEBAR_WIDTH,
+  findAncestorFolderIds,
+  findFolderNode,
+  resolveActiveNoteData,
   sortExplorerNodes,
   useNotesStore,
 } from '../store/useNotesStore';
 import { ExplorerNode, FolderItem } from '../types';
+
+const BASE_INDENT_PX = 14;
+const DEPTH_INDENT_STEP_PX = 16;
 
 export const FolderExplorer: React.FC = () => {
   const folders = useNotesStore((s) => s.folders);
@@ -41,7 +48,7 @@ export const FolderExplorer: React.FC = () => {
   const pendingRenameNodeId = useNotesStore((s) => s.pendingRenameNodeId);
   const isCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
-  const sidebarWidth = useNotesStore((s) => s.sidebarWidth ?? 280);
+  const sidebarWidth = useNotesStore((s) => s.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH);
   const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
   const isSyncingFolderId = useNotesStore((s) => s.isSyncingFolderId);
 
@@ -69,14 +76,10 @@ export const FolderExplorer: React.FC = () => {
 
   const isSyncingThis = Boolean(folder && isSyncingFolderId === folder.id);
 
-  const selectedNoteId = useMemo(() => {
-    if (!folder) return null;
-    const preferred = selectedNoteByFolder[folder.id];
-    if (preferred && findNoteAndPath(folder.items, preferred, [])) {
-      return preferred;
-    }
-    return findDefaultNoteId(folder.items, sortOrder);
-  }, [folder, selectedNoteByFolder, sortOrder]);
+  const selectedNoteId = useMemo(
+    () => resolveActiveNoteData(folder, selectedNoteByFolder, sortOrder)?.note.id ?? null,
+    [folder, selectedNoteByFolder, sortOrder]
+  );
 
   const collapsedSet = useMemo(
     () => new Set(collapsedSubfolderIds),
@@ -86,37 +89,30 @@ export const FolderExplorer: React.FC = () => {
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
   const [isFolderMenuOpen, setIsFolderMenuOpen] = useState(false);
+  const [focusedFolderId, setFocusedFolderId] = useState<string | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
   const skipCommitRef = useRef(false);
   const folderMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close folder menu on click outside
+  const closeFolderMenu = useCallback(() => setIsFolderMenuOpen(false), []);
+  useClickOutside(folderMenuRef, isFolderMenuOpen, closeFolderMenu);
+
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (folderMenuRef.current && !folderMenuRef.current.contains(event.target as Node)) {
-        setIsFolderMenuOpen(false);
-      }
-    }
-    if (isFolderMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isFolderMenuOpen]);
+    setFocusedFolderId(null);
+  }, [selectedFolderId, selectedNoteId]);
+
+  const activeFolderIdSet = useMemo(() => {
+    if (!folder) return new Set<string>();
+    const targetId = focusedFolderId ?? selectedNoteId;
+    if (!targetId) return new Set<string>();
+    const ancestors = findAncestorFolderIds(folder.items, targetId);
+    return new Set(ancestors ?? []);
+  }, [folder, focusedFolderId, selectedNoteId]);
 
   useEffect(() => {
     if (pendingRenameNodeId && folder) {
-      const findFolder = (items: ExplorerNode[]): FolderItem | null => {
-        for (const item of items) {
-          if (item.type === 'folder') {
-            if (item.id === pendingRenameNodeId) return item;
-            const nested = findFolder(item.children);
-            if (nested) return nested;
-          }
-        }
-        return null;
-      };
-      const target = findFolder(folder.items);
+      const target = findFolderNode(folder.items, pendingRenameNodeId);
       if (target) {
         skipCommitRef.current = false;
         setEditingNodeId(target.id);
@@ -185,25 +181,38 @@ export const FolderExplorer: React.FC = () => {
     const ordered = sortExplorerNodes(nodes, sortOrder);
 
     return ordered.map((node) => {
-      const indentPx = 14 + depth * 16;
+      const indentPx = BASE_INDENT_PX + depth * DEPTH_INDENT_STEP_PX;
 
       if (node.type === 'folder') {
         const isCollapsedFolder = collapsedSet.has(node.id);
         const isEditing = editingNodeId === node.id;
+        const isParentLevel = depth === 0;
+        const isSelectedParent = activeFolderIdSet.has(node.id);
+        const folderLevelClass = isParentLevel ? 'is-parent-folder' : 'is-child-folder';
+        const folderSelectedClass = isSelectedParent ? 'is-selected-parent' : '';
 
         return (
-          <div key={node.id} className="explorer-group">
+          <div
+            key={node.id}
+            className={`explorer-group ${isParentLevel ? 'is-root-group' : 'is-nested-group'} ${
+              isSelectedParent ? 'is-active-group' : ''
+            }`}
+          >
             <div
               role="button"
               tabIndex={0}
-              className="explorer-row is-folder"
+              className={`explorer-row is-folder ${folderLevelClass} ${folderSelectedClass}`}
               style={{ paddingLeft: `${indentPx}px` }}
-              onClick={() => toggleSubfolderCollapse(node.id)}
+              onClick={() => {
+                setFocusedFolderId(node.id);
+                toggleSubfolderCollapse(node.id);
+              }}
               onDoubleClick={(e) => startSubfolderRename(node, e)}
               onKeyDown={(e) => {
                 if (isEditing) return;
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
+                  setFocusedFolderId(node.id);
                   toggleSubfolderCollapse(node.id);
                 }
               }}
@@ -302,25 +311,33 @@ export const FolderExplorer: React.FC = () => {
       }
 
       const isSelected = node.id === selectedNoteId;
-
-      const isPdf = node.fileType === 'pdf' || node.filePath?.toLowerCase().endsWith('.pdf');
+      const isPdf = isPdfNote(node);
+      const noteLevelClass = depth > 0 ? 'is-child-note' : 'is-root-note';
 
       return (
         <div
           key={node.id}
           role="button"
           tabIndex={0}
-          className={`explorer-row is-note ${isSelected ? 'is-selected' : ''}`}
+          className={`explorer-row is-note ${noteLevelClass} ${isSelected ? 'is-selected' : ''}`}
           style={{ paddingLeft: `${indentPx}px` }}
-          onClick={() => selectNote(node.id)}
+          onClick={() => {
+            setFocusedFolderId(null);
+            selectNote(node.id);
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
+              setFocusedFolderId(null);
               selectNote(node.id);
             }
           }}
         >
-          <FileText size={16} strokeWidth={1.75} className={`explorer-item-icon explorer-note-icon ${isPdf ? 'is-pdf-icon' : ''}`} />
+          <FileText
+            size={16}
+            strokeWidth={1.75}
+            className={`explorer-item-icon explorer-note-icon ${isPdf ? 'is-pdf-icon' : ''}`}
+          />
           <span className="explorer-row-label">{node.title.trim() || 'Untitled'}</span>
           {isPdf && <span className="explorer-pdf-badge" title="PDF Document">PDF</span>}
           <div className="explorer-row-actions">
@@ -352,7 +369,7 @@ export const FolderExplorer: React.FC = () => {
       <input
         ref={noteFileInputRef}
         type="file"
-        accept=".md,.markdown,.mdx,.txt,.pdf"
+        accept={NOTE_FILE_ACCEPT}
         multiple
         hidden
         onChange={(e) => {
@@ -438,7 +455,7 @@ export const FolderExplorer: React.FC = () => {
                   type="button"
                   className="dropdown-menu-item"
                   onClick={() => {
-                    setIsFolderMenuOpen(false);
+                    closeFolderMenu();
                     void createNote(null);
                   }}
                 >
@@ -450,7 +467,7 @@ export const FolderExplorer: React.FC = () => {
                   type="button"
                   className="dropdown-menu-item"
                   onClick={() => {
-                    setIsFolderMenuOpen(false);
+                    closeFolderMenu();
                     void createSubfolder(null);
                   }}
                 >
@@ -468,7 +485,7 @@ export const FolderExplorer: React.FC = () => {
                       className="dropdown-menu-item"
                       disabled={isSyncingThis}
                       onClick={() => {
-                        setIsFolderMenuOpen(false);
+                        closeFolderMenu();
                         void syncFolderFromDisk(folder.id);
                       }}
                     >
@@ -483,7 +500,7 @@ export const FolderExplorer: React.FC = () => {
                       type="button"
                       className="dropdown-menu-item"
                       onClick={() => {
-                        setIsFolderMenuOpen(false);
+                        closeFolderMenu();
                         unlinkFolderFromDisk(folder.id);
                       }}
                     >
@@ -496,7 +513,7 @@ export const FolderExplorer: React.FC = () => {
                     type="button"
                     className="dropdown-menu-item"
                     onClick={() => {
-                      setIsFolderMenuOpen(false);
+                      closeFolderMenu();
                       openLinkModal();
                     }}
                   >
@@ -511,7 +528,7 @@ export const FolderExplorer: React.FC = () => {
                   type="button"
                   className="dropdown-menu-item"
                   onClick={() => {
-                    setIsFolderMenuOpen(false);
+                    closeFolderMenu();
                     noteFileInputRef.current?.click();
                   }}
                 >
@@ -523,7 +540,7 @@ export const FolderExplorer: React.FC = () => {
                   type="button"
                   className="dropdown-menu-item"
                   onClick={() => {
-                    setIsFolderMenuOpen(false);
+                    closeFolderMenu();
                     openImportModal('subfolder');
                   }}
                 >
@@ -539,7 +556,7 @@ export const FolderExplorer: React.FC = () => {
                   className={`dropdown-menu-item ${sortOrder === 'name-asc' ? 'is-selected-sort' : ''}`}
                   onClick={() => {
                     setSortOrder('name-asc');
-                    setIsFolderMenuOpen(false);
+                    closeFolderMenu();
                   }}
                 >
                   <ArrowDown01 size={15} strokeWidth={1.8} />
@@ -552,7 +569,7 @@ export const FolderExplorer: React.FC = () => {
                   className={`dropdown-menu-item ${sortOrder === 'name-desc' ? 'is-selected-sort' : ''}`}
                   onClick={() => {
                     setSortOrder('name-desc');
-                    setIsFolderMenuOpen(false);
+                    closeFolderMenu();
                   }}
                 >
                   <ArrowUp10 size={15} strokeWidth={1.8} />
@@ -565,7 +582,7 @@ export const FolderExplorer: React.FC = () => {
                   className={`dropdown-menu-item ${sortOrder === 'date-desc' ? 'is-selected-sort' : ''}`}
                   onClick={() => {
                     setSortOrder('date-desc');
-                    setIsFolderMenuOpen(false);
+                    closeFolderMenu();
                   }}
                 >
                   <Calendar size={15} strokeWidth={1.8} />
@@ -579,7 +596,7 @@ export const FolderExplorer: React.FC = () => {
                   type="button"
                   className="dropdown-menu-item"
                   onClick={() => {
-                    setIsFolderMenuOpen(false);
+                    closeFolderMenu();
                     toggleSidebar();
                   }}
                 >
@@ -591,7 +608,7 @@ export const FolderExplorer: React.FC = () => {
                   type="button"
                   className="dropdown-menu-item"
                   onClick={() => {
-                    setIsFolderMenuOpen(false);
+                    closeFolderMenu();
                     toggleNavbar();
                   }}
                 >
@@ -607,7 +624,7 @@ export const FolderExplorer: React.FC = () => {
                   type="button"
                   className="dropdown-menu-item is-danger"
                   onClick={() => {
-                    setIsFolderMenuOpen(false);
+                    closeFolderMenu();
                     deleteTopFolder(folder.id);
                   }}
                 >

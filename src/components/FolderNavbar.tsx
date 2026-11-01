@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ChevronDown,
   FilePlus,
@@ -21,6 +21,8 @@ import {
   Search,
   Trash2,
 } from 'lucide-react';
+import { useClickOutside } from '../hooks/useDomInteractions';
+import { NOTE_FILE_ACCEPT } from '../lib/fileUtils';
 import { sessionApi } from '../lib/sessionManager';
 import { useNotesStore } from '../store/useNotesStore';
 import { themes } from '../themes';
@@ -62,18 +64,8 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const skipCommitRef = useRef(false);
   const plusMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close plus menu on outside click
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
-        setIsPlusMenuOpen(false);
-      }
-    }
-    if (isPlusMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [isPlusMenuOpen]);
+  const closePlusMenu = useCallback(() => setIsPlusMenuOpen(false), []);
+  useClickOutside(plusMenuRef, isPlusMenuOpen, closePlusMenu);
 
   useEffect(() => {
     if (pendingRenameFolderId) {
@@ -193,7 +185,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
       <input
         ref={noteFileInputRef}
         type="file"
-        accept=".md,.markdown,.mdx,.txt,.pdf"
+        accept={NOTE_FILE_ACCEPT}
         multiple
         hidden
         onChange={(e) => {
@@ -268,7 +260,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                   type="button"
                   className="plus-menu-item"
                   onClick={() => {
-                    setIsPlusMenuOpen(false);
+                    closePlusMenu();
                     sessionApi.openSessionInNewTab();
                   }}
                 >
@@ -280,7 +272,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                   type="button"
                   className="plus-menu-item"
                   onClick={() => {
-                    setIsPlusMenuOpen(false);
+                    closePlusMenu();
                     openLinkModal();
                   }}
                 >
@@ -292,7 +284,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                   type="button"
                   className="plus-menu-item"
                   onClick={() => {
-                    setIsPlusMenuOpen(false);
+                    closePlusMenu();
                     createTopFolder();
                   }}
                 >
@@ -304,7 +296,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                   type="button"
                   className="plus-menu-item"
                   onClick={() => {
-                    setIsPlusMenuOpen(false);
+                    closePlusMenu();
                     void createNote(null);
                   }}
                 >
@@ -318,7 +310,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                   type="button"
                   className="plus-menu-item"
                   onClick={() => {
-                    setIsPlusMenuOpen(false);
+                    closePlusMenu();
                     openImportModal('top-folder');
                   }}
                 >
@@ -330,7 +322,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                   type="button"
                   className="plus-menu-item"
                   onClick={() => {
-                    setIsPlusMenuOpen(false);
+                    closePlusMenu();
                     noteFileInputRef.current?.click();
                   }}
                 >
@@ -344,7 +336,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                   type="button"
                   className="plus-menu-item"
                   onClick={() => {
-                    setIsPlusMenuOpen(false);
+                    closePlusMenu();
                     openThemeModal();
                   }}
                 >

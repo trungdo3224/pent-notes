@@ -8,6 +8,22 @@ interface PdfViewerProps {
   className?: string;
 }
 
+function formatPdfFilename(title: string): string {
+  return title.endsWith('.pdf') ? title : `${title}.pdf`;
+}
+
+function convertDataUrlToBlobUrl(dataUrl: string): string {
+  const parts = dataUrl.split(',');
+  const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+  const binaryStr = atob(parts[1]);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: mime });
+  return URL.createObjectURL(blob);
+}
+
 export const PdfViewer: React.FC<PdfViewerProps> = ({
   title,
   filePath,
@@ -34,21 +50,12 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
     );
   }
 
+  const displayFilename = formatPdfFilename(title);
+
   const handleOpenExternal = () => {
     if (pdfData) {
-      // For data URL, convert to Blob URL to avoid browser URL length limits
       try {
-        const arr = pdfData.split(',');
-        const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/pdf';
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        const blob = new Blob([u8arr], { type: mime });
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, '_blank');
+        window.open(convertDataUrlToBlobUrl(pdfData), '_blank');
         return;
       } catch {
         window.open(pdfUrl, '_blank');
@@ -59,12 +66,12 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   };
 
   const handleDownload = () => {
-    const a = document.createElement('a');
-    a.href = pdfUrl;
-    a.download = title.endsWith('.pdf') ? title : `${title}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = displayFilename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -72,7 +79,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
       <div className="pdf-viewer-toolbar">
         <div className="pdf-viewer-info">
           <FileText size={15} className="pdf-badge-icon" />
-          <span className="pdf-viewer-filename">{title.endsWith('.pdf') ? title : `${title}.pdf`}</span>
+          <span className="pdf-viewer-filename">{displayFilename}</span>
         </div>
         <div className="pdf-viewer-actions">
           <button
@@ -110,4 +117,3 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
 };
 
 export default PdfViewer;
-

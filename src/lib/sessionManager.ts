@@ -1,3 +1,6 @@
+import { createId } from './fileUtils';
+import { postJson, requestJson } from './httpClient';
+
 export interface SessionInfo {
   id: string;
   name: string;
@@ -18,12 +21,28 @@ export interface SessionData {
 const SESSION_STORAGE_KEY = 'pentnotes_session_id';
 const LOCAL_STORAGE_LAST_SESSION = 'pentnotes_last_session';
 const PULSE_KEY = 'pentnotes_tab_pulse';
+const DEFAULT_SESSION_ID = 'default';
+const TAB_PULSE_INTERVAL_MS = 1000;
+const ACTIVE_TAB_THRESHOLD_MS = 2500;
 
 function generateSessionId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `session-${crypto.randomUUID().slice(0, 8)}`;
+  return createId('session');
+}
+
+function updateUrlSessionParam(sessionId: string): void {
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set('session', sessionId);
+  window.history.replaceState({}, '', nextUrl.toString());
+}
+
+function persistSessionInTabStorage(sessionId: string, syncUrl = false): string {
+  sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+  localStorage.setItem(LOCAL_STORAGE_LAST_SESSION, sessionId);
+  activeSessionIdCache = sessionId;
+  if (syncUrl) {
+    updateUrlSessionParam(sessionId);
   }
-  return `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  return sessionId;
 }
 
 // Start tab pulse for detecting concurrent tabs
@@ -32,11 +51,11 @@ if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(PULSE_KEY, Date.now().toString());
     } catch {
-      // ignore
+      // Ignore restricted storage environments
     }
   };
   pulse();
-  setInterval(pulse, 1000);
+  setInterval(pulse, TAB_PULSE_INTERVAL_MS);
 }
 
 let activeSessionIdCache: string | null = null;
@@ -44,7 +63,7 @@ let activeSessionNameCache: string | null = null;
 
 export function getTabSessionId(): string {
   if (typeof window === 'undefined') {
-    return 'default';
+    return DEFAULT_SESSION_ID;
   }
 
   if (activeSessionIdCache) {
@@ -56,24 +75,12 @@ export function getTabSessionId(): string {
 
   // Case 1: Explicit ?session=new
   if (paramSession === 'new') {
-    const newId = generateSessionId();
-    sessionStorage.setItem(SESSION_STORAGE_KEY, newId);
-    localStorage.setItem(LOCAL_STORAGE_LAST_SESSION, newId);
-    activeSessionIdCache = newId;
-
-    const newUrl = new URL(window.location.href);
-    newUrl.searchParams.set('session', newId);
-    window.history.replaceState({}, '', newUrl.toString());
-    return newId;
+    return persistSessionInTabStorage(generateSessionId(), true);
   }
 
   // Case 2: Specific session in URL ?session=<id>
   if (paramSession && paramSession.trim()) {
-    const trimmed = paramSession.trim();
-    sessionStorage.setItem(SESSION_STORAGE_KEY, trimmed);
-    localStorage.setItem(LOCAL_STORAGE_LAST_SESSION, trimmed);
-    activeSessionIdCache = trimmed;
-    return trimmed;
+    return persistSessionInTabStorage(paramSession.trim(), false);
   }
 
   // Case 3: Re-reading from current tab's sessionStorage (e.g. page refresh)
@@ -83,36 +90,21 @@ export function getTabSessionId(): string {
     return activeSessionIdCache;
   }
 
-  // Case 4: Brand new tab opened!
-  // Check if another tab is currently open (heartbeat pulse within last 2.5s)
-  const now = Date.now();
+  // Case 4: Brand new tab opened — check if another tab is currently active
   const lastPulse = Number(localStorage.getItem(PULSE_KEY) || '0');
-  const isAnotherTabActive = now - lastPulse < 2500;
+  const isAnotherTabActive = Date.now() - lastPulse < ACTIVE_TAB_THRESHOLD_MS;
 
-  let assignedId: string;
-  if (isAnotherTabActive) {
-    // Another tab is running -> Create a separate session for this new tab!
-    assignedId = generateSessionId();
-  } else {
-    // Only tab running -> resume last active session or default
-    assignedId = localStorage.getItem(LOCAL_STORAGE_LAST_SESSION) || 'default';
-  }
+  const assignedId = isAnotherTabActive
+    ? generateSessionId()
+    : localStorage.getItem(LOCAL_STORAGE_LAST_SESSION) || DEFAULT_SESSION_ID;
 
-  sessionStorage.setItem(SESSION_STORAGE_KEY, assignedId);
-  localStorage.setItem(LOCAL_STORAGE_LAST_SESSION, assignedId);
-  activeSessionIdCache = assignedId;
-
-  const newUrl = new URL(window.location.href);
-  newUrl.searchParams.set('session', assignedId);
-  window.history.replaceState({}, '', newUrl.toString());
-
-  return assignedId;
+  return persistSessionInTabStorage(assignedId, true);
 }
 
 export function getTabSessionName(): string {
   if (activeSessionNameCache) return activeSessionNameCache;
   const id = getTabSessionId();
-  if (id === 'default') return 'Default Session';
+  if (id === DEFAULT_SESSION_ID) return 'Default Session';
   return id.replace(/^session-/, 'Session ');
 }
 
@@ -122,77 +114,65 @@ export function setTabSessionName(name: string): void {
 
 export const sessionApi = {
   async listSessions(): Promise<SessionInfo[]> {
-    const res = await fetch('/api/sessions', { method: 'GET', cache: 'no-store' });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to list sessions.');
-    }
-    return res.json();
+    return requestJson<SessionInfo[]>(
+      '/api/sessions',
+      { method: 'GET', cache: 'no-store' },
+      'Failed to list sessions.'
+    );
   },
 
   async getSession(id: string): Promise<SessionData> {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
-      method: 'GET',
-      cache: 'no-store',
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to load session.');
-    }
-    const data: SessionData = await res.json();
+    const data = await requestJson<SessionData>(
+      `/api/sessions/${encodeURIComponent(id)}`,
+      { method: 'GET', cache: 'no-store' },
+      'Failed to load session.'
+    );
     setTabSessionName(data.name);
     return data;
   },
 
   async saveSession(id: string, payload: string, name?: string): Promise<void> {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payload, name }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to save session.');
-    }
+    await requestJson<{ ok: boolean }>(
+      `/api/sessions/${encodeURIComponent(id)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload, name }),
+      },
+      'Failed to save session.'
+    );
   },
 
   async createSession(name?: string, cloneFromId?: string): Promise<SessionData> {
-    const res = await fetch('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, cloneFromId }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to create session.');
-    }
-    const data = await res.json();
+    const data = await postJson<{ session: SessionData }>(
+      '/api/sessions',
+      { name, cloneFromId },
+      'Failed to create session.'
+    );
     return data.session;
   },
 
   async renameSession(id: string, newName: string): Promise<void> {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to rename session.');
-    }
+    await requestJson<{ ok: boolean }>(
+      `/api/sessions/${encodeURIComponent(id)}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName }),
+      },
+      'Failed to rename session.'
+    );
     if (id === getTabSessionId()) {
       setTabSessionName(newName);
     }
   },
 
   async deleteSession(id: string): Promise<void> {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Failed to delete session.');
-    }
+    await requestJson<{ ok: boolean }>(
+      `/api/sessions/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+      'Failed to delete session.'
+    );
   },
 
   openSessionInNewTab(id?: string): void {
@@ -208,4 +188,3 @@ export const sessionApi = {
     window.location.href = newUrl.toString();
   },
 };
-

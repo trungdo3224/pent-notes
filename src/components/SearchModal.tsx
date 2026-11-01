@@ -3,6 +3,11 @@ import { FileText, Folder, Search, X } from 'lucide-react';
 import { useNotesStore } from '../store/useNotesStore';
 import { ExplorerNode } from '../types';
 
+const SNIPPET_MAX_LENGTH = 140;
+const INITIAL_RESULTS_LIMIT = 20;
+const FILTERED_RESULTS_LIMIT = 30;
+const INPUT_FOCUS_DELAY_MS = 50;
+
 interface SearchResultItem {
   folderId: string;
   folderName: string;
@@ -21,13 +26,14 @@ function collectNotes(
   const results: SearchResultItem[] = [];
   for (const node of nodes) {
     if (node.type === 'note') {
+      const displayTitle = node.title.trim() || 'Untitled';
       results.push({
         folderId,
         folderName,
         noteId: node.id,
-        title: node.title.trim() || 'Untitled',
-        snippet: (node.content || '').slice(0, 140).replace(/\s+/g, ' '),
-        path: [...currentPath, node.title.trim() || 'Untitled'],
+        title: displayTitle,
+        snippet: (node.content || '').slice(0, SNIPPET_MAX_LENGTH).replace(/\s+/g, ' '),
+        path: [...currentPath, displayTitle],
       });
     } else if (node.type === 'folder') {
       results.push(
@@ -65,7 +71,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, initi
   // Filter notes based on query
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return allNotes.slice(0, 20);
+    if (!q) return allNotes.slice(0, INITIAL_RESULTS_LIMIT);
     return allNotes
       .filter(
         (item) =>
@@ -73,7 +79,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, initi
           item.folderName.toLowerCase().includes(q) ||
           item.snippet.toLowerCase().includes(q)
       )
-      .slice(0, 30);
+      .slice(0, FILTERED_RESULTS_LIMIT);
   }, [allNotes, query]);
 
   useEffect(() => {
@@ -85,7 +91,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose, initi
         if (initialQuery) {
           inputRef.current?.select();
         }
-      }, 50);
+      }, INPUT_FOCUS_DELAY_MS);
     }
   }, [isOpen, initialQuery]);
 

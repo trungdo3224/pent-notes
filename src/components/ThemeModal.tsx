@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Check, Moon, Sun, X } from 'lucide-react';
+import { useEscapeKey } from '../hooks/useDomInteractions';
 import { ThemeId, themes } from '../themes';
 
 interface ThemeModalProps {
@@ -9,15 +10,7 @@ interface ThemeModalProps {
 }
 
 export const ThemeModal: React.FC<ThemeModalProps> = ({ theme, onChoose, onClose }) => {
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  useEscapeKey(true, onClose);
 
   return (
     <div
@@ -122,4 +115,3 @@ export const ThemeModal: React.FC<ThemeModalProps> = ({ theme, onChoose, onClose
     </div>
   );
 };
-

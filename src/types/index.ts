@@ -32,4 +32,9 @@ export type PdfViewMode = 'pdf' | 'split' | 'notes';
 
 export type SortOrder = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc';
 
+export type ImportTargetMode = 'top-folder' | 'subfolder' | 'note';
+
+export type CatalogTab = 'outline' | 'tags' | 'info';
+
+
 

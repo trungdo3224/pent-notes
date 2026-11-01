@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FolderExplorer } from './components/FolderExplorer';
 import { FolderNavbar } from './components/FolderNavbar';
 import { ImportModal } from './components/ImportModal';
@@ -8,7 +8,12 @@ import { NoteEditor } from './components/NoteEditor';
 import { SearchModal } from './components/SearchModal';
 import { SessionModal } from './components/SessionModal';
 import { ThemeModal } from './components/ThemeModal';
-import { useNotesStore } from './store/useNotesStore';
+import { usePointerDrag } from './hooks/useDomInteractions';
+import {
+  DEFAULT_RIGHT_SIDEBAR_WIDTH,
+  DEFAULT_SIDEBAR_WIDTH,
+  useNotesStore,
+} from './store/useNotesStore';
 import { applyTheme } from './themes';
 
 export const App: React.FC = () => {
@@ -41,84 +46,46 @@ export const App: React.FC = () => {
     applyTheme(theme);
   }, [theme]);
 
-  // Handle dragging sidebar resize
-  useEffect(() => {
-    if (!isDraggingSidebar) return;
-
-    const handlePointerMove = (e: MouseEvent | TouchEvent) => {
+  const handleLeftSidebarDrag = useCallback(
+    (clientX: number) => {
       if (!workspaceRef.current) return;
-      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const rect = workspaceRef.current.getBoundingClientRect();
-      const newWidth = clientX - rect.left;
-      setSidebarWidth(newWidth);
-    };
+      setSidebarWidth(clientX - rect.left);
+    },
+    [setSidebarWidth]
+  );
 
-    const handlePointerUp = () => {
-      setIsDraggingSidebar(false);
-      document.body.classList.remove('is-col-resizing');
-    };
-
-    document.body.classList.add('is-col-resizing');
-    window.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
-    window.addEventListener('touchmove', handlePointerMove);
-    window.addEventListener('touchend', handlePointerUp);
-
-    return () => {
-      document.body.classList.remove('is-col-resizing');
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-      window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('touchend', handlePointerUp);
-    };
-  }, [isDraggingSidebar, setSidebarWidth]);
-
-  // Handle dragging right sidebar resize
-  useEffect(() => {
-    if (!isDraggingRightSidebar) return;
-
-    const handlePointerMove = (e: MouseEvent | TouchEvent) => {
+  const handleRightSidebarDrag = useCallback(
+    (clientX: number) => {
       if (!workspaceRef.current) return;
-      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const rect = workspaceRef.current.getBoundingClientRect();
-      const newWidth = rect.right - clientX;
-      setRightSidebarWidth(newWidth);
-    };
+      setRightSidebarWidth(rect.right - clientX);
+    },
+    [setRightSidebarWidth]
+  );
 
-    const handlePointerUp = () => {
-      setIsDraggingRightSidebar(false);
-      document.body.classList.remove('is-col-resizing');
-    };
+  const stopDraggingLeftSidebar = useCallback(() => setIsDraggingSidebar(false), []);
+  const stopDraggingRightSidebar = useCallback(() => setIsDraggingRightSidebar(false), []);
 
-    document.body.classList.add('is-col-resizing');
-    window.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
-    window.addEventListener('touchmove', handlePointerMove);
-    window.addEventListener('touchend', handlePointerUp);
-
-    return () => {
-      document.body.classList.remove('is-col-resizing');
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-      window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('touchend', handlePointerUp);
-    };
-  }, [isDraggingRightSidebar, setRightSidebarWidth]);
+  usePointerDrag(isDraggingSidebar, handleLeftSidebarDrag, stopDraggingLeftSidebar);
+  usePointerDrag(isDraggingRightSidebar, handleRightSidebarDrag, stopDraggingRightSidebar);
 
   // Global keyboard shortcuts: Ctrl+K for search, Ctrl+\ for sidebar, Ctrl+] for catalog, Ctrl+Shift+\ for navbar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      if (!(e.ctrlKey || e.metaKey)) return;
+
+      if (e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setSearchInitialQuery('');
         setIsSearchOpen((prev) => !prev);
-      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === '\\') {
+      } else if (e.shiftKey && e.key === '\\') {
         e.preventDefault();
         toggleNavbar();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+      } else if (e.key === '\\') {
         e.preventDefault();
         toggleSidebar();
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === ']' || e.key === '}')) {
+      } else if (e.key === ']' || e.key === '}') {
         e.preventDefault();
         toggleRightSidebar();
       }
@@ -154,7 +121,7 @@ export const App: React.FC = () => {
               setIsDraggingSidebar(true);
             }}
             onTouchStart={() => setIsDraggingSidebar(true)}
-            onDoubleClick={() => setSidebarWidth(280)}
+            onDoubleClick={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
             title="Drag to resize sidebar (Double-click to reset)"
           >
             <div className="sidebar-resizer-line" />
@@ -172,7 +139,7 @@ export const App: React.FC = () => {
               setIsDraggingRightSidebar(true);
             }}
             onTouchStart={() => setIsDraggingRightSidebar(true)}
-            onDoubleClick={() => setRightSidebarWidth(270)}
+            onDoubleClick={() => setRightSidebarWidth(DEFAULT_RIGHT_SIDEBAR_WIDTH)}
             title="Drag to resize catalog sidebar (Double-click to reset)"
           >
             <div className="sidebar-resizer-line" />

@@ -14,6 +14,7 @@ import {
   Search,
   Tag,
 } from 'lucide-react';
+import { useCopyFeedback } from '../hooks/useDomInteractions';
 import {
   calculateNoteStats,
   extractAllWorkspaceTags,
@@ -21,7 +22,13 @@ import {
   extractTags,
   scrollToHeading,
 } from '../lib/catalogUtils';
-import { findDefaultNoteId, findNoteAndPath, useNotesStore } from '../store/useNotesStore';
+import {
+  DEFAULT_RIGHT_SIDEBAR_WIDTH,
+  resolveActiveNoteData,
+  useNotesStore,
+} from '../store/useNotesStore';
+
+const MIN_HEADINGS_FOR_FILTER = 4;
 
 interface NoteCatalogSidebarProps {
   onOpenSearchWithQuery?: (query: string) => void;
@@ -35,33 +42,24 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
   const selectedNoteByFolder = useNotesStore((s) => s.selectedNoteByFolder);
   const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
   const isCollapsed = useNotesStore((s) => s.isRightSidebarCollapsed);
-  const width = useNotesStore((s) => s.rightSidebarWidth ?? 270);
+  const width = useNotesStore((s) => s.rightSidebarWidth ?? DEFAULT_RIGHT_SIDEBAR_WIDTH);
   const activeTab = useNotesStore((s) => s.rightSidebarTab ?? 'outline');
 
   const toggleRightSidebar = useNotesStore((s) => s.toggleRightSidebar);
   const setRightSidebarTab = useNotesStore((s) => s.setRightSidebarTab);
 
   const [headingFilter, setHeadingFilter] = useState('');
-  const [copiedPath, setCopiedPath] = useState(false);
+  const [copiedPath, copyPath] = useCopyFeedback();
 
   const activeFolder = useMemo(
     () => folders.find((f) => f.id === selectedFolderId) ?? null,
     [folders, selectedFolderId]
   );
 
-  const activeNoteData = useMemo(() => {
-    if (!activeFolder) return null;
-    const preferredId = selectedNoteByFolder[activeFolder.id];
-    if (preferredId) {
-      const found = findNoteAndPath(activeFolder.items, preferredId, [activeFolder.name]);
-      if (found) return found;
-    }
-    const fallbackId = findDefaultNoteId(activeFolder.items, sortOrder);
-    if (fallbackId) {
-      return findNoteAndPath(activeFolder.items, fallbackId, [activeFolder.name]);
-    }
-    return null;
-  }, [activeFolder, selectedNoteByFolder, sortOrder]);
+  const activeNoteData = useMemo(
+    () => resolveActiveNoteData(activeFolder, selectedNoteByFolder, sortOrder),
+    [activeFolder, selectedNoteByFolder, sortOrder]
+  );
 
   const note = activeNoteData?.note ?? null;
 
@@ -91,13 +89,6 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
   }, [note?.content]);
 
   if (isCollapsed) return null;
-
-  const handleCopyPath = (path: string) => {
-    navigator.clipboard.writeText(path).then(() => {
-      setCopiedPath(true);
-      setTimeout(() => setCopiedPath(false), 2000);
-    });
-  };
 
   return (
     <aside
@@ -175,7 +166,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
             {/* Outline / Table of Contents Tab */}
             {activeTab === 'outline' && (
               <div className="catalog-outline-view">
-                {headings.length > 4 && (
+                {headings.length > MIN_HEADINGS_FOR_FILTER && (
                   <div className="catalog-search-wrapper">
                     <Search size={12} className="catalog-search-icon" />
                     <input
@@ -322,7 +313,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                         type="button"
                         className="subtle-btn is-compact"
                         style={{ marginTop: 8 }}
-                        onClick={() => handleCopyPath(note.filePath!)}
+                        onClick={() => copyPath(note.filePath!)}
                       >
                         <Copy size={12} />
                         <span>{copiedPath ? 'Copied path!' : 'Copy absolute path'}</span>
@@ -371,4 +362,3 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
     </aside>
   );
 };
-

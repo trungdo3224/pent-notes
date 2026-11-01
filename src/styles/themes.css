@@ -30,6 +30,7 @@
   --button-text: #05101a;
   --accent: #f43f5e;
   --secondary: #f43f5e;
+  --folder-contrast: #f97316;
 
   /* High-Contrast Selection & Caret */
   --caret: #00e5ff;
@@ -78,6 +79,7 @@
   --button-text: #041a12;
   --accent: #06b6d4;
   --secondary: #06b6d4;
+  --folder-contrast: #f97316;
 
   /* High-Contrast Selection & Caret */
   --caret: #10b981;
@@ -126,6 +128,7 @@
   --button-text: #1f0b03;
   --accent: #f43f5e;
   --secondary: #f43f5e;
+  --folder-contrast: #00e5ff;
 
   /* High-Contrast Selection & Caret */
   --caret: #f97316;
@@ -178,6 +181,7 @@
   --button-text: #ffffff;
   --accent: #0284c7;
   --secondary: #0284c7;
+  --folder-contrast: #0284c7;
 
   /* High-Contrast Selection & Caret */
   --caret: #c2410c;
@@ -226,6 +230,7 @@
   --button-text: #ffffff;
   --accent: #0d9488;
   --secondary: #0d9488;
+  --folder-contrast: #ea580c;
 
   /* High-Contrast Selection & Caret */
   --caret: #0284c7;
@@ -274,6 +279,7 @@
   --button-text: #ffffff;
   --accent: #6366f1;
   --secondary: #6366f1;
+  --folder-contrast: #0d9488;
 
   /* High-Contrast Selection & Caret */
   --caret: #9d174d;

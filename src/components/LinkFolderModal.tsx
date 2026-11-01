@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Check, FolderSync, HardDrive, LoaderCircle, Sparkles, X } from 'lucide-react';
+import { useEscapeKey } from '../hooks/useDomInteractions';
 import { useNotesStore } from '../store/useNotesStore';
+
+const SAMPLE_LOCAL_PATHS = [
+  'C:\\Users\\Skdu\\Desktop\\Techie\\pentest-book',
+  'C:\\Users\\Skdu\\Desktop\\Techie\\Web-pentest\\Web-pentest-vault',
+] as const;
 
 export const LinkFolderModal: React.FC = () => {
   const isOpen = useNotesStore((s) => s.isLinkModalOpen);
@@ -12,7 +18,7 @@ export const LinkFolderModal: React.FC = () => {
 
   const activeFolder = folders.find((f) => f.id === selectedFolderId) ?? null;
 
-  const [folderPath, setFolderPath] = useState('C:\\Users\\Skdu\\Desktop\\Techie\\pentest-book');
+  const [folderPath, setFolderPath] = useState<string>(SAMPLE_LOCAL_PATHS[0]);
   const [targetMode, setTargetMode] = useState<'new-tab' | 'current-tab'>('new-tab');
   const [customName, setCustomName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -25,17 +31,7 @@ export const LinkFolderModal: React.FC = () => {
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) {
-        closeLinkModal();
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      return () => document.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen, busy, closeLinkModal]);
+  useEscapeKey(isOpen && !busy, closeLinkModal);
 
   if (!isOpen) return null;
 
@@ -65,11 +61,6 @@ export const LinkFolderModal: React.FC = () => {
       setBusy(false);
     }
   };
-
-  const samplePaths = [
-    'C:\\Users\\Skdu\\Desktop\\Techie\\pentest-book',
-    'C:\\Users\\Skdu\\Desktop\\Techie\\Web-pentest\\Web-pentest-vault',
-  ];
 
   return (
     <div
@@ -116,7 +107,7 @@ export const LinkFolderModal: React.FC = () => {
             <Sparkles size={12} /> Detected Local Folders:
           </span>
           <div className="link-presets-list">
-            {samplePaths.map((preset) => (
+            {SAMPLE_LOCAL_PATHS.map((preset) => (
               <button
                 key={preset}
                 type="button"
@@ -226,4 +217,3 @@ export const LinkFolderModal: React.FC = () => {
     </div>
   );
 };
-

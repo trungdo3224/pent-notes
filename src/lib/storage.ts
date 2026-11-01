@@ -9,6 +9,7 @@ interface StoredEnvelope {
 const IDB_NAME = 'pentnotes-db';
 const IDB_STORE = 'workspace-kv';
 const IDB_VERSION = 2;
+const SERVER_WRITE_DEBOUNCE_MS = 150;
 
 function openIdb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -28,20 +29,22 @@ function openIdb(): Promise<IDBDatabase> {
   });
 }
 
+function isStoredEnvelope(val: unknown): val is StoredEnvelope {
+  return (
+    Boolean(val) &&
+    typeof val === 'object' &&
+    typeof (val as StoredEnvelope).savedAt === 'number' &&
+    typeof (val as StoredEnvelope).payload === 'string'
+  );
+}
+
 async function idbGet(key: string): Promise<StoredEnvelope | null> {
   try {
     const db = await openIdb();
     return await new Promise<StoredEnvelope | null>((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, 'readonly');
       const req = tx.objectStore(IDB_STORE).get(key);
-      req.onsuccess = () => {
-        const val = req.result;
-        if (val && typeof val.savedAt === 'number' && typeof val.payload === 'string') {
-          resolve(val as StoredEnvelope);
-        } else {
-          resolve(null);
-        }
-      };
+      req.onsuccess = () => resolve(isStoredEnvelope(req.result) ? req.result : null);
       req.onerror = () => reject(req.error);
     });
   } catch {
@@ -49,12 +52,14 @@ async function idbGet(key: string): Promise<StoredEnvelope | null> {
   }
 }
 
-async function idbSet(key: string, envelope: StoredEnvelope): Promise<void> {
+async function idbMutate(
+  operation: (store: IDBObjectStore) => void
+): Promise<void> {
   try {
     const db = await openIdb();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).put(envelope, key);
+      operation(tx.objectStore(IDB_STORE));
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -63,18 +68,16 @@ async function idbSet(key: string, envelope: StoredEnvelope): Promise<void> {
   }
 }
 
+async function idbSet(key: string, envelope: StoredEnvelope): Promise<void> {
+  await idbMutate((store) => {
+    store.put(envelope, key);
+  });
+}
+
 async function idbDelete(key: string): Promise<void> {
-  try {
-    const db = await openIdb();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, 'readwrite');
-      tx.objectStore(IDB_STORE).delete(key);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  } catch {
-    // Ignore
-  }
+  await idbMutate((store) => {
+    store.delete(key);
+  });
 }
 
 async function serverGet(sessionId: string): Promise<StoredEnvelope | null> {
@@ -132,7 +135,7 @@ function scheduleServerWrite(sessionId: string, envelope: StoredEnvelope): void 
       pendingEnvelope = null;
       void serverSet(sessionId, toWrite);
     }
-  }, 150);
+  }, SERVER_WRITE_DEBOUNCE_MS);
 }
 
 if (typeof window !== 'undefined') {
@@ -155,10 +158,14 @@ if (typeof window !== 'undefined') {
   });
 }
 
+function getSessionStorageKey(name: string): { sessionId: string; idbKey: string } {
+  const sessionId = getTabSessionId();
+  return { sessionId, idbKey: `${name}:${sessionId}` };
+}
+
 export const workspaceStorage: StateStorage = {
   async getItem(name: string): Promise<string | null> {
-    const sessionId = getTabSessionId();
-    const idbKey = `${name}:${sessionId}`;
+    const { sessionId, idbKey } = getSessionStorageKey(name);
     const [localEnv, diskEnv] = await Promise.all([idbGet(idbKey), serverGet(sessionId)]);
 
     if (localEnv && diskEnv) {
@@ -186,8 +193,7 @@ export const workspaceStorage: StateStorage = {
   },
 
   async setItem(name: string, value: string): Promise<void> {
-    const sessionId = getTabSessionId();
-    const idbKey = `${name}:${sessionId}`;
+    const { sessionId, idbKey } = getSessionStorageKey(name);
     const envelope: StoredEnvelope = {
       savedAt: Date.now(),
       payload: value,
@@ -197,13 +203,12 @@ export const workspaceStorage: StateStorage = {
   },
 
   async removeItem(name: string): Promise<void> {
-    const sessionId = getTabSessionId();
-    const idbKey = `${name}:${sessionId}`;
+    const { sessionId, idbKey } = getSessionStorageKey(name);
     await idbDelete(idbKey);
     try {
       await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
     } catch {
-      // Ignore
+      // Ignore network errors when deleting session
     }
   },
 };
