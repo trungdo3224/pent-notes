@@ -101,6 +101,40 @@ function resolveParentDiskPath(
 const contentSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const titleRenameTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+export function hasPendingDiskOperations(): boolean {
+  return contentSaveTimers.size > 0 || titleRenameTimers.size > 0;
+}
+
+function areNodeTreesEqual(a: ExplorerNode[], b: ExplorerNode[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const nodeA = a[i];
+    const nodeB = b[i];
+    if (nodeA.id !== nodeB.id || nodeA.type !== nodeB.type) return false;
+    if (nodeA.type === 'note' && nodeB.type === 'note') {
+      if (
+        nodeA.title !== nodeB.title ||
+        nodeA.content !== nodeB.content ||
+        nodeA.filePath !== nodeB.filePath ||
+        nodeA.fileType !== nodeB.fileType ||
+        nodeA.updatedAt !== nodeB.updatedAt
+      ) {
+        return false;
+      }
+    } else if (nodeA.type === 'folder' && nodeB.type === 'folder') {
+      if (
+        nodeA.name !== nodeB.name ||
+        nodeA.folderPath !== nodeB.folderPath ||
+        !areNodeTreesEqual(nodeA.children, nodeB.children)
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 export interface NotesState {
   // Persisted workspace state
   folders: TopLevelFolder[];
@@ -143,6 +177,7 @@ export interface NotesState {
   navigateToNote: (topFolderId: string, noteId: string) => void;
   toggleNoteLink: (activeNoteId: string, targetNoteId: string) => void;
   createNote: (parentFolderId: string | null) => Promise<string | null>;
+  duplicateNote: (noteId: string, parentFolderId: string | null) => Promise<string | null>;
   createSubfolder: (parentFolderId: string | null) => Promise<string | null>;
   renameSubfolder: (subfolderId: string, newName: string) => void;
   deleteNode: (nodeId: string) => void;
@@ -229,7 +264,13 @@ export const useNotesStore = create<NotesState>()(
 
       setHydrated: (hydrated) => set({ isHydrated: hydrated }),
 
-      selectFolder: (folderId) => set({ selectedFolderId: folderId }),
+      selectFolder: (folderId) => {
+        set({ selectedFolderId: folderId });
+        const target = get().folders.find((f) => f.id === folderId);
+        if (target?.localPath) {
+          void get().syncFolderFromDisk(folderId);
+        }
+      },
 
       createTopFolder: () => {
         const newFolder: TopLevelFolder = {
@@ -403,6 +444,58 @@ export const useNotesStore = create<NotesState>()(
         }
 
         return newNote.id;
+      },
+
+      duplicateNote: async (noteId, parentFolderId) => {
+        const state = get();
+        const currentFolder = getSelectedTopFolder(state);
+        if (!currentFolder) return null;
+
+        const sourceNote = findNoteNode(currentFolder.items, noteId);
+        if (!sourceNote) return null;
+
+        const copyTitle = `${(sourceNote.title || 'Untitled').trim()} (Copy)`;
+        const duplicated: NoteItem = {
+          id: createId('note'),
+          type: 'note',
+          title: copyTitle,
+          content: sourceNote.content,
+          fileType: sourceNote.fileType,
+          pdfData: sourceNote.pdfData,
+          updatedAt: todayDateString(),
+        };
+
+        set((s) => ({
+          folders: mapFolderById(s.folders, s.selectedFolderId, (folder) => ({
+            ...folder,
+            items: insertIntoTree(folder.items, parentFolderId, duplicated),
+          })),
+          selectedNoteByFolder: {
+            ...s.selectedNoteByFolder,
+            [currentFolder.id]: duplicated.id,
+          },
+        }));
+
+        const parentPath = resolveParentDiskPath(currentFolder, parentFolderId);
+        if (parentPath && sourceNote.fileType !== 'pdf') {
+          try {
+            const filename = `${sanitizeFilename(copyTitle)}.md`;
+            const diskNote = await fsApi.createFile(parentPath, filename, sourceNote.content);
+            set((s) => ({
+              folders: mapFolderById(s.folders, s.selectedFolderId, (folder) => ({
+                ...folder,
+                items: updateNoteInTree(folder.items, duplicated.id, {
+                  title: diskNote.title,
+                  filePath: diskNote.filePath,
+                }),
+              })),
+            }));
+          } catch (err) {
+            console.error('Failed to duplicate file on disk:', err);
+          }
+        }
+
+        return duplicated.id;
       },
 
       createSubfolder: async (parentFolderId) => {
@@ -661,13 +754,34 @@ export const useNotesStore = create<NotesState>()(
         }),
 
       syncFolderFromDisk: async (folderId: string): Promise<boolean> => {
-        const folder = get().folders.find((f) => f.id === folderId);
+        const stateSnapshot = get();
+        if (stateSnapshot.isSyncingFolderId || hasPendingDiskOperations()) {
+          return false;
+        }
+        const folder = stateSnapshot.folders.find((f) => f.id === folderId);
         if (!folder || !folder.localPath) return false;
 
         set({ isSyncingFolderId: folderId });
         try {
           const result = await fsApi.scanFolder(folder.localPath);
-          const mergedItems = matchAndPreserveIds(result.items, folder.items);
+          if (hasPendingDiskOperations()) {
+            return false;
+          }
+
+          const latestFolder = get().folders.find((f) => f.id === folderId);
+          if (!latestFolder || !latestFolder.localPath) return false;
+
+          const mergedItems = matchAndPreserveIds(result.items, latestFolder.items);
+          const nextName =
+            latestFolder.name === 'Untitled Folder' ? result.rootName : latestFolder.name;
+
+          if (
+            areNodeTreesEqual(latestFolder.items, mergedItems) &&
+            latestFolder.name === nextName &&
+            latestFolder.localPath === result.rootPath
+          ) {
+            return true;
+          }
 
           set((state) => {
             const currentSelected = state.selectedNoteByFolder[folderId];
@@ -679,7 +793,7 @@ export const useNotesStore = create<NotesState>()(
             return {
               folders: mapFolderById(state.folders, folderId, (f) => ({
                 ...f,
-                name: f.name === 'Untitled Folder' ? result.rootName : f.name,
+                name: nextName,
                 items: mergedItems,
                 localPath: result.rootPath,
               })),

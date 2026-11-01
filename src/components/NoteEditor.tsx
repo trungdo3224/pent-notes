@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   BookOpen,
   Check,
+  ChevronDown,
   ChevronRight,
   Columns2,
   Eye,
-  FilePlus,
   FileText,
   FileUp,
   Folder,
@@ -55,7 +55,6 @@ export const NoteEditor: React.FC = () => {
   const updateNote = useNotesStore((s) => s.updateNote);
   const navigateToNote = useNotesStore((s) => s.navigateToNote);
   const toggleNoteLink = useNotesStore((s) => s.toggleNoteLink);
-  const createNote = useNotesStore((s) => s.createNote);
   const createTopFolder = useNotesStore((s) => s.createTopFolder);
   const openImportModal = useNotesStore((s) => s.openImportModal);
   const clearFocusNoteTitle = useNotesStore((s) => s.clearFocusNoteTitle);
@@ -179,19 +178,10 @@ export const NoteEditor: React.FC = () => {
             </p>
             <p className="editor-empty-subtitle">
               {hasActiveFolder
-                ? 'Choose a note from the folder explorer or create a new one.'
+                ? 'Choose a note from the folder explorer or right-click in the sidebar to create a new note or subfolder.'
                 : 'Create a folder or import an existing notes directory to get started.'}
             </p>
-            {hasActiveFolder ? (
-              <button
-                type="button"
-                className="primary-subtle-btn"
-                onClick={() => void createNote(null)}
-              >
-                <FilePlus size={15} />
-                <span>New note</span>
-              </button>
-            ) : (
+            {!hasActiveFolder && (
               <div className="empty-state-actions">
                 <button
                   type="button"
@@ -327,73 +317,6 @@ export const NoteEditor: React.FC = () => {
             {words} {words === 1 ? 'word' : 'words'}
           </span>
 
-          {/* Connect / Link Note Picker */}
-          <div className="editor-link-picker-wrap" ref={linkPickerRef}>
-            <button
-              type="button"
-              className={`mode-btn editor-link-btn ${
-                isLinkPickerOpen || connections.linkedNotes.length > 0 ? 'is-active' : ''
-              }`}
-              onClick={() => setIsLinkPickerOpen((v) => !v)}
-              title="Connect / link this note with other notes across folders"
-              aria-label="Link notes"
-            >
-              <Link2 size={13} strokeWidth={2} />
-              <span>Link Note</span>
-              {connections.linkedNotes.length > 0 && (
-                <span className="editor-link-count-badge">{connections.linkedNotes.length}</span>
-              )}
-            </button>
-
-            {isLinkPickerOpen && (
-              <div className="editor-link-popover">
-                <div className="editor-link-popover-header">
-                  <span>CONNECT NOTES</span>
-                  <span className="editor-link-popover-hint">or type [[Note Title]]</span>
-                </div>
-                <div className="editor-link-search">
-                  <Search size={12} className="editor-link-search-icon" />
-                  <input
-                    type="text"
-                    className="editor-link-search-input"
-                    placeholder="Filter notes or folders..."
-                    value={linkFilter}
-                    onChange={(e) => setLinkFilter(e.target.value)}
-                    autoFocus
-                  />
-                </div>
-                <div className="editor-link-list">
-                  {connectableNotes.length === 0 ? (
-                    <div className="editor-link-empty">No other notes found in workspace.</div>
-                  ) : (
-                    connectableNotes.map((opt) => {
-                      const isLinked = connections.linkedNoteIds.has(opt.note.id);
-                      const pathLabel = [opt.topFolderName, ...opt.subfolderNames].join(' / ');
-                      return (
-                        <button
-                          key={opt.note.id}
-                          type="button"
-                          className={`editor-link-option ${isLinked ? 'is-linked' : ''}`}
-                          onClick={() => toggleNoteLink(note.id, opt.note.id)}
-                        >
-                          <div className="editor-link-option-info">
-                            <span className="editor-link-option-title">
-                              {opt.note.title.trim() || 'Untitled'}
-                            </span>
-                            <span className="editor-link-option-path">{pathLabel}</span>
-                          </div>
-                          <span className="editor-link-option-check">
-                            {isLinked ? <Check size={13} strokeWidth={2.3} /> : <Plus size={13} />}
-                          </span>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
           {isPdf ? (
             <div className="editor-mode-switch" role="group" aria-label="PDF view mode">
               <button
@@ -463,17 +386,95 @@ export const NoteEditor: React.FC = () => {
             hidden
             onChange={(e) => void handleAttachPdf(e)}
           />
-          {!isPdf && (
+
+          {/* Collapsible Link & Attach Menu */}
+          <div className="editor-link-picker-wrap" ref={linkPickerRef}>
             <button
               type="button"
-              className="mode-btn attach-pdf-btn"
-              onClick={() => pdfAttachInputRef.current?.click()}
-              title="Attach a PDF to view side-by-side with this note"
+              className={`mode-btn editor-link-btn ${
+                isLinkPickerOpen || connections.linkedNotes.length > 0 ? 'is-active' : ''
+              }`}
+              onClick={() => setIsLinkPickerOpen((v) => !v)}
+              title="Link notes or attach a PDF to this note"
+              aria-label="Link notes and attach files"
+              aria-expanded={isLinkPickerOpen}
             >
-              <FileUp size={13} strokeWidth={1.8} />
-              <span>Attach PDF</span>
+              <Link2 size={13} strokeWidth={2} />
+              <span>Link & Attach</span>
+              {connections.linkedNotes.length > 0 && (
+                <span className="editor-link-count-badge">{connections.linkedNotes.length}</span>
+              )}
+              <ChevronDown size={12} strokeWidth={2} />
             </button>
-          )}
+
+            {isLinkPickerOpen && (
+              <div className="editor-link-popover">
+                {!isPdf && (
+                  <>
+                    <button
+                      type="button"
+                      className="editor-attach-pdf-menu-item"
+                      onClick={() => {
+                        closeLinkPicker();
+                        pdfAttachInputRef.current?.click();
+                      }}
+                    >
+                      <FileUp size={14} strokeWidth={1.9} className="attach-pdf-menu-icon" />
+                      <div className="attach-pdf-menu-text">
+                        <span className="attach-pdf-menu-title">Attach PDF to note...</span>
+                        <span className="attach-pdf-menu-sub">View PDF side-by-side with notes</span>
+                      </div>
+                    </button>
+                    <div className="dropdown-menu-divider" />
+                  </>
+                )}
+
+                <div className="editor-link-popover-header">
+                  <span>CONNECT NOTES</span>
+                  <span className="editor-link-popover-hint">or type [[Note Title]]</span>
+                </div>
+                <div className="editor-link-search">
+                  <Search size={12} className="editor-link-search-icon" />
+                  <input
+                    type="text"
+                    className="editor-link-search-input"
+                    placeholder="Filter notes or folders..."
+                    value={linkFilter}
+                    onChange={(e) => setLinkFilter(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="editor-link-list">
+                  {connectableNotes.length === 0 ? (
+                    <div className="editor-link-empty">No other notes found in workspace.</div>
+                  ) : (
+                    connectableNotes.map((opt) => {
+                      const isLinked = connections.linkedNoteIds.has(opt.note.id);
+                      const pathLabel = [opt.topFolderName, ...opt.subfolderNames].join(' / ');
+                      return (
+                        <button
+                          key={opt.note.id}
+                          type="button"
+                          className={`editor-link-option ${isLinked ? 'is-linked' : ''}`}
+                          onClick={() => toggleNoteLink(note.id, opt.note.id)}
+                        >
+                          <div className="editor-link-option-info">
+                            <span className="editor-link-option-title">
+                              {opt.note.title.trim() || 'Untitled'}
+                            </span>
+                            <span className="editor-link-option-path">{pathLabel}</span>
+                          </div>
+                          <span className="editor-link-option-check">
+                            {isLinked ? <Check size={13} strokeWidth={2.3} /> : <Plus size={13} />}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="editor-topbar-divider" />
 

@@ -19,6 +19,7 @@ import { applyTheme } from './themes';
 export const App: React.FC = () => {
   const folders = useNotesStore((s) => s.folders);
   const selectedFolderId = useNotesStore((s) => s.selectedFolderId);
+  const isHydrated = useNotesStore((s) => s.isHydrated);
   const theme = useNotesStore((s) => s.theme);
   const isThemeModalOpen = useNotesStore((s) => s.isThemeModalOpen);
   const importModalMode = useNotesStore((s) => s.importModalMode);
@@ -29,6 +30,7 @@ export const App: React.FC = () => {
   const toggleSidebar = useNotesStore((s) => s.toggleSidebar);
   const toggleNavbar = useNotesStore((s) => s.toggleNavbar);
   const toggleRightSidebar = useNotesStore((s) => s.toggleRightSidebar);
+  const syncFolderFromDisk = useNotesStore((s) => s.syncFolderFromDisk);
 
   const chooseTheme = useNotesStore((s) => s.chooseTheme);
   const closeThemeModal = useNotesStore((s) => s.closeThemeModal);
@@ -45,6 +47,33 @@ export const App: React.FC = () => {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  const activeLocalPath = useMemo(
+    () => folders.find((f) => f.id === selectedFolderId)?.localPath ?? null,
+    [folders, selectedFolderId]
+  );
+
+  // Automatic background disk synchronization for linked local folders
+  useEffect(() => {
+    if (!isHydrated || !selectedFolderId || !activeLocalPath) return;
+
+    const triggerAutoSync = () => {
+      if (document.visibilityState === 'hidden') return;
+      void syncFolderFromDisk(selectedFolderId);
+    };
+
+    triggerAutoSync();
+
+    const intervalId = window.setInterval(triggerAutoSync, 4000);
+    window.addEventListener('focus', triggerAutoSync);
+    document.addEventListener('visibilitychange', triggerAutoSync);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', triggerAutoSync);
+      document.removeEventListener('visibilitychange', triggerAutoSync);
+    };
+  }, [isHydrated, selectedFolderId, activeLocalPath, syncFolderFromDisk]);
 
   const handleLeftSidebarDrag = useCallback(
     (clientX: number) => {

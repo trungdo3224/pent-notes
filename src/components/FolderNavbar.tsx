@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronDown,
-  FilePlus,
   FileUp,
   Folder,
   FolderPlus,
@@ -12,8 +10,6 @@ import {
   Link2,
   Notebook,
   Palette,
-  PanelLeftClose,
-  PanelLeftOpen,
   PanelTopClose,
   PanelTopOpen,
   Pencil,
@@ -40,14 +36,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const selectedNoteByFolder = useNotesStore((s) => s.selectedNoteByFolder);
   const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
   const pendingRenameFolderId = useNotesStore((s) => s.pendingRenameFolderId);
-  const isSidebarCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
-  const toggleSidebar = useNotesStore((s) => s.toggleSidebar);
   const toggleNavbar = useNotesStore((s) => s.toggleNavbar);
   const selectFolder = useNotesStore((s) => s.selectFolder);
   const navigateToNote = useNotesStore((s) => s.navigateToNote);
   const createTopFolder = useNotesStore((s) => s.createTopFolder);
-  const createNote = useNotesStore((s) => s.createNote);
   const renameTopFolder = useNotesStore((s) => s.renameTopFolder);
   const deleteTopFolder = useNotesStore((s) => s.deleteTopFolder);
   const clearPendingRenameFolder = useNotesStore((s) => s.clearPendingRenameFolder);
@@ -305,18 +298,6 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                 >
                   <FolderPlus size={16} strokeWidth={1.8} className="plus-menu-icon" />
                   <span>New folder</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="plus-menu-item"
-                  onClick={() => {
-                    closePlusMenu();
-                    void createNote(null);
-                  }}
-                >
-                  <FilePlus size={16} strokeWidth={1.8} className="plus-menu-icon" />
-                  <span>New note</span>
                 </button>
 
                 <div className="plus-menu-divider" />

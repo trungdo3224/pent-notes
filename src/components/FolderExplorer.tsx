@@ -6,7 +6,9 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   FilePlus,
+  Files,
   FileText,
   FileUp,
   Folder,
@@ -21,7 +23,6 @@ import {
   PanelTopClose,
   PanelTopOpen,
   Pencil,
-  RefreshCw,
   Trash2,
   Unlink,
 } from 'lucide-react';
@@ -37,10 +38,30 @@ import {
   sortExplorerNodes,
   useNotesStore,
 } from '../store/useNotesStore';
-import { ExplorerNode, FolderItem } from '../types';
+import { ExplorerNode, FolderItem, NoteItem } from '../types';
 
 const BASE_INDENT_PX = 14;
 const DEPTH_INDENT_STEP_PX = 16;
+
+type ExplorerContextMenuState =
+  | {
+      kind: 'note';
+      note: NoteItem;
+      parentFolderId: string | null;
+      x: number;
+      y: number;
+    }
+  | {
+      kind: 'subfolder';
+      subfolder: FolderItem;
+      x: number;
+      y: number;
+    }
+  | {
+      kind: 'root';
+      x: number;
+      y: number;
+    };
 
 export const FolderExplorer: React.FC = () => {
   const folders = useNotesStore((s) => s.folders);
@@ -60,6 +81,8 @@ export const FolderExplorer: React.FC = () => {
   const toggleNoteLink = useNotesStore((s) => s.toggleNoteLink);
   const setSortOrder = useNotesStore((s) => s.setSortOrder);
   const createNote = useNotesStore((s) => s.createNote);
+  const duplicateNote = useNotesStore((s) => s.duplicateNote);
+  const updateNote = useNotesStore((s) => s.updateNote);
   const createSubfolder = useNotesStore((s) => s.createSubfolder);
   const renameSubfolder = useNotesStore((s) => s.renameSubfolder);
   const deleteTopFolder = useNotesStore((s) => s.deleteTopFolder);
@@ -68,7 +91,6 @@ export const FolderExplorer: React.FC = () => {
   const importNotesFiles = useNotesStore((s) => s.importNotesFiles);
   const openImportModal = useNotesStore((s) => s.openImportModal);
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
-  const syncFolderFromDisk = useNotesStore((s) => s.syncFolderFromDisk);
   const unlinkFolderFromDisk = useNotesStore((s) => s.unlinkFolderFromDisk);
   const toggleSubfolderCollapse = useNotesStore((s) => s.toggleSubfolderCollapse);
 
@@ -93,13 +115,26 @@ export const FolderExplorer: React.FC = () => {
   const [draftName, setDraftName] = useState('');
   const [isFolderMenuOpen, setIsFolderMenuOpen] = useState(false);
   const [focusedFolderId, setFocusedFolderId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<ExplorerContextMenuState | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
   const skipCommitRef = useRef(false);
   const folderMenuRef = useRef<HTMLDivElement>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const closeFolderMenu = useCallback(() => setIsFolderMenuOpen(false), []);
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
   useClickOutside(folderMenuRef, isFolderMenuOpen, closeFolderMenu);
+  useClickOutside(contextMenuRef, Boolean(contextMenu), closeContextMenu);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [contextMenu]);
 
   useEffect(() => {
     setFocusedFolderId(null);
@@ -185,7 +220,62 @@ export const FolderExplorer: React.FC = () => {
     setEditingNodeId(null);
   };
 
-  const renderNodes = (nodes: ExplorerNode[], depth: number): React.ReactNode => {
+  const startNoteRename = (node: NoteItem, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    skipCommitRef.current = false;
+    setEditingNodeId(node.id);
+    setDraftName(node.title);
+  };
+
+  const commitNoteRename = (nodeId: string) => {
+    if (skipCommitRef.current) {
+      skipCommitRef.current = false;
+      return;
+    }
+    const trimmed = draftName.trim();
+    if (trimmed) {
+      updateNote(nodeId, { title: trimmed });
+    }
+    setEditingNodeId(null);
+  };
+
+  const clampMenuPosition = (clientX: number, clientY: number, menuHeight = 250) => {
+    const menuWidth = 215;
+    return {
+      x: Math.min(clientX, window.innerWidth - menuWidth - 8),
+      y: Math.min(clientY, window.innerHeight - menuHeight - 8),
+    };
+  };
+
+  const openNoteContextMenu = (
+    e: React.MouseEvent,
+    node: NoteItem,
+    parentFolderId: string | null
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 290);
+    setContextMenu({ kind: 'note', note: node, parentFolderId, x, y });
+  };
+
+  const openSubfolderContextMenu = (e: React.MouseEvent, node: FolderItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 210);
+    setContextMenu({ kind: 'subfolder', subfolder: node, x, y });
+  };
+
+  const openRootContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 190);
+    setContextMenu({ kind: 'root', x, y });
+  };
+
+  const renderNodes = (
+    nodes: ExplorerNode[],
+    depth: number,
+    parentFolderId: string | null = null
+  ): React.ReactNode => {
     const ordered = sortExplorerNodes(nodes, sortOrder);
 
     return ordered.map((node) => {
@@ -198,6 +288,8 @@ export const FolderExplorer: React.FC = () => {
         const isSelectedParent = activeFolderIdSet.has(node.id);
         const linkedNoteCount = connections.linkedSubfolderCounts.get(node.id) ?? 0;
         const isLinkedFolder = linkedNoteCount > 0;
+        const isContextTarget =
+          contextMenu?.kind === 'subfolder' && contextMenu.subfolder.id === node.id;
         const folderLevelClass = isParentLevel ? 'is-parent-folder' : 'is-child-folder';
         const folderSelectedClass = isSelectedParent ? 'is-selected-parent' : '';
         const folderLinkedClass = isLinkedFolder ? 'is-linked-folder' : '';
@@ -212,13 +304,16 @@ export const FolderExplorer: React.FC = () => {
             <div
               role="button"
               tabIndex={0}
-              className={`explorer-row is-folder ${folderLevelClass} ${folderSelectedClass} ${folderLinkedClass}`}
+              className={`explorer-row is-folder ${folderLevelClass} ${folderSelectedClass} ${folderLinkedClass} ${
+                isContextTarget ? 'is-context-open' : ''
+              }`}
               style={{ paddingLeft: `${indentPx}px` }}
               onClick={() => {
                 setFocusedFolderId(node.id);
                 toggleSubfolderCollapse(node.id);
               }}
               onDoubleClick={(e) => startSubfolderRename(node, e)}
+              onContextMenu={(e) => openSubfolderContextMenu(e, node)}
               onKeyDown={(e) => {
                 if (isEditing) return;
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -276,32 +371,8 @@ export const FolderExplorer: React.FC = () => {
                 </span>
               )}
 
-              {/* Subfolder row hover actions for fast nested creation */}
+              {/* Subfolder row hover actions */}
               <div className="explorer-row-actions">
-                <button
-                  type="button"
-                  className="icon-action-btn"
-                  title="New note in this subfolder"
-                  aria-label="New note in subfolder"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void createNote(node.id);
-                  }}
-                >
-                  <FilePlus size={12} strokeWidth={1.9} />
-                </button>
-                <button
-                  type="button"
-                  className="icon-action-btn"
-                  title="New subfolder inside here"
-                  aria-label="New subfolder inside"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void createSubfolder(node.id);
-                  }}
-                >
-                  <FolderPlus size={12} strokeWidth={1.9} />
-                </button>
                 <button
                   type="button"
                   className="icon-action-btn"
@@ -327,14 +398,18 @@ export const FolderExplorer: React.FC = () => {
             </div>
 
             {!isCollapsedFolder && node.children.length > 0 && (
-              <div className="explorer-children">{renderNodes(node.children, depth + 1)}</div>
+              <div className="explorer-children">
+                {renderNodes(node.children, depth + 1, node.id)}
+              </div>
             )}
           </div>
         );
       }
 
       const isSelected = node.id === selectedNoteId;
+      const isEditingNote = editingNodeId === node.id;
       const isLinkedNote = !isSelected && connections.linkedNoteIds.has(node.id);
+      const isContextTarget = contextMenu?.kind === 'note' && contextMenu.note.id === node.id;
       const isPdf = isPdfNote(node);
       const noteLevelClass = depth > 0 ? 'is-child-note' : 'is-root-note';
 
@@ -345,13 +420,16 @@ export const FolderExplorer: React.FC = () => {
           tabIndex={0}
           className={`explorer-row is-note ${noteLevelClass} ${isSelected ? 'is-selected' : ''} ${
             isLinkedNote ? 'is-linked-note' : ''
-          }`}
+          } ${isContextTarget ? 'is-context-open' : ''}`}
           style={{ paddingLeft: `${indentPx}px` }}
           onClick={() => {
             setFocusedFolderId(null);
             selectNote(node.id);
           }}
+          onDoubleClick={(e) => startNoteRename(node, e)}
+          onContextMenu={(e) => openNoteContextMenu(e, node, parentFolderId)}
           onKeyDown={(e) => {
+            if (isEditingNote) return;
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
               setFocusedFolderId(null);
@@ -364,8 +442,29 @@ export const FolderExplorer: React.FC = () => {
             strokeWidth={1.75}
             className={`explorer-item-icon explorer-note-icon ${isPdf ? 'is-pdf-icon' : ''}`}
           />
-          <span className="explorer-row-label">{node.title.trim() || 'Untitled'}</span>
-          {isLinkedNote && (
+          {isEditingNote ? (
+            <input
+              ref={renameInputRef}
+              type="text"
+              className="explorer-rename-input"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onBlur={() => commitNoteRename(node.id)}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                  commitNoteRename(node.id);
+                } else if (e.key === 'Escape') {
+                  skipCommitRef.current = true;
+                  setEditingNodeId(null);
+                }
+              }}
+            />
+          ) : (
+            <span className="explorer-row-label">{node.title.trim() || 'Untitled'}</span>
+          )}
+          {isLinkedNote && !isEditingNote && (
             <span
               className="explorer-link-badge"
               title="Connected to current selected note (click link icon on hover to unlink)"
@@ -438,8 +537,8 @@ export const FolderExplorer: React.FC = () => {
         }}
       />
 
-      {/* Explorer header with direct creation buttons */}
-      <div className="explorer-header">
+      {/* Explorer header */}
+      <div className="explorer-header" onContextMenu={openRootContextMenu}>
         <span className="explorer-overline">SELECTED FOLDER</span>
         <div className="explorer-header-row">
           <div className="explorer-folder-title" title={folder.name}>
@@ -448,42 +547,6 @@ export const FolderExplorer: React.FC = () => {
           </div>
 
           <div className="explorer-header-actions" ref={folderMenuRef}>
-            {/* Direct Quick-Add Note button */}
-            <button
-              type="button"
-              className="explorer-menu-btn"
-              title="New note in folder"
-              aria-label="New note"
-              onClick={() => void createNote(null)}
-            >
-              <FilePlus size={16} strokeWidth={1.8} />
-            </button>
-
-            {/* Direct Quick-Add Subfolder button */}
-            <button
-              type="button"
-              className="explorer-menu-btn"
-              title="New subfolder in folder"
-              aria-label="New subfolder"
-              onClick={() => void createSubfolder(null)}
-            >
-              <FolderPlus size={16} strokeWidth={1.8} />
-            </button>
-
-            {/* Quick Sync button if linked to disk */}
-            {folder.localPath && (
-              <button
-                type="button"
-                className={`explorer-menu-btn ${isSyncingThis ? 'is-active' : ''}`}
-                title="Sync from local disk"
-                aria-label="Sync from disk"
-                disabled={isSyncingThis}
-                onClick={() => void syncFolderFromDisk(folder.id)}
-              >
-                <RefreshCw size={15} strokeWidth={1.8} className={isSyncingThis ? 'spin' : ''} />
-              </button>
-            )}
-
             {/* List/Menu button for extended folder options */}
             <button
               type="button"
@@ -508,63 +571,19 @@ export const FolderExplorer: React.FC = () => {
 
             {isFolderMenuOpen && (
               <div className="explorer-dropdown-menu">
-                <button
-                  type="button"
-                  className="dropdown-menu-item"
-                  onClick={() => {
-                    closeFolderMenu();
-                    void createNote(null);
-                  }}
-                >
-                  <FilePlus size={15} strokeWidth={1.8} />
-                  <span>New note</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="dropdown-menu-item"
-                  onClick={() => {
-                    closeFolderMenu();
-                    void createSubfolder(null);
-                  }}
-                >
-                  <FolderPlus size={15} strokeWidth={1.8} />
-                  <span>New subfolder</span>
-                </button>
-
-                <div className="dropdown-menu-divider" />
-
                 {/* Local Folder Sync Options */}
                 {folder.localPath ? (
-                  <>
-                    <button
-                      type="button"
-                      className="dropdown-menu-item"
-                      disabled={isSyncingThis}
-                      onClick={() => {
-                        closeFolderMenu();
-                        void syncFolderFromDisk(folder.id);
-                      }}
-                    >
-                      <RefreshCw
-                        size={15}
-                        strokeWidth={1.8}
-                        className={isSyncingThis ? 'spin' : ''}
-                      />
-                      <span>Sync from disk now</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="dropdown-menu-item"
-                      onClick={() => {
-                        closeFolderMenu();
-                        unlinkFolderFromDisk(folder.id);
-                      }}
-                    >
-                      <Unlink size={15} strokeWidth={1.8} />
-                      <span>Unlink local folder</span>
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    className="dropdown-menu-item"
+                    onClick={() => {
+                      closeFolderMenu();
+                      unlinkFolderFromDisk(folder.id);
+                    }}
+                  >
+                    <Unlink size={15} strokeWidth={1.8} />
+                    <span>Unlink local folder</span>
+                  </button>
                 ) : (
                   <button
                     type="button"
@@ -695,52 +714,316 @@ export const FolderExplorer: React.FC = () => {
 
         {/* Local Folder Sync Status Bar if linked */}
         {folder.localPath && (
-          <div className="explorer-local-badge" title={`Connected to disk: ${folder.localPath}`}>
+          <div
+            className="explorer-local-badge"
+            title={`Auto-synced with local disk: ${folder.localPath}`}
+          >
             <div className="explorer-local-badge-info">
               <span className={`local-dot-indicator ${isSyncingThis ? 'is-syncing' : ''}`} />
               <HardDrive size={12} className="local-badge-icon" />
               <span className="local-folder-name">{getBasename(folder.localPath)}</span>
             </div>
-            <button
-              type="button"
-              className="local-sync-action-btn"
-              onClick={() => void syncFolderFromDisk(folder.id)}
-              disabled={isSyncingThis}
-              title="Sync now from local folder"
-            >
-              <RefreshCw size={11} className={isSyncingThis ? 'spin' : ''} />
-              <span>{isSyncingThis ? 'Syncing...' : 'Sync'}</span>
-            </button>
           </div>
         )}
       </div>
 
       {/* Notes & subfolders list */}
-      <div className="explorer-tree">
+      <div
+        className="explorer-tree"
+        onScroll={closeContextMenu}
+        onContextMenu={openRootContextMenu}
+      >
         {folder.items.length === 0 ? (
           <div className="explorer-empty">
             <p>No notes in this folder yet.</p>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button
-                type="button"
-                className="subtle-btn"
-                onClick={() => void createNote(null)}
-              >
-                + New note
-              </button>
-              <button
-                type="button"
-                className="subtle-btn"
-                onClick={() => void createSubfolder(null)}
-              >
-                + New subfolder
-              </button>
-            </div>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              Right-click here to create a note or subfolder.
+            </span>
           </div>
         ) : (
-          renderNodes(folder.items, 0)
+          renderNodes(folder.items, 0, null)
         )}
       </div>
+
+      {/* Unified Right-Click Context Menu (Note, Subfolder, or Root Folder) */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="explorer-context-menu"
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          role="menu"
+          aria-label="Sidebar context actions"
+        >
+          {contextMenu.kind === 'note' && (
+            <>
+              <div className="context-menu-header">
+                <FileText size={12} className="context-menu-header-icon" />
+                <span>{contextMenu.note.title.trim() || 'Untitled'}</span>
+              </div>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetId = contextMenu.note.id;
+                  closeContextMenu();
+                  setFocusedFolderId(null);
+                  selectNote(targetId);
+                }}
+              >
+                <FileText size={14} strokeWidth={1.8} />
+                <span>Open note</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetParentId = contextMenu.parentFolderId;
+                  closeContextMenu();
+                  void createNote(targetParentId);
+                }}
+              >
+                <FilePlus size={14} strokeWidth={1.8} />
+                <span>New note</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetParentId = contextMenu.parentFolderId;
+                  closeContextMenu();
+                  void createSubfolder(targetParentId);
+                }}
+              >
+                <FolderPlus size={14} strokeWidth={1.8} />
+                <span>New subfolder</span>
+              </button>
+
+              <div className="dropdown-menu-divider" />
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetNote = contextMenu.note;
+                  closeContextMenu();
+                  startNoteRename(targetNote);
+                }}
+              >
+                <Pencil size={14} strokeWidth={1.8} />
+                <span>Rename note</span>
+              </button>
+
+              {selectedNoteId && selectedNoteId !== contextMenu.note.id && (
+                <button
+                  type="button"
+                  className="dropdown-menu-item is-link-item"
+                  role="menuitem"
+                  onClick={() => {
+                    const targetId = contextMenu.note.id;
+                    closeContextMenu();
+                    toggleNoteLink(selectedNoteId, targetId);
+                  }}
+                >
+                  {connections.linkedNoteIds.has(contextMenu.note.id) ? (
+                    <>
+                      <Unlink size={14} strokeWidth={1.9} />
+                      <span>Unlink from current note</span>
+                    </>
+                  ) : (
+                    <>
+                      <Link2 size={14} strokeWidth={1.9} />
+                      <span>Link with current note</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const title = contextMenu.note.title.trim() || 'Untitled';
+                  closeContextMenu();
+                  void navigator.clipboard?.writeText(`[[${title}]]`);
+                }}
+              >
+                <Copy size={14} strokeWidth={1.8} />
+                <span>Copy [[WikiLink]]</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const { note: targetNote, parentFolderId } = contextMenu;
+                  closeContextMenu();
+                  void duplicateNote(targetNote.id, parentFolderId);
+                }}
+              >
+                <Files size={14} strokeWidth={1.8} />
+                <span>Duplicate note</span>
+              </button>
+
+              <div className="dropdown-menu-divider" />
+
+              <button
+                type="button"
+                className="dropdown-menu-item is-danger"
+                role="menuitem"
+                onClick={() => {
+                  const targetId = contextMenu.note.id;
+                  closeContextMenu();
+                  deleteNode(targetId);
+                }}
+              >
+                <Trash2 size={14} strokeWidth={1.8} />
+                <span>Delete note</span>
+              </button>
+            </>
+          )}
+
+          {contextMenu.kind === 'subfolder' && (
+            <>
+              <div className="context-menu-header">
+                <Folder size={12} className="context-menu-header-icon" />
+                <span>{contextMenu.subfolder.name}</span>
+              </div>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetId = contextMenu.subfolder.id;
+                  closeContextMenu();
+                  void createNote(targetId);
+                }}
+              >
+                <FilePlus size={14} strokeWidth={1.8} />
+                <span>New note</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetId = contextMenu.subfolder.id;
+                  closeContextMenu();
+                  void createSubfolder(targetId);
+                }}
+              >
+                <FolderPlus size={14} strokeWidth={1.8} />
+                <span>New subfolder</span>
+              </button>
+
+              <div className="dropdown-menu-divider" />
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetFolder = contextMenu.subfolder;
+                  closeContextMenu();
+                  startSubfolderRename(targetFolder);
+                }}
+              >
+                <Pencil size={14} strokeWidth={1.8} />
+                <span>Rename subfolder</span>
+              </button>
+
+              <div className="dropdown-menu-divider" />
+
+              <button
+                type="button"
+                className="dropdown-menu-item is-danger"
+                role="menuitem"
+                onClick={() => {
+                  const targetId = contextMenu.subfolder.id;
+                  closeContextMenu();
+                  deleteNode(targetId);
+                }}
+              >
+                <Trash2 size={14} strokeWidth={1.8} />
+                <span>Delete subfolder</span>
+              </button>
+            </>
+          )}
+
+          {contextMenu.kind === 'root' && (
+            <>
+              <div className="context-menu-header">
+                <Folder size={12} className="context-menu-header-icon" />
+                <span>{folder.name}</span>
+              </div>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  closeContextMenu();
+                  void createNote(null);
+                }}
+              >
+                <FilePlus size={14} strokeWidth={1.8} />
+                <span>New note</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  closeContextMenu();
+                  void createSubfolder(null);
+                }}
+              >
+                <FolderPlus size={14} strokeWidth={1.8} />
+                <span>New subfolder</span>
+              </button>
+
+              <div className="dropdown-menu-divider" />
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  closeContextMenu();
+                  noteFileInputRef.current?.click();
+                }}
+              >
+                <FileUp size={14} strokeWidth={1.8} />
+                <span>Import notes here...</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  closeContextMenu();
+                  openImportModal('subfolder');
+                }}
+              >
+                <FolderUp size={14} strokeWidth={1.8} />
+                <span>Import subfolder...</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </aside>
   );
 };
