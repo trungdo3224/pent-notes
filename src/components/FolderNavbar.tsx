@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   FilePlus,
@@ -9,6 +9,7 @@ import {
   FolderUp,
   HardDrive,
   Layers,
+  Link2,
   Notebook,
   Palette,
   PanelLeftClose,
@@ -22,9 +23,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useClickOutside } from '../hooks/useDomInteractions';
+import { resolveWorkspaceConnections } from '../lib/catalogUtils';
 import { NOTE_FILE_ACCEPT } from '../lib/fileUtils';
 import { sessionApi } from '../lib/sessionManager';
-import { useNotesStore } from '../store/useNotesStore';
+import { resolveActiveNoteData, useNotesStore } from '../store/useNotesStore';
 import { themes } from '../themes';
 import { TopLevelFolder } from '../types';
 
@@ -35,12 +37,15 @@ interface FolderNavbarProps {
 export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const folders = useNotesStore((s) => s.folders);
   const selectedFolderId = useNotesStore((s) => s.selectedFolderId);
+  const selectedNoteByFolder = useNotesStore((s) => s.selectedNoteByFolder);
+  const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
   const pendingRenameFolderId = useNotesStore((s) => s.pendingRenameFolderId);
   const isSidebarCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
   const toggleSidebar = useNotesStore((s) => s.toggleSidebar);
   const toggleNavbar = useNotesStore((s) => s.toggleNavbar);
   const selectFolder = useNotesStore((s) => s.selectFolder);
+  const navigateToNote = useNotesStore((s) => s.navigateToNote);
   const createTopFolder = useNotesStore((s) => s.createTopFolder);
   const createNote = useNotesStore((s) => s.createNote);
   const renameTopFolder = useNotesStore((s) => s.renameTopFolder);
@@ -111,6 +116,16 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   };
 
   const activeFolder = folders.find((f) => f.id === selectedFolderId) ?? null;
+
+  const activeNoteId = useMemo(
+    () => resolveActiveNoteData(activeFolder, selectedNoteByFolder, sortOrder)?.note.id ?? null,
+    [activeFolder, selectedNoteByFolder, sortOrder]
+  );
+
+  const connections = useMemo(
+    () => resolveWorkspaceConnections(folders, activeNoteId),
+    [folders, activeNoteId]
+  );
 
   if (isNavbarCollapsed) {
     return (
@@ -414,6 +429,29 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
           folders.map((folder) => {
             const isSelected = folder.id === selectedFolderId;
             const isEditing = folder.id === editingId;
+            const linkedNoteCount = !isSelected
+              ? (connections.linkedTopFolderCounts.get(folder.id) ?? 0)
+              : 0;
+            const isLinkedFolder = linkedNoteCount > 0;
+
+            const handleSelectFolderTab = () => {
+              if (isLinkedFolder) {
+                const currentNoteInTarget = resolveActiveNoteData(
+                  folder,
+                  selectedNoteByFolder,
+                  sortOrder
+                )?.note.id;
+                const firstLinkedId = connections.firstLinkedNoteByTopFolder.get(folder.id);
+                if (
+                  firstLinkedId &&
+                  (!currentNoteInTarget || !connections.linkedNoteIds.has(currentNoteInTarget))
+                ) {
+                  navigateToNote(folder.id, firstLinkedId);
+                  return;
+                }
+              }
+              selectFolder(folder.id);
+            };
 
             return (
               <div
@@ -421,14 +459,16 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                 role="button"
                 tabIndex={0}
                 aria-pressed={isSelected}
-                className={`folder-tab ${isSelected ? 'is-selected' : ''}`}
-                onClick={() => selectFolder(folder.id)}
+                className={`folder-tab ${isSelected ? 'is-selected' : ''} ${
+                  isLinkedFolder ? 'is-linked-folder' : ''
+                }`}
+                onClick={handleSelectFolderTab}
                 onDoubleClick={(e) => startRename(folder, e)}
                 onKeyDown={(e) => {
                   if (isEditing) return;
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    selectFolder(folder.id);
+                    handleSelectFolderTab();
                   }
                 }}
               >
@@ -438,7 +478,9 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     <Folder
                       size={20}
                       strokeWidth={1.8}
-                      className={`folder-tab-icon ${isSelected ? 'is-selected-icon' : ''}`}
+                      className={`folder-tab-icon ${isSelected ? 'is-selected-icon' : ''} ${
+                        isLinkedFolder ? 'is-linked-icon' : ''
+                      }`}
                     />
                     {folder.localPath && (
                       <span
@@ -446,6 +488,17 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                         title={`Synced with: ${folder.localPath}`}
                       >
                         <HardDrive size={11} />
+                      </span>
+                    )}
+                    {isLinkedFolder && (
+                      <span
+                        className="tab-link-indicator"
+                        title={`${linkedNoteCount} ${
+                          linkedNoteCount === 1 ? 'note' : 'notes'
+                        } in "${folder.name}" connected to current note`}
+                      >
+                        <Link2 size={11} strokeWidth={2.2} />
+                        <span>{linkedNoteCount}</span>
                       </span>
                     )}
                   </div>

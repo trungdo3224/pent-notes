@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
+  appendWikiLinkToContent,
+  removeWikiLinkFromContent,
+  resolveWorkspaceConnections,
+} from '../lib/catalogUtils';
+import {
   buildNoteItemsFromFiles,
   createId,
   sanitizeFilename,
@@ -135,6 +140,8 @@ export interface NotesState {
   deleteTopFolder: (folderId: string) => void;
 
   selectNote: (noteId: string) => void;
+  navigateToNote: (topFolderId: string, noteId: string) => void;
+  toggleNoteLink: (activeNoteId: string, targetNoteId: string) => void;
   createNote: (parentFolderId: string | null) => Promise<string | null>;
   createSubfolder: (parentFolderId: string | null) => Promise<string | null>;
   renameSubfolder: (subfolderId: string, newName: string) => void;
@@ -270,6 +277,81 @@ export const useNotesStore = create<NotesState>()(
             },
           };
         }),
+
+      navigateToNote: (topFolderId, noteId) =>
+        set((state) => {
+          const targetTopFolder = state.folders.find((f) => f.id === topFolderId);
+          const ancestors = targetTopFolder
+            ? (findAncestorFolderIds(targetTopFolder.items, noteId) ?? [])
+            : [];
+          const ancestorSet = new Set(ancestors);
+          return {
+            selectedFolderId: topFolderId,
+            selectedNoteByFolder: {
+              ...state.selectedNoteByFolder,
+              [topFolderId]: noteId,
+            },
+            collapsedSubfolderIds: state.collapsedSubfolderIds.filter((id) => !ancestorSet.has(id)),
+          };
+        }),
+
+      toggleNoteLink: (activeNoteId, targetNoteId) => {
+        if (!activeNoteId || !targetNoteId || activeNoteId === targetNoteId) return;
+        const state = get();
+
+        let activeNote: NoteItem | null = null;
+        let targetNote: NoteItem | null = null;
+        for (const f of state.folders) {
+          if (!activeNote) activeNote = findNoteNode(f.items, activeNoteId);
+          if (!targetNote) targetNote = findNoteNode(f.items, targetNoteId);
+        }
+        if (!activeNote || !targetNote) return;
+
+        const connections = resolveWorkspaceConnections(state.folders, activeNoteId);
+        const isCurrentlyLinked = connections.linkedNoteIds.has(targetNoteId);
+
+        if (isCurrentlyLinked) {
+          const nextActiveContent = removeWikiLinkFromContent(activeNote.content, targetNote.title);
+          const nextTargetContent = removeWikiLinkFromContent(targetNote.content, activeNote.title);
+
+          set((s) => ({
+            folders: s.folders.map((folder) => ({
+              ...folder,
+              items: updateNoteInTree(
+                updateNoteInTree(folder.items, activeNoteId, { content: nextActiveContent }),
+                targetNoteId,
+                { content: nextTargetContent }
+              ),
+            })),
+          }));
+
+          if (activeNote.filePath && nextActiveContent !== activeNote.content) {
+            void fsApi.writeFile(activeNote.filePath, nextActiveContent).catch((err) => {
+              console.error('Failed to write unlinked active note to disk:', err);
+            });
+          }
+          if (targetNote.filePath && nextTargetContent !== targetNote.content) {
+            void fsApi.writeFile(targetNote.filePath, nextTargetContent).catch((err) => {
+              console.error('Failed to write unlinked target note to disk:', err);
+            });
+          }
+        } else {
+          const nextActiveContent = appendWikiLinkToContent(activeNote.content, targetNote.title);
+
+          set((s) => ({
+            folders: s.folders.map((folder) => ({
+              ...folder,
+              items: updateNoteInTree(folder.items, activeNoteId, { content: nextActiveContent }),
+            })),
+          }));
+
+          if (activeNote.filePath) {
+            void fsApi.writeFile(activeNote.filePath, nextActiveContent).catch((err) => {
+              console.error('Failed to write linked active note to disk:', err);
+            });
+          }
+        }
+      },
 
       createNote: async (parentFolderId) => {
         const state = get();

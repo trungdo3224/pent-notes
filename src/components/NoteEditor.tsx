@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
+  Check,
   ChevronRight,
   Columns2,
   Eye,
@@ -10,13 +11,20 @@ import {
   Folder,
   FolderUp,
   HardDrive,
+  Link2,
   PanelLeftOpen,
   PanelTopOpen,
   PenLine,
   Plus,
+  Search,
+  X,
 } from 'lucide-react';
-import { usePointerDrag } from '../hooks/useDomInteractions';
-import { countWords } from '../lib/catalogUtils';
+import { useClickOutside, usePointerDrag } from '../hooks/useDomInteractions';
+import {
+  countWords,
+  listConnectableNotes,
+  resolveWorkspaceConnections,
+} from '../lib/catalogUtils';
 import { isPdfNote, readFileAsDataUrl } from '../lib/fileUtils';
 import {
   DEFAULT_SPLIT_RATIO,
@@ -45,6 +53,8 @@ export const NoteEditor: React.FC = () => {
   const setViewMode = useNotesStore((s) => s.setViewMode);
   const setEditorSplitRatio = useNotesStore((s) => s.setEditorSplitRatio);
   const updateNote = useNotesStore((s) => s.updateNote);
+  const navigateToNote = useNotesStore((s) => s.navigateToNote);
+  const toggleNoteLink = useNotesStore((s) => s.toggleNoteLink);
   const createNote = useNotesStore((s) => s.createNote);
   const createTopFolder = useNotesStore((s) => s.createTopFolder);
   const openImportModal = useNotesStore((s) => s.openImportModal);
@@ -52,9 +62,18 @@ export const NoteEditor: React.FC = () => {
 
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [pdfViewMode, setPdfViewMode] = useState<PdfViewMode>('pdf');
+  const [isLinkPickerOpen, setIsLinkPickerOpen] = useState(false);
+  const [linkFilter, setLinkFilter] = useState('');
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const pdfAttachInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const linkPickerRef = useRef<HTMLDivElement>(null);
+
+  const closeLinkPicker = useCallback(() => {
+    setIsLinkPickerOpen(false);
+    setLinkFilter('');
+  }, []);
+  useClickOutside(linkPickerRef, isLinkPickerOpen, closeLinkPicker);
 
   const activeFolder = useMemo(
     () => folders.find((f) => f.id === selectedFolderId) ?? null,
@@ -69,6 +88,22 @@ export const NoteEditor: React.FC = () => {
   const note = activeNoteData?.note ?? null;
   const breadcrumb = activeNoteData?.path ?? (activeFolder ? [activeFolder.name] : []);
   const hasActiveFolder = Boolean(activeFolder);
+
+  const connections = useMemo(
+    () => resolveWorkspaceConnections(folders, note?.id ?? null),
+    [folders, note?.id]
+  );
+
+  const connectableNotes = useMemo(() => {
+    const all = listConnectableNotes(folders, note?.id ?? null);
+    if (!linkFilter.trim()) return all;
+    const q = linkFilter.trim().toLowerCase();
+    return all.filter((item) => {
+      const title = (item.note.title || 'Untitled').toLowerCase();
+      const folderPath = [item.topFolderName, ...item.subfolderNames].join('/').toLowerCase();
+      return title.includes(q) || folderPath.includes(q);
+    });
+  }, [folders, note?.id, linkFilter]);
 
   useEffect(() => {
     if (shouldFocusTitle && note && titleInputRef.current) {
@@ -292,6 +327,73 @@ export const NoteEditor: React.FC = () => {
             {words} {words === 1 ? 'word' : 'words'}
           </span>
 
+          {/* Connect / Link Note Picker */}
+          <div className="editor-link-picker-wrap" ref={linkPickerRef}>
+            <button
+              type="button"
+              className={`mode-btn editor-link-btn ${
+                isLinkPickerOpen || connections.linkedNotes.length > 0 ? 'is-active' : ''
+              }`}
+              onClick={() => setIsLinkPickerOpen((v) => !v)}
+              title="Connect / link this note with other notes across folders"
+              aria-label="Link notes"
+            >
+              <Link2 size={13} strokeWidth={2} />
+              <span>Link Note</span>
+              {connections.linkedNotes.length > 0 && (
+                <span className="editor-link-count-badge">{connections.linkedNotes.length}</span>
+              )}
+            </button>
+
+            {isLinkPickerOpen && (
+              <div className="editor-link-popover">
+                <div className="editor-link-popover-header">
+                  <span>CONNECT NOTES</span>
+                  <span className="editor-link-popover-hint">or type [[Note Title]]</span>
+                </div>
+                <div className="editor-link-search">
+                  <Search size={12} className="editor-link-search-icon" />
+                  <input
+                    type="text"
+                    className="editor-link-search-input"
+                    placeholder="Filter notes or folders..."
+                    value={linkFilter}
+                    onChange={(e) => setLinkFilter(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="editor-link-list">
+                  {connectableNotes.length === 0 ? (
+                    <div className="editor-link-empty">No other notes found in workspace.</div>
+                  ) : (
+                    connectableNotes.map((opt) => {
+                      const isLinked = connections.linkedNoteIds.has(opt.note.id);
+                      const pathLabel = [opt.topFolderName, ...opt.subfolderNames].join(' / ');
+                      return (
+                        <button
+                          key={opt.note.id}
+                          type="button"
+                          className={`editor-link-option ${isLinked ? 'is-linked' : ''}`}
+                          onClick={() => toggleNoteLink(note.id, opt.note.id)}
+                        >
+                          <div className="editor-link-option-info">
+                            <span className="editor-link-option-title">
+                              {opt.note.title.trim() || 'Untitled'}
+                            </span>
+                            <span className="editor-link-option-path">{pathLabel}</span>
+                          </div>
+                          <span className="editor-link-option-check">
+                            {isLinked ? <Check size={13} strokeWidth={2.3} /> : <Plus size={13} />}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {isPdf ? (
             <div className="editor-mode-switch" role="group" aria-label="PDF view mode">
               <button
@@ -391,6 +493,50 @@ export const NoteEditor: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Connected Notes Strip */}
+      {connections.linkedNotes.length > 0 && (
+        <div className="editor-connected-strip" aria-label="Connected notes">
+          <span className="connected-strip-label">
+            <Link2 size={12} strokeWidth={2.2} />
+            <span>Connected:</span>
+          </span>
+          <div className="connected-strip-pills">
+            {connections.linkedNotes.map((item) => {
+              const isOtherTopFolder = item.topFolderId !== selectedFolderId;
+              const folderPrefix = isOtherTopFolder
+                ? [item.topFolderName, ...item.subfolderNames].join(' / ')
+                : item.subfolderNames.join(' / ');
+              return (
+                <div key={item.note.id} className="connected-note-chip">
+                  <button
+                    type="button"
+                    className="connected-note-jump-btn"
+                    onClick={() => navigateToNote(item.topFolderId, item.note.id)}
+                    title={`Jump to "${item.note.title.trim() || 'Untitled'}"`}
+                  >
+                    {folderPrefix && (
+                      <span className="connected-note-folder">{folderPrefix} / </span>
+                    )}
+                    <span className="connected-note-title">
+                      {item.note.title.trim() || 'Untitled'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="connected-note-unlink-btn"
+                    onClick={() => toggleNoteLink(note.id, item.note.id)}
+                    title={`Unlink "${item.note.title.trim() || 'Untitled'}"`}
+                    aria-label={`Unlink ${item.note.title.trim() || 'Untitled'}`}
+                  >
+                    <X size={11} strokeWidth={2.2} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {isPdf && pdfViewMode === 'pdf' ? (
         <div className="editor-pdf-full">

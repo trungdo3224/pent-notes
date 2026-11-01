@@ -1,4 +1,4 @@
-import { ExplorerNode, TopLevelFolder } from '../types';
+import { ExplorerNode, NoteItem, TopLevelFolder } from '../types';
 
 export interface HeadingItem {
   id: string;
@@ -18,6 +18,31 @@ export interface NoteStats {
   lines: number;
   readTimeMin: number;
   wikiLinks: string[];
+}
+
+export interface LinkedNoteInfo {
+  note: NoteItem;
+  topFolderId: string;
+  topFolderName: string;
+  subfolderNames: string[];
+  direction: 'outgoing' | 'incoming' | 'bidirectional';
+}
+
+export interface WorkspaceNoteOption {
+  note: NoteItem;
+  topFolderId: string;
+  topFolderName: string;
+  subfolderNames: string[];
+}
+
+export interface WorkspaceConnections {
+  linkedNotes: LinkedNoteInfo[];
+  linkedNoteIds: Set<string>;
+  linkedSubfolderIds: Set<string>;
+  linkedSubfolderCounts: Map<string, number>;
+  linkedTopFolderIds: Set<string>;
+  linkedTopFolderCounts: Map<string, number>;
+  firstLinkedNoteByTopFolder: Map<string, string>;
 }
 
 const WORDS_PER_MINUTE = 200;
@@ -155,24 +180,274 @@ export function extractAllWorkspaceTags(folders: TopLevelFolder[]): TagItem[] {
   return mapToSortedTagItems(tagCounts);
 }
 
+const NOTE_EXTENSION_REGEX = /\.(md|markdown|txt)$/i;
+const EXTERNAL_PROTOCOL_REGEX = /^(https?:|mailto:|tel:|data:|javascript:)/i;
+
+function normalizeLinkKey(raw: string): string {
+  let cleaned = raw.replace(/\\+/g, '').trim();
+  try {
+    cleaned = decodeURIComponent(cleaned);
+  } catch {
+    // Keep raw string if malformed URI component
+  }
+  cleaned = cleaned
+    .split('|')[0]
+    .split('#')[0]
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^(\.\/|\.\.\/)+/, '')
+    .replace(/^\/+|\/+$/g, '')
+    .replace(NOTE_EXTENSION_REGEX, '')
+    .trim()
+    .toLowerCase();
+  return cleaned;
+}
+
+export function extractNoteLinks(markdown: string): string[] {
+  if (!markdown) return [];
+  const links: string[] = [];
+  const seen = new Set<string>();
+  const lines = markdown.split('\n');
+  let inCodeBlock = false;
+
+  for (const rawLine of lines) {
+    const trimmed = rawLine.trim();
+    if (trimmed.startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) continue;
+
+    // 1. Obsidian-style wikilinks: [[Target]] or Milkdown escaped \[\[Target\]\]
+    const wikiMatches = rawLine.matchAll(/\\?\[\\?\[([^\]]+?)\\?\]\\?\]/g);
+    for (const match of wikiMatches) {
+      const target = match[1].replace(/\\+/g, '').split('|')[0].split('#')[0].trim();
+      if (target && !seen.has(target)) {
+        seen.add(target);
+        links.push(target);
+      }
+    }
+
+    // 2. Standard internal markdown links: [Label](target.md) (excluding images ![...] and external URLs)
+    const mdMatches = rawLine.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/g);
+    for (const match of mdMatches) {
+      const rawHref = match[1].trim().replace(/^<|>$/g, '');
+      if (!rawHref || rawHref.startsWith('#') || EXTERNAL_PROTOCOL_REGEX.test(rawHref)) {
+        continue;
+      }
+      const target = rawHref.split('#')[0].trim();
+      if (target && !seen.has(target)) {
+        seen.add(target);
+        links.push(target);
+      }
+    }
+  }
+
+  return links;
+}
+
+export function appendWikiLinkToContent(content: string, targetTitle: string): string {
+  const cleanTitle = targetTitle.trim() || 'Untitled';
+  const linkToken = `[[${cleanTitle}]]`;
+  const trimmed = content.trimEnd();
+  if (!trimmed) {
+    return linkToken;
+  }
+  return `${trimmed}\n\n${linkToken}`;
+}
+
+export function removeWikiLinkFromContent(content: string, targetTitle: string): string {
+  if (!content) return content;
+  const targetKey = normalizeLinkKey(targetTitle);
+  if (!targetKey) return content;
+
+  const updated = content.replace(/\\?\[\\?\[([^\]]+?)\\?\]\\?\]/g, (fullMatch, inner: string) => {
+    const innerKey = normalizeLinkKey(inner);
+    const segments = innerKey.split('/');
+    const baseKey = segments[segments.length - 1]?.trim() || '';
+    if (innerKey === targetKey || baseKey === targetKey) {
+      return '';
+    }
+    return fullMatch;
+  });
+
+  return updated.replace(/\n{3,}/g, '\n\n').trimEnd();
+}
+
 export function calculateNoteStats(content: string): NoteStats {
   const chars = content.length;
   const words = countWords(content);
   const lines = content.split('\n').length;
   const readTimeMin = Math.max(1, Math.ceil(words / WORDS_PER_MINUTE));
+  const wikiLinks = extractNoteLinks(content);
 
-  const wikiLinks: string[] = [];
-  const wikiMatches = content.match(/\[\[(.*?)\]\]/g);
-  if (wikiMatches) {
-    for (const match of wikiMatches) {
-      const target = match.slice(2, -2).split('|')[0].trim();
-      if (target && !wikiLinks.includes(target)) {
-        wikiLinks.push(target);
+  return { chars, words, lines, readTimeMin, wikiLinks };
+}
+
+interface IndexedWorkspaceNote {
+  note: NoteItem;
+  topFolderId: string;
+  topFolderName: string;
+  ancestorSubfolderIds: string[];
+  subfolderNames: string[];
+  matchKeys: Set<string>;
+  outgoingKeys: Set<string>;
+}
+
+function indexWorkspaceNotes(folders: TopLevelFolder[]): IndexedWorkspaceNote[] {
+  const indexed: IndexedWorkspaceNote[] = [];
+
+  function walkNodes(
+    nodes: ExplorerNode[],
+    topFolder: TopLevelFolder,
+    subfolderIds: string[],
+    subfolderNames: string[]
+  ) {
+    for (const node of nodes) {
+      if (node.type === 'note') {
+        const titleKey = normalizeLinkKey(node.title || '');
+        const matchKeys = new Set<string>();
+        if (titleKey) {
+          matchKeys.add(titleKey);
+          if (subfolderNames.length > 0) {
+            const relPath = normalizeLinkKey([...subfolderNames, titleKey].join('/'));
+            if (relPath) matchKeys.add(relPath);
+          }
+          const fullPath = normalizeLinkKey([topFolder.name, ...subfolderNames, titleKey].join('/'));
+          if (fullPath) matchKeys.add(fullPath);
+        }
+
+        const outgoingKeys = new Set<string>();
+        for (const rawLink of extractNoteLinks(node.content)) {
+          const normalized = normalizeLinkKey(rawLink);
+          if (normalized) {
+            outgoingKeys.add(normalized);
+            const segments = normalized.split('/');
+            const baseKey = segments[segments.length - 1]?.trim();
+            if (baseKey) {
+              outgoingKeys.add(baseKey);
+            }
+          }
+        }
+
+        indexed.push({
+          note: node,
+          topFolderId: topFolder.id,
+          topFolderName: topFolder.name,
+          ancestorSubfolderIds: subfolderIds,
+          subfolderNames,
+          matchKeys,
+          outgoingKeys,
+        });
+      } else if (node.type === 'folder' && Array.isArray(node.children)) {
+        walkNodes(
+          node.children,
+          topFolder,
+          [...subfolderIds, node.id],
+          [...subfolderNames, node.name]
+        );
       }
     }
   }
 
-  return { chars, words, lines, readTimeMin, wikiLinks };
+  for (const topFolder of folders) {
+    if (Array.isArray(topFolder.items)) {
+      walkNodes(topFolder.items, topFolder, [], []);
+    }
+  }
+
+  return indexed;
+}
+
+export function listConnectableNotes(
+  folders: TopLevelFolder[],
+  excludeNoteId: string | null
+): WorkspaceNoteOption[] {
+  return indexWorkspaceNotes(folders)
+    .filter((item) => item.note.id !== excludeNoteId)
+    .map((item) => ({
+      note: item.note,
+      topFolderId: item.topFolderId,
+      topFolderName: item.topFolderName,
+      subfolderNames: item.subfolderNames,
+    }));
+}
+
+function setsIntersect(a: Set<string>, b: Set<string>): boolean {
+  for (const item of a) {
+    if (b.has(item)) return true;
+  }
+  return false;
+}
+
+export function resolveWorkspaceConnections(
+  folders: TopLevelFolder[],
+  activeNoteId: string | null
+): WorkspaceConnections {
+  const empty: WorkspaceConnections = {
+    linkedNotes: [],
+    linkedNoteIds: new Set(),
+    linkedSubfolderIds: new Set(),
+    linkedSubfolderCounts: new Map(),
+    linkedTopFolderIds: new Set(),
+    linkedTopFolderCounts: new Map(),
+    firstLinkedNoteByTopFolder: new Map(),
+  };
+
+  if (!activeNoteId || folders.length === 0) {
+    return empty;
+  }
+
+  const allNotes = indexWorkspaceNotes(folders);
+  const activeIndexed = allNotes.find((item) => item.note.id === activeNoteId);
+  if (!activeIndexed) {
+    return empty;
+  }
+
+  for (const candidate of allNotes) {
+    if (candidate.note.id === activeNoteId) continue;
+
+    const activeLinksToCandidate = setsIntersect(activeIndexed.outgoingKeys, candidate.matchKeys);
+    const candidateLinksToActive = setsIntersect(candidate.outgoingKeys, activeIndexed.matchKeys);
+
+    if (activeLinksToCandidate || candidateLinksToActive) {
+      const direction: LinkedNoteInfo['direction'] =
+        activeLinksToCandidate && candidateLinksToActive
+          ? 'bidirectional'
+          : activeLinksToCandidate
+            ? 'outgoing'
+            : 'incoming';
+
+      empty.linkedNotes.push({
+        note: candidate.note,
+        topFolderId: candidate.topFolderId,
+        topFolderName: candidate.topFolderName,
+        subfolderNames: candidate.subfolderNames,
+        direction,
+      });
+
+      empty.linkedNoteIds.add(candidate.note.id);
+
+      empty.linkedTopFolderIds.add(candidate.topFolderId);
+      empty.linkedTopFolderCounts.set(
+        candidate.topFolderId,
+        (empty.linkedTopFolderCounts.get(candidate.topFolderId) ?? 0) + 1
+      );
+      if (!empty.firstLinkedNoteByTopFolder.has(candidate.topFolderId)) {
+        empty.firstLinkedNoteByTopFolder.set(candidate.topFolderId, candidate.note.id);
+      }
+
+      for (const subfolderId of candidate.ancestorSubfolderIds) {
+        empty.linkedSubfolderIds.add(subfolderId);
+        empty.linkedSubfolderCounts.set(
+          subfolderId,
+          (empty.linkedSubfolderCounts.get(subfolderId) ?? 0) + 1
+        );
+      }
+    }
+  }
+
+  return empty;
 }
 
 export function scrollToHeading(headingText: string, level: number): boolean {

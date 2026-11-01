@@ -15,6 +15,7 @@ import {
   FolderSync,
   FolderUp,
   HardDrive,
+  Link2,
   List,
   PanelLeftClose,
   PanelTopClose,
@@ -25,6 +26,7 @@ import {
   Unlink,
 } from 'lucide-react';
 import { useClickOutside } from '../hooks/useDomInteractions';
+import { resolveWorkspaceConnections } from '../lib/catalogUtils';
 import { isPdfNote, NOTE_FILE_ACCEPT } from '../lib/fileUtils';
 import { getBasename } from '../lib/pathUtils';
 import {
@@ -55,6 +57,7 @@ export const FolderExplorer: React.FC = () => {
   const toggleSidebar = useNotesStore((s) => s.toggleSidebar);
   const toggleNavbar = useNotesStore((s) => s.toggleNavbar);
   const selectNote = useNotesStore((s) => s.selectNote);
+  const toggleNoteLink = useNotesStore((s) => s.toggleNoteLink);
   const setSortOrder = useNotesStore((s) => s.setSortOrder);
   const createNote = useNotesStore((s) => s.createNote);
   const createSubfolder = useNotesStore((s) => s.createSubfolder);
@@ -109,6 +112,11 @@ export const FolderExplorer: React.FC = () => {
     const ancestors = findAncestorFolderIds(folder.items, targetId);
     return new Set(ancestors ?? []);
   }, [folder, focusedFolderId, selectedNoteId]);
+
+  const connections = useMemo(
+    () => resolveWorkspaceConnections(folders, selectedNoteId),
+    [folders, selectedNoteId]
+  );
 
   useEffect(() => {
     if (pendingRenameNodeId && folder) {
@@ -188,20 +196,23 @@ export const FolderExplorer: React.FC = () => {
         const isEditing = editingNodeId === node.id;
         const isParentLevel = depth === 0;
         const isSelectedParent = activeFolderIdSet.has(node.id);
+        const linkedNoteCount = connections.linkedSubfolderCounts.get(node.id) ?? 0;
+        const isLinkedFolder = linkedNoteCount > 0;
         const folderLevelClass = isParentLevel ? 'is-parent-folder' : 'is-child-folder';
         const folderSelectedClass = isSelectedParent ? 'is-selected-parent' : '';
+        const folderLinkedClass = isLinkedFolder ? 'is-linked-folder' : '';
 
         return (
           <div
             key={node.id}
             className={`explorer-group ${isParentLevel ? 'is-root-group' : 'is-nested-group'} ${
               isSelectedParent ? 'is-active-group' : ''
-            }`}
+            } ${isLinkedFolder ? 'is-linked-group' : ''}`}
           >
             <div
               role="button"
               tabIndex={0}
-              className={`explorer-row is-folder ${folderLevelClass} ${folderSelectedClass}`}
+              className={`explorer-row is-folder ${folderLevelClass} ${folderSelectedClass} ${folderLinkedClass}`}
               style={{ paddingLeft: `${indentPx}px` }}
               onClick={() => {
                 setFocusedFolderId(node.id);
@@ -251,6 +262,18 @@ export const FolderExplorer: React.FC = () => {
                 />
               ) : (
                 <span className="explorer-row-label">{node.name}</span>
+              )}
+
+              {isLinkedFolder && !isEditing && (
+                <span
+                  className="explorer-link-badge is-folder-badge"
+                  title={`${linkedNoteCount} ${
+                    linkedNoteCount === 1 ? 'note' : 'notes'
+                  } inside connected to current note`}
+                >
+                  <Link2 size={11} strokeWidth={2.2} />
+                  <span>{linkedNoteCount}</span>
+                </span>
               )}
 
               {/* Subfolder row hover actions for fast nested creation */}
@@ -311,6 +334,7 @@ export const FolderExplorer: React.FC = () => {
       }
 
       const isSelected = node.id === selectedNoteId;
+      const isLinkedNote = !isSelected && connections.linkedNoteIds.has(node.id);
       const isPdf = isPdfNote(node);
       const noteLevelClass = depth > 0 ? 'is-child-note' : 'is-root-note';
 
@@ -319,7 +343,9 @@ export const FolderExplorer: React.FC = () => {
           key={node.id}
           role="button"
           tabIndex={0}
-          className={`explorer-row is-note ${noteLevelClass} ${isSelected ? 'is-selected' : ''}`}
+          className={`explorer-row is-note ${noteLevelClass} ${isSelected ? 'is-selected' : ''} ${
+            isLinkedNote ? 'is-linked-note' : ''
+          }`}
           style={{ paddingLeft: `${indentPx}px` }}
           onClick={() => {
             setFocusedFolderId(null);
@@ -339,8 +365,39 @@ export const FolderExplorer: React.FC = () => {
             className={`explorer-item-icon explorer-note-icon ${isPdf ? 'is-pdf-icon' : ''}`}
           />
           <span className="explorer-row-label">{node.title.trim() || 'Untitled'}</span>
+          {isLinkedNote && (
+            <span
+              className="explorer-link-badge"
+              title="Connected to current selected note (click link icon on hover to unlink)"
+            >
+              <Link2 size={11} strokeWidth={2.2} />
+              <span>Linked</span>
+            </span>
+          )}
           {isPdf && <span className="explorer-pdf-badge" title="PDF Document">PDF</span>}
           <div className="explorer-row-actions">
+            {!isSelected && selectedNoteId && (
+              <button
+                type="button"
+                className={`icon-action-btn ${isLinkedNote ? 'is-linked-action' : ''}`}
+                title={
+                  isLinkedNote
+                    ? 'Unlink from current selected note'
+                    : 'Connect / link with current selected note'
+                }
+                aria-label={isLinkedNote ? 'Unlink note' : 'Link note'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleNoteLink(selectedNoteId, node.id);
+                }}
+              >
+                {isLinkedNote ? (
+                  <Unlink size={12} strokeWidth={2} />
+                ) : (
+                  <Link2 size={12} strokeWidth={2} />
+                )}
+              </button>
+            )}
             <button
               type="button"
               className="icon-action-btn is-danger"
