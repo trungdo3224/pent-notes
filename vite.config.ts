@@ -107,9 +107,24 @@ function sendError(
 }
 
 async function writeFileAtomic(targetPath: string, content: string): Promise<void> {
-  const tempFile = `${targetPath}.${Date.now()}.tmp`;
-  await fs.writeFile(tempFile, content, 'utf-8');
-  await fs.rename(tempFile, targetPath);
+  const tempFile = `${targetPath}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`;
+  try {
+    await fs.writeFile(tempFile, content, 'utf-8');
+    await fs.rename(tempFile, targetPath);
+  } catch {
+    // Windows file rename fallback if destination was briefly locked
+    try {
+      await fs.writeFile(targetPath, content, 'utf-8');
+    } catch (err) {
+      throw err;
+    }
+  } finally {
+    try {
+      await fs.unlink(tempFile);
+    } catch {
+      // Ignored if already renamed or unlinked
+    }
+  }
 }
 
 function extractCounts(payloadStr: string): { folderCount: number; noteCount: number } {

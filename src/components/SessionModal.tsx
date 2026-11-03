@@ -76,6 +76,15 @@ export const SessionModal: React.FC = () => {
     copyToClipboard(url.toString());
   };
 
+  const handleCreateNewSession = async () => {
+    try {
+      const newSession = await sessionApi.createSession();
+      sessionApi.switchSessionInCurrentTab(newSession.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create session.');
+    }
+  };
+
   const handleDuplicateToNewTab = async () => {
     try {
       const newSession = await sessionApi.createSession(
@@ -141,9 +150,9 @@ export const SessionModal: React.FC = () => {
         </div>
 
         <p className="modal-description" style={{ marginBottom: 14 }}>
-          Each browser tab can run its own independent workspace session stored in a clean JSON
-          file on disk (<code>data/sessions/*.json</code>). Open multiple tabs simultaneously for
-          different tasks, targets, or projects.
+          Workspaces are stored in clean JSON files on disk (<code>data/sessions/*.json</code>).
+          New tabs start in your Default session. You can switch to any existing session or create
+          new ones whenever you need.
         </p>
 
         {/* Current Tab Active Session Card */}
@@ -208,11 +217,20 @@ export const SessionModal: React.FC = () => {
             <button
               type="button"
               className="primary-subtle-btn"
+              onClick={() => void handleCreateNewSession()}
+              title="Create a new session in this tab"
+            >
+              <Plus size={14} />
+              <span>Create New Session</span>
+            </button>
+            <button
+              type="button"
+              className="subtle-btn"
               onClick={() => sessionApi.openSessionInNewTab()}
               title="Open a fresh new session in a new browser tab"
             >
-              <Plus size={14} />
-              <span>New Session in New Tab</span>
+              <ExternalLink size={14} />
+              <span>New in New Tab</span>
             </button>
             <button
               type="button"
@@ -221,7 +239,7 @@ export const SessionModal: React.FC = () => {
               title="Duplicate this session into a new tab"
             >
               <Sparkles size={14} />
-              <span>Duplicate into New Tab</span>
+              <span>Duplicate</span>
             </button>
           </div>
         </div>

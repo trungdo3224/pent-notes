@@ -5,7 +5,6 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
-  Clock,
   Copy,
   ExternalLink,
   FileCode,
@@ -481,11 +480,6 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                       <FileCode size={14} className="stat-icon" />
                       <span className="stat-value">{stats.chars.toLocaleString()}</span>
                       <span className="stat-label">Characters</span>
-                    </div>
-                    <div className="catalog-stat-box">
-                      <Clock size={14} className="stat-icon" />
-                      <span className="stat-value">~{stats.readTimeMin}m</span>
-                      <span className="stat-label">Read time</span>
                     </div>
                     <div className="catalog-stat-box">
                       <ListTree size={14} className="stat-icon" />

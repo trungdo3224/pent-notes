@@ -19,7 +19,6 @@ import {
   FolderPlus,
   FolderSync,
   FolderUp,
-  HardDrive,
   Link2,
   List,
   PanelLeftClose,
@@ -33,7 +32,6 @@ import {
 import { useClickOutside } from '../hooks/useDomInteractions';
 import { resolveWorkspaceConnections } from '../lib/catalogUtils';
 import { isPdfNote, NOTE_FILE_ACCEPT } from '../lib/fileUtils';
-import { getBasename } from '../lib/pathUtils';
 import { findLeaf, getAllLeaves } from '../lib/paneLayoutTree';
 import {
   collectAllSubfolderIds,
@@ -79,7 +77,7 @@ export const FolderExplorer: React.FC = () => {
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
   const sidebarWidth = useNotesStore((s) => s.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH);
   const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
-  const isSyncingFolderId = useNotesStore((s) => s.isSyncingFolderId);
+  // const isSyncingFolderId = useNotesStore((s) => s.isSyncingFolderId);
   const isSplitViewActive = useNotesStore((s) => s.isSplitViewActive);
   const openInSplitView = useNotesStore((s) => s.openInSplitView);
   const splitPane = useNotesStore((s) => s.splitPane);
@@ -112,7 +110,7 @@ export const FolderExplorer: React.FC = () => {
     [folders, selectedFolderId]
   );
 
-  const isSyncingThis = Boolean(folder && isSyncingFolderId === folder.id);
+  // const isSyncingThis = Boolean(folder && isSyncingFolderId === folder.id);
 
   const selectedNoteId = useMemo(
     () => resolveActiveNoteData(folder, selectedNoteByFolder, sortOrder)?.note.id ?? null,
@@ -790,7 +788,7 @@ export const FolderExplorer: React.FC = () => {
         </div>
 
         {/* Local Folder Sync Status Bar if linked */}
-        {folder.localPath && (
+        {/* {folder.localPath && (
           <div
             className="explorer-local-badge"
             title={`Auto-synced with local disk: ${folder.localPath}`}
@@ -801,7 +799,7 @@ export const FolderExplorer: React.FC = () => {
               <span className="local-folder-name">{getBasename(folder.localPath)}</span>
             </div>
           </div>
-        )}
+        )} */}
       </div>
 
       {/* Notes & subfolders list */}

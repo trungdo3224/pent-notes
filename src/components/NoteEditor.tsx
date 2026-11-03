@@ -414,10 +414,10 @@ export const NoteEditor: React.FC = () => {
                     type="button"
                     className={`mode-btn ${viewMode === 'write' ? 'is-active' : ''}`}
                     onClick={() => setViewMode('write')}
-                    title="Write mode (raw Markdown)"
+                    title="Write mode (Raw Markdown)"
                   >
                     <PenLine size={13} />
-                    <span>Write</span>
+                    {/* <span>Write</span> */}
                   </button>
                   <button
                     type="button"
@@ -426,7 +426,7 @@ export const NoteEditor: React.FC = () => {
                     title="Preview mode (Rich Markdown)"
                   >
                     <Eye size={13} />
-                    <span>Preview</span>
+                    {/* <span>Preview</span> */}
                   </button>
                 </div>
               )}
@@ -467,7 +467,7 @@ export const NoteEditor: React.FC = () => {
                     <>
                       <button
                         type="button"
-                        className="editor-link-popover-item is-attach-btn"
+                        className="is-attach-btn"
                         onClick={() => {
                           closeLinkPicker();
                           pdfAttachInputRef.current?.click();

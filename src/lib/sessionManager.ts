@@ -20,10 +20,7 @@ export interface SessionData {
 
 const SESSION_STORAGE_KEY = 'pentnotes_session_id';
 const LOCAL_STORAGE_LAST_SESSION = 'pentnotes_last_session';
-const PULSE_KEY = 'pentnotes_tab_pulse';
 const DEFAULT_SESSION_ID = 'default';
-const TAB_PULSE_INTERVAL_MS = 1000;
-const ACTIVE_TAB_THRESHOLD_MS = 2500;
 
 function generateSessionId(): string {
   return createId('session');
@@ -31,7 +28,11 @@ function generateSessionId(): string {
 
 function updateUrlSessionParam(sessionId: string): void {
   const nextUrl = new URL(window.location.href);
-  nextUrl.searchParams.set('session', sessionId);
+  if (sessionId === DEFAULT_SESSION_ID) {
+    nextUrl.searchParams.delete('session');
+  } else {
+    nextUrl.searchParams.set('session', sessionId);
+  }
   window.history.replaceState({}, '', nextUrl.toString());
 }
 
@@ -43,19 +44,6 @@ function persistSessionInTabStorage(sessionId: string, syncUrl = false): string 
     updateUrlSessionParam(sessionId);
   }
   return sessionId;
-}
-
-// Start tab pulse for detecting concurrent tabs
-if (typeof window !== 'undefined') {
-  const pulse = () => {
-    try {
-      localStorage.setItem(PULSE_KEY, Date.now().toString());
-    } catch {
-      // Ignore restricted storage environments
-    }
-  };
-  pulse();
-  setInterval(pulse, TAB_PULSE_INTERVAL_MS);
 }
 
 let activeSessionIdCache: string | null = null;
@@ -90,15 +78,8 @@ export function getTabSessionId(): string {
     return activeSessionIdCache;
   }
 
-  // Case 4: Brand new tab opened — check if another tab is currently active
-  const lastPulse = Number(localStorage.getItem(PULSE_KEY) || '0');
-  const isAnotherTabActive = Date.now() - lastPulse < ACTIVE_TAB_THRESHOLD_MS;
-
-  const assignedId = isAnotherTabActive
-    ? generateSessionId()
-    : localStorage.getItem(LOCAL_STORAGE_LAST_SESSION) || DEFAULT_SESSION_ID;
-
-  return persistSessionInTabStorage(assignedId, true);
+  // Case 4: Default for new tabs — always use default state without auto-creating sessions
+  return persistSessionInTabStorage(DEFAULT_SESSION_ID, false);
 }
 
 export function getTabSessionName(): string {
@@ -184,7 +165,11 @@ export const sessionApi = {
     sessionStorage.setItem(SESSION_STORAGE_KEY, id);
     localStorage.setItem(LOCAL_STORAGE_LAST_SESSION, id);
     const newUrl = new URL(window.location.href);
-    newUrl.searchParams.set('session', id);
+    if (id === DEFAULT_SESSION_ID) {
+      newUrl.searchParams.delete('session');
+    } else {
+      newUrl.searchParams.set('session', id);
+    }
     window.location.href = newUrl.toString();
   },
 };
