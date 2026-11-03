@@ -39,17 +39,57 @@ import {
 } from '../lib/treeUtils';
 import { applyTheme, initialTheme, saveTheme, ThemeId } from '../themes';
 import {
+  createBranchId,
+  createLeafNode,
+  findLeaf,
+  getAllLeaves,
+  removeLeafFromTree,
+  resetBranchSizes,
+  resizeBranchInTree,
+  splitLeafInTree,
+  toggleBranchDirection,
+  updateLeafInTree,
+} from '../lib/paneLayoutTree';
+import {
   CatalogTab,
   EditorViewMode,
   ExplorerNode,
   FolderItem,
-  ImportTargetMode,
+  LinkModalTargetMode,
   NoteItem,
+  PaneLayoutNode,
   SortOrder,
+  SplitDirection,
   TabGroup,
   TabGroupColorId,
   TopLevelFolder,
 } from '../types';
+
+export function collectMainFolderIds(nodes: ExplorerNode[]): string[] {
+  return nodes.filter((n): n is FolderItem => n.type === 'folder').map((f) => f.id);
+}
+
+export function collectNestedSubfolderIds(nodes: ExplorerNode[], currentDepth = 0): string[] {
+  const ids: string[] = [];
+  for (const node of nodes) {
+    if (node.type === 'folder') {
+      if (currentDepth >= 1) {
+        ids.push(node.id);
+      }
+      ids.push(...collectNestedSubfolderIds(node.children, currentDepth + 1));
+    }
+  }
+  return ids;
+}
+
+/**
+ * Collects all subfolder IDs (nested at depth >= 1) under the main/parent folders.
+ * Main folders (depth === 0) are excluded so that collapsing/expanding subfolders
+ * keeps the main folder open.
+ */
+export function collectAllSubfolderIds(nodes: ExplorerNode[]): string[] {
+  return collectNestedSubfolderIds(nodes, 0);
+}
 
 export {
   findAncestorFolderIds,
@@ -177,15 +217,25 @@ export interface NotesState {
   theme: ThemeId;
   lastSyncTimeByFolder: Record<string, number>;
 
+  // Multi-file Split View state (VS Code & Obsidian style recursive multi-pane)
+  paneLayout: PaneLayoutNode | null;
+  activePaneId: string | null;
+  isSplitViewActive: boolean;
+  splitDirection: SplitDirection;
+  secondaryFolderId: string | null;
+  secondaryNoteId: string | null;
+  secondaryViewMode: EditorViewMode;
+  activePane: 'primary' | 'secondary';
+
   // Transient UI state
   isHydrated: boolean;
   isThemeModalOpen: boolean;
   isLinkModalOpen: boolean;
+  linkModalTargetMode: LinkModalTargetMode;
   isSessionModalOpen: boolean;
   currentSessionId: string;
   currentSessionName: string;
   isSyncingFolderId: string | null;
-  importModalMode: ImportTargetMode | null;
   pendingRenameFolderId: string | null;
   pendingRenameGroupId: string | null;
   pendingRenameNodeId: string | null;
@@ -228,12 +278,38 @@ export interface NotesState {
   deleteNode: (nodeId: string) => void;
   updateNote: (noteId: string, updates: NoteUpdates) => void;
 
+  // Multi-file Split View actions (VS Code & Obsidian style recursive multi-pane)
+  splitPane: (
+    direction: SplitDirection,
+    targetFolderId?: string,
+    targetNoteId?: string,
+    fromPaneId?: string
+  ) => void;
+  toggleSplitDirection: (branchId?: string) => void;
+  closePane: (pane?: string | 'primary' | 'secondary') => void;
+  closeOtherPanes: (keepPaneId?: string) => void;
+  toggleSplitView: () => void;
+  openInSplitView: (folderId: string, noteId: string, direction?: SplitDirection) => void;
+  closeSplitView: () => void;
+  setActivePaneId: (paneId: string) => void;
+  setActivePane: (pane: 'primary' | 'secondary') => void;
+  setPaneNote: (paneId: string, folderId: string, noteId: string) => void;
+  setPaneViewMode: (paneId: string, mode: EditorViewMode) => void;
+  resizePaneBranch: (branchId: string, dividerIndex: number, deltaRatio: number) => void;
+  resetPaneSizes: (branchId?: string) => void;
+  setSecondaryNote: (folderId: string, noteId: string) => void;
+  setSecondaryViewMode: (mode: EditorViewMode) => void;
+
+  collapseAllSubfolders: () => void;
+  expandAllSubfolders: () => void;
+  toggleCollapseAllSubfolders: () => void;
+
   importNotes: (notes: NoteItem[]) => void;
   importNotesFiles: (files: File[]) => Promise<void>;
   importFolder: (
     rootName: string,
     items: ExplorerNode[],
-    asTopLevel: boolean,
+    placement: boolean | LinkModalTargetMode,
     localPath?: string
   ) => void;
 
@@ -257,9 +333,7 @@ export interface NotesState {
   setSortOrder: (order: SortOrder) => void;
   chooseTheme: (theme: ThemeId) => void;
 
-  openImportModal: (mode: ImportTargetMode) => void;
-  closeImportModal: () => void;
-  openLinkModal: () => void;
+  openLinkModal: (mode?: LinkModalTargetMode) => void;
   closeLinkModal: () => void;
   openSessionModal: () => void;
   closeSessionModal: () => void;
@@ -296,14 +370,23 @@ export const useNotesStore = create<NotesState>()(
       theme: initialTheme(),
       lastSyncTimeByFolder: {},
 
+      paneLayout: null,
+      activePaneId: null,
+      isSplitViewActive: false,
+      splitDirection: 'horizontal',
+      secondaryFolderId: null,
+      secondaryNoteId: null,
+      secondaryViewMode: 'preview',
+      activePane: 'primary',
+
       isHydrated: false,
       isThemeModalOpen: false,
       isLinkModalOpen: false,
+      linkModalTargetMode: 'new-tab',
       isSessionModalOpen: false,
       currentSessionId: getTabSessionId(),
       currentSessionName: getTabSessionName(),
       isSyncingFolderId: null,
-      importModalMode: null,
       pendingRenameFolderId: null,
       pendingRenameGroupId: null,
       pendingRenameNodeId: null,
@@ -545,17 +628,39 @@ export const useNotesStore = create<NotesState>()(
           }
           const nextNoteMap = { ...state.selectedNoteByFolder };
           delete nextNoteMap[folderId];
+          const isSecondaryFolderDeleted = state.secondaryFolderId === folderId;
           return {
             folders: nextFolders,
             tabGroups: cleanupEmptyTabGroups(nextFolders, state.tabGroups),
             selectedFolderId: nextSelectedId,
             selectedNoteByFolder: nextNoteMap,
+            ...(isSecondaryFolderDeleted ? { secondaryFolderId: null, secondaryNoteId: null } : {}),
           };
         }),
 
       selectNote: (noteId) =>
         set((state) => {
           if (!state.selectedFolderId) return state;
+          const leaves = getAllLeaves(state.paneLayout);
+          if (state.isSplitViewActive && state.activePaneId && leaves.length > 1) {
+            const updatedLayout = updateLeafInTree(state.paneLayout!, state.activePaneId, (l) => ({
+              ...l,
+              folderId: state.selectedFolderId,
+              noteId,
+            }));
+            const updatedLeaves = getAllLeaves(updatedLayout);
+            const secLeaf = updatedLeaves[1] ?? null;
+            return {
+              paneLayout: updatedLayout,
+              secondaryFolderId: secLeaf?.folderId ?? null,
+              secondaryNoteId: secLeaf?.noteId ?? null,
+              secondaryViewMode: secLeaf?.viewMode ?? 'preview',
+              selectedNoteByFolder:
+                state.activePaneId === updatedLeaves[0]?.id
+                  ? { ...state.selectedNoteByFolder, [state.selectedFolderId]: noteId }
+                  : state.selectedNoteByFolder,
+            };
+          }
           return {
             selectedNoteByFolder: {
               ...state.selectedNoteByFolder,
@@ -571,6 +676,30 @@ export const useNotesStore = create<NotesState>()(
             ? (findAncestorFolderIds(targetTopFolder.items, noteId) ?? [])
             : [];
           const ancestorSet = new Set(ancestors);
+          const leaves = getAllLeaves(state.paneLayout);
+
+          if (state.isSplitViewActive && state.activePaneId && leaves.length > 1) {
+            const updatedLayout = updateLeafInTree(state.paneLayout!, state.activePaneId, (l) => ({
+              ...l,
+              folderId: topFolderId,
+              noteId,
+            }));
+            const updatedLeaves = getAllLeaves(updatedLayout);
+            const secLeaf = updatedLeaves[1] ?? null;
+            return {
+              selectedFolderId: topFolderId,
+              paneLayout: updatedLayout,
+              secondaryFolderId: secLeaf?.folderId ?? null,
+              secondaryNoteId: secLeaf?.noteId ?? null,
+              secondaryViewMode: secLeaf?.viewMode ?? 'preview',
+              collapsedSubfolderIds: state.collapsedSubfolderIds.filter((id) => !ancestorSet.has(id)),
+              selectedNoteByFolder:
+                state.activePaneId === updatedLeaves[0]?.id
+                  ? { ...state.selectedNoteByFolder, [topFolderId]: noteId }
+                  : state.selectedNoteByFolder,
+            };
+          }
+
           return {
             selectedFolderId: topFolderId,
             selectedNoteByFolder: {
@@ -829,6 +958,7 @@ export const useNotesStore = create<NotesState>()(
         const nodeToDelete = findNodeById(currentFolder.items, nodeId);
         const diskPath =
           nodeToDelete?.type === 'note' ? nodeToDelete.filePath : nodeToDelete?.folderPath;
+        const isSecondaryDeleted = state.secondaryNoteId === nodeId;
 
         set((s) => ({
           folders: mapFolderById(s.folders, s.selectedFolderId, (folder) => ({
@@ -836,6 +966,7 @@ export const useNotesStore = create<NotesState>()(
             items: removeNodeFromTree(folder.items, nodeId),
           })),
           collapsedSubfolderIds: s.collapsedSubfolderIds.filter((id) => id !== nodeId),
+          ...(isSecondaryDeleted ? { secondaryNoteId: null } : {}),
         }));
 
         if (diskPath) {
@@ -847,13 +978,23 @@ export const useNotesStore = create<NotesState>()(
 
       updateNote: (noteId, updates) => {
         const state = get();
-        const currentFolder = getSelectedTopFolder(state);
-        if (!currentFolder) return;
+        let containingFolder: TopLevelFolder | null = null;
+        for (const f of state.folders) {
+          if (findNoteNode(f.items, noteId)) {
+            containingFolder = f;
+            break;
+          }
+        }
+        if (!containingFolder) {
+          containingFolder = getSelectedTopFolder(state);
+        }
+        if (!containingFolder) return;
 
-        const targetNote = findNoteNode(currentFolder.items, noteId);
+        const targetFolderId = containingFolder.id;
+        const targetNote = findNoteNode(containingFolder.items, noteId);
 
         set((s) => ({
-          folders: mapFolderById(s.folders, s.selectedFolderId, (folder) => ({
+          folders: mapFolderById(s.folders, targetFolderId, (folder) => ({
             ...folder,
             items: updateNoteInTree(folder.items, noteId, updates),
           })),
@@ -895,7 +1036,7 @@ export const useNotesStore = create<NotesState>()(
               if (newPath !== currentFilePath) {
                 const actualPath = await fsApi.renamePath(currentFilePath, newPath);
                 set((s) => ({
-                  folders: mapFolderById(s.folders, s.selectedFolderId, (folder) => ({
+                  folders: mapFolderById(s.folders, targetFolderId, (folder) => ({
                     ...folder,
                     items: updateNoteInTree(folder.items, noteId, {
                       filePath: actualPath,
@@ -950,9 +1091,12 @@ export const useNotesStore = create<NotesState>()(
         get().importNotes(notes);
       },
 
-      importFolder: (rootName, items, asTopLevel, localPath) =>
+      importFolder: (rootName, items, placement, localPath) =>
         set((state) => {
-          if (asTopLevel || !state.selectedFolderId) {
+          const isTopLevel =
+            placement === true || placement === 'new-tab' || !state.selectedFolderId;
+
+          if (isTopLevel) {
             const newTopFolder: TopLevelFolder = {
               id: createId('top'),
               name: rootName,
@@ -976,6 +1120,26 @@ export const useNotesStore = create<NotesState>()(
             };
           }
 
+          if (placement === 'current-tab' && state.selectedFolderId) {
+            const activeFolderId = state.selectedFolderId;
+            const firstNoteId = findDefaultNoteId(items, state.sortOrder);
+            return {
+              folders: mapFolderById(state.folders, activeFolderId, (folder) => ({
+                ...folder,
+                name: folder.name === 'Untitled Folder' ? rootName : folder.name,
+                items: [...folder.items, ...items],
+                localPath: localPath ?? folder.localPath,
+              })),
+              selectedNoteByFolder:
+                !state.selectedNoteByFolder[activeFolderId] && firstNoteId
+                  ? {
+                      ...state.selectedNoteByFolder,
+                      [activeFolderId]: firstNoteId,
+                    }
+                  : state.selectedNoteByFolder,
+            };
+          }
+
           const newSubfolder: FolderItem = {
             id: createId('sub'),
             type: 'folder',
@@ -985,14 +1149,14 @@ export const useNotesStore = create<NotesState>()(
           };
           const firstNoteId = findDefaultNoteId(newSubfolder.children, state.sortOrder);
           return {
-            folders: mapFolderById(state.folders, state.selectedFolderId, (folder) => ({
+            folders: mapFolderById(state.folders, state.selectedFolderId!, (folder) => ({
               ...folder,
               items: [...folder.items, newSubfolder],
             })),
             selectedNoteByFolder: firstNoteId
               ? {
                   ...state.selectedNoteByFolder,
-                  [state.selectedFolderId]: firstNoteId,
+                  [state.selectedFolderId!]: firstNoteId,
                 }
               : state.selectedNoteByFolder,
           };
@@ -1129,7 +1293,340 @@ export const useNotesStore = create<NotesState>()(
           };
         }),
 
+      collapseAllSubfolders: () => {
+        const state = get();
+        const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+        if (!currentFolder) return;
+        const mainFolderIds = new Set(collectMainFolderIds(currentFolder.items));
+        const subfolderIds = collectNestedSubfolderIds(currentFolder.items, 0);
+        if (subfolderIds.length === 0) return;
+        // Keep main/parent folders (depth 0) open, and collapse all nested subfolders (depth >= 1)
+        const nextCollapsed = state.collapsedSubfolderIds.filter((id) => !mainFolderIds.has(id));
+        set({
+          collapsedSubfolderIds: Array.from(new Set([...nextCollapsed, ...subfolderIds])),
+        });
+      },
+
+      expandAllSubfolders: () => {
+        const state = get();
+        const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+        if (!currentFolder) {
+          set({ collapsedSubfolderIds: [] });
+          return;
+        }
+        const mainFolderIds = new Set(collectMainFolderIds(currentFolder.items));
+        const subfolderIds = new Set(collectNestedSubfolderIds(currentFolder.items, 0));
+        set({
+          collapsedSubfolderIds: state.collapsedSubfolderIds.filter(
+            (id) => !subfolderIds.has(id) && !mainFolderIds.has(id)
+          ),
+        });
+      },
+
+      toggleCollapseAllSubfolders: () => {
+        const state = get();
+        const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+        if (!currentFolder) return;
+        const subfolderIds = collectNestedSubfolderIds(currentFolder.items, 0);
+        if (subfolderIds.length === 0) return;
+        const collapsedSet = new Set(state.collapsedSubfolderIds);
+        const allAreCollapsed = subfolderIds.every((id) => collapsedSet.has(id));
+        if (allAreCollapsed) {
+          get().expandAllSubfolders();
+        } else {
+          get().collapseAllSubfolders();
+        }
+      },
+
       setViewMode: (mode) => set({ viewMode: mode }),
+
+      splitPane: (direction, targetFolderId, targetNoteId, fromPaneId) => {
+        const state = get();
+        let fId: string | null = targetFolderId ?? null;
+        let nId: string | null = targetNoteId ?? null;
+
+        // If target file not specified, clone active file of fromPaneId (or active pane)
+        if (!nId) {
+          const activeLeaf =
+            state.paneLayout && (fromPaneId || state.activePaneId)
+              ? findLeaf(state.paneLayout, (fromPaneId || state.activePaneId)!)
+              : null;
+
+          if (activeLeaf && activeLeaf.noteId) {
+            fId = activeLeaf.folderId;
+            nId = activeLeaf.noteId;
+          } else {
+            fId = state.selectedFolderId;
+            nId = state.selectedFolderId
+              ? (state.selectedNoteByFolder[state.selectedFolderId] ?? null)
+              : null;
+          }
+        }
+
+        const newLeaf = createLeafNode(fId ?? state.selectedFolderId, nId, 'write');
+
+        let nextLayout: PaneLayoutNode;
+        if (!state.paneLayout || getAllLeaves(state.paneLayout).length <= 1) {
+          // Starting from single view mode
+          const primaryFolderId = state.selectedFolderId;
+          const primaryNoteId = primaryFolderId
+            ? (state.selectedNoteByFolder[primaryFolderId] ?? null)
+            : null;
+          const primaryLeaf = createLeafNode(
+            primaryFolderId,
+            primaryNoteId,
+            state.viewMode,
+            'pane-primary'
+          );
+          nextLayout = {
+            id: createBranchId(),
+            type: 'branch',
+            direction,
+            children: [primaryLeaf, newLeaf],
+            sizes: [0.5, 0.5],
+          };
+        } else {
+          // Split from specific origin pane
+          const originId =
+            fromPaneId ?? state.activePaneId ?? getAllLeaves(state.paneLayout)[0].id;
+          nextLayout = splitLeafInTree(state.paneLayout, originId, direction, newLeaf);
+        }
+
+        const leaves = getAllLeaves(nextLayout);
+        const secLeaf = leaves[1] ?? null;
+
+        set({
+          paneLayout: nextLayout,
+          activePaneId: newLeaf.id,
+          isSplitViewActive: leaves.length > 1,
+          splitDirection: nextLayout.type === 'branch' ? nextLayout.direction : direction,
+          secondaryFolderId: secLeaf?.folderId ?? null,
+          secondaryNoteId: secLeaf?.noteId ?? null,
+          secondaryViewMode: secLeaf?.viewMode ?? 'preview',
+          activePane: newLeaf.id === leaves[0]?.id ? 'primary' : 'secondary',
+        });
+      },
+
+      toggleSplitDirection: (branchId) => {
+        const state = get();
+        if (!state.paneLayout) {
+          set((s) => ({
+            splitDirection: s.splitDirection === 'horizontal' ? 'vertical' : 'horizontal',
+          }));
+          return;
+        }
+        const updatedLayout = toggleBranchDirection(state.paneLayout, branchId);
+        const dir = updatedLayout.type === 'branch' ? updatedLayout.direction : 'horizontal';
+        set({
+          paneLayout: updatedLayout,
+          splitDirection: dir,
+        });
+      },
+
+      closePane: (targetPane) => {
+        const state = get();
+        if (!state.paneLayout) return;
+
+        const leaves = getAllLeaves(state.paneLayout);
+        let paneIdToClose: string | null = null;
+
+        if (typeof targetPane === 'string' && targetPane !== 'primary' && targetPane !== 'secondary') {
+          paneIdToClose = targetPane;
+        } else if (targetPane === 'primary') {
+          paneIdToClose = leaves[0]?.id ?? null;
+        } else if (targetPane === 'secondary') {
+          paneIdToClose = leaves[1]?.id ?? null;
+        } else {
+          paneIdToClose = state.activePaneId ?? leaves[leaves.length - 1]?.id ?? null;
+        }
+
+        if (!paneIdToClose) return;
+
+        const nextLayout = removeLeafFromTree(state.paneLayout, paneIdToClose);
+        if (!nextLayout || nextLayout.type === 'leaf') {
+          const remainingLeaf = nextLayout ?? (leaves.find((l) => l.id !== paneIdToClose) ?? null);
+          if (remainingLeaf && remainingLeaf.folderId && remainingLeaf.noteId) {
+            const fId = remainingLeaf.folderId;
+            const nId = remainingLeaf.noteId;
+            set((s) => ({
+              paneLayout: null,
+              activePaneId: null,
+              isSplitViewActive: false,
+              selectedFolderId: fId,
+              selectedNoteByFolder: {
+                ...s.selectedNoteByFolder,
+                [fId]: nId,
+              },
+              viewMode: remainingLeaf.viewMode,
+              activePane: 'primary',
+              secondaryFolderId: null,
+              secondaryNoteId: null,
+            }));
+          } else {
+            set({
+              paneLayout: null,
+              activePaneId: null,
+              isSplitViewActive: false,
+              activePane: 'primary',
+              secondaryFolderId: null,
+              secondaryNoteId: null,
+            });
+          }
+          return;
+        }
+
+        const remainingLeaves = getAllLeaves(nextLayout);
+        const nextActiveId =
+          state.activePaneId === paneIdToClose
+            ? (remainingLeaves[0]?.id ?? null)
+            : state.activePaneId;
+        const secLeaf = remainingLeaves[1] ?? null;
+
+        set({
+          paneLayout: nextLayout,
+          activePaneId: nextActiveId,
+          isSplitViewActive: remainingLeaves.length > 1,
+          secondaryFolderId: secLeaf?.folderId ?? null,
+          secondaryNoteId: secLeaf?.noteId ?? null,
+          secondaryViewMode: secLeaf?.viewMode ?? 'preview',
+          activePane: nextActiveId === remainingLeaves[0]?.id ? 'primary' : 'secondary',
+        });
+      },
+
+      closeOtherPanes: (keepPaneId) => {
+        const state = get();
+        if (!state.paneLayout) return;
+        const targetId = keepPaneId ?? state.activePaneId;
+        const targetLeaf = targetId ? findLeaf(state.paneLayout, targetId) : null;
+        if (!targetLeaf) {
+          get().closeSplitView();
+          return;
+        }
+        if (targetLeaf.folderId && targetLeaf.noteId) {
+          const fId = targetLeaf.folderId;
+          const nId = targetLeaf.noteId;
+          set((s) => ({
+            paneLayout: null,
+            activePaneId: null,
+            isSplitViewActive: false,
+            selectedFolderId: fId,
+            selectedNoteByFolder: {
+              ...s.selectedNoteByFolder,
+              [fId]: nId,
+            },
+            viewMode: targetLeaf.viewMode,
+            activePane: 'primary',
+            secondaryFolderId: null,
+            secondaryNoteId: null,
+          }));
+        } else {
+          get().closeSplitView();
+        }
+      },
+
+      toggleSplitView: () => {
+        const state = get();
+        if (state.isSplitViewActive) {
+          get().closePane('secondary');
+        } else {
+          get().splitPane('horizontal');
+        }
+      },
+
+      openInSplitView: (folderId, noteId, direction = 'horizontal') => {
+        get().splitPane(direction, folderId, noteId);
+      },
+
+      closeSplitView: () => {
+        get().closeOtherPanes(get().activePaneId ?? undefined);
+      },
+
+      setActivePaneId: (paneId) => {
+        const state = get();
+        const leaves = getAllLeaves(state.paneLayout);
+        const isPrimary = leaves[0]?.id === paneId;
+        set({
+          activePaneId: paneId,
+          activePane: isPrimary ? 'primary' : 'secondary',
+        });
+      },
+
+      setActivePane: (pane) => {
+        const state = get();
+        const leaves = getAllLeaves(state.paneLayout);
+        if (pane === 'primary' && leaves[0]) {
+          set({ activePaneId: leaves[0].id, activePane: 'primary' });
+        } else if (pane === 'secondary' && leaves[1]) {
+          set({ activePaneId: leaves[1].id, activePane: 'secondary' });
+        } else {
+          set({ activePane: pane });
+        }
+      },
+
+      setPaneNote: (paneId, folderId, noteId) => {
+        const state = get();
+        if (!state.paneLayout) return;
+        const updatedLayout = updateLeafInTree(state.paneLayout, paneId, (l) => ({
+          ...l,
+          folderId,
+          noteId,
+        }));
+        const leaves = getAllLeaves(updatedLayout);
+        const secLeaf = leaves[1] ?? null;
+        set({
+          paneLayout: updatedLayout,
+          activePaneId: paneId,
+          secondaryFolderId: secLeaf?.folderId ?? null,
+          secondaryNoteId: secLeaf?.noteId ?? null,
+        });
+      },
+
+      setPaneViewMode: (paneId, mode) => {
+        const state = get();
+        if (!state.paneLayout) return;
+        const updatedLayout = updateLeafInTree(state.paneLayout, paneId, (l) => ({
+          ...l,
+          viewMode: mode,
+        }));
+        set({ paneLayout: updatedLayout });
+      },
+
+      resizePaneBranch: (branchId, index, deltaRatio) => {
+        const state = get();
+        if (!state.paneLayout) return;
+        const updatedLayout = resizeBranchInTree(state.paneLayout, branchId, index, deltaRatio);
+        set({ paneLayout: updatedLayout });
+      },
+
+      resetPaneSizes: (branchId) => {
+        const state = get();
+        if (!state.paneLayout) return;
+        const updatedLayout = resetBranchSizes(state.paneLayout, branchId);
+        set({ paneLayout: updatedLayout });
+      },
+
+      setSecondaryNote: (folderId, noteId) => {
+        const state = get();
+        const leaves = getAllLeaves(state.paneLayout);
+        if (leaves.length > 1 && leaves[1]) {
+          get().setPaneNote(leaves[1].id, folderId, noteId);
+        } else {
+          set({
+            secondaryFolderId: folderId,
+            secondaryNoteId: noteId,
+            activePane: 'secondary',
+          });
+        }
+      },
+
+      setSecondaryViewMode: (mode) => {
+        const state = get();
+        const leaves = getAllLeaves(state.paneLayout);
+        if (leaves.length > 1 && leaves[1]) {
+          get().setPaneViewMode(leaves[1].id, mode);
+        }
+        set({ secondaryViewMode: mode });
+      },
 
       toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
       toggleNavbar: () => set((state) => ({ isNavbarCollapsed: !state.isNavbarCollapsed })),
@@ -1150,9 +1647,8 @@ export const useNotesStore = create<NotesState>()(
         set({ theme: nextTheme });
       },
 
-      openImportModal: (mode) => set({ importModalMode: mode }),
-      closeImportModal: () => set({ importModalMode: null }),
-      openLinkModal: () => set({ isLinkModalOpen: true }),
+      openLinkModal: (mode = 'new-tab') =>
+        set({ isLinkModalOpen: true, linkModalTargetMode: mode }),
       closeLinkModal: () => set({ isLinkModalOpen: false }),
       openSessionModal: () => set({ isSessionModalOpen: true }),
       closeSessionModal: () => set({ isSessionModalOpen: false }),
@@ -1187,11 +1683,29 @@ export const useNotesStore = create<NotesState>()(
         sortOrder: state.sortOrder,
         theme: state.theme,
         lastSyncTimeByFolder: state.lastSyncTimeByFolder,
+        isSplitViewActive: state.isSplitViewActive,
+        splitDirection: state.splitDirection,
+        secondaryFolderId: state.secondaryFolderId,
+        secondaryNoteId: state.secondaryNoteId,
+        secondaryViewMode: state.secondaryViewMode,
+        paneLayout: state.paneLayout,
+        activePaneId: state.activePaneId,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state?.theme) {
-          applyTheme(state.theme);
-          saveTheme(state.theme);
+        if (state) {
+          if (state.theme) {
+            applyTheme(state.theme);
+            saveTheme(state.theme);
+          }
+          if ((state.viewMode as string) === 'split') {
+            state.setViewMode('write');
+          }
+          if ((state.secondaryViewMode as string) === 'split') {
+            state.setSecondaryViewMode('preview');
+          }
+          if (state.paneLayout && getAllLeaves(state.paneLayout).length > 1) {
+            state.isSplitViewActive = true;
+          }
         }
         const sessionId = getTabSessionId();
         sessionApi

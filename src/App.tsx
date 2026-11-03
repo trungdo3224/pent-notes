@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FolderExplorer } from './components/FolderExplorer';
 import { FolderNavbar } from './components/FolderNavbar';
-import { ImportModal } from './components/ImportModal';
 import { LinkFolderModal } from './components/LinkFolderModal';
 import { NoteCatalogSidebar } from './components/NoteCatalogSidebar';
 import { NoteEditor } from './components/NoteEditor';
@@ -22,7 +21,6 @@ export const App: React.FC = () => {
   const isHydrated = useNotesStore((s) => s.isHydrated);
   const theme = useNotesStore((s) => s.theme);
   const isThemeModalOpen = useNotesStore((s) => s.isThemeModalOpen);
-  const importModalMode = useNotesStore((s) => s.importModalMode);
   const isSidebarCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
   const isRightSidebarCollapsed = useNotesStore((s) => s.isRightSidebarCollapsed);
   const setSidebarWidth = useNotesStore((s) => s.setSidebarWidth);
@@ -34,9 +32,6 @@ export const App: React.FC = () => {
 
   const chooseTheme = useNotesStore((s) => s.chooseTheme);
   const closeThemeModal = useNotesStore((s) => s.closeThemeModal);
-  const closeImportModal = useNotesStore((s) => s.closeImportModal);
-  const importNotes = useNotesStore((s) => s.importNotes);
-  const importFolder = useNotesStore((s) => s.importFolder);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchInitialQuery, setSearchInitialQuery] = useState('');
@@ -123,11 +118,6 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleSidebar, toggleNavbar, toggleRightSidebar]);
 
-  const activeFolderName = useMemo(
-    () => folders.find((f) => f.id === selectedFolderId)?.name ?? null,
-    [folders, selectedFolderId]
-  );
-
   return (
     <div className="app-shell">
       <FolderNavbar
@@ -192,16 +182,6 @@ export const App: React.FC = () => {
       />
       <LinkFolderModal />
       <SessionModal />
-
-      {importModalMode && (
-        <ImportModal
-          initialMode={importModalMode}
-          activeFolderName={activeFolderName}
-          onClose={closeImportModal}
-          onImportedNotes={importNotes}
-          onImportedFolder={importFolder}
-        />
-      )}
 
       {isThemeModalOpen && (
         <ThemeModal theme={theme} onChoose={chooseTheme} onClose={closeThemeModal} />

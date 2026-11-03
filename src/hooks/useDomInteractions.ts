@@ -8,15 +8,17 @@ const COPY_FEEDBACK_DURATION_MS = 2000;
  */
 export function usePointerDrag(
   isDragging: boolean,
-  onMoveClientX: (clientX: number) => void,
+  onMove: (clientX: number, clientY: number) => void,
   onEnd: () => void
 ): void {
   useEffect(() => {
     if (!isDragging) return;
 
     const handlePointerMove = (event: MouseEvent | TouchEvent) => {
-      const clientX = 'touches' in event ? event.touches[0].clientX : event.clientX;
-      onMoveClientX(clientX);
+      const touch = 'touches' in event ? event.touches[0] : null;
+      const clientX = touch ? touch.clientX : (event as MouseEvent).clientX;
+      const clientY = touch ? touch.clientY : (event as MouseEvent).clientY;
+      onMove(clientX, clientY);
     };
 
     const handlePointerUp = () => {
@@ -37,7 +39,7 @@ export function usePointerDrag(
       window.removeEventListener('touchmove', handlePointerMove);
       window.removeEventListener('touchend', handlePointerUp);
     };
-  }, [isDragging, onMoveClientX, onEnd]);
+  }, [isDragging, onMove, onEnd]);
 }
 
 /**

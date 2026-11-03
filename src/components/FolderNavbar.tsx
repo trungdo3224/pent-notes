@@ -5,7 +5,6 @@ import {
   FileUp,
   Folder,
   FolderPlus,
-  FolderSync,
   FolderUp,
   HardDrive,
   Layers,
@@ -87,7 +86,6 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const clearPendingRenameFolder = useNotesStore((s) => s.clearPendingRenameFolder);
   const clearPendingRenameGroup = useNotesStore((s) => s.clearPendingRenameGroup);
   const importNotesFiles = useNotesStore((s) => s.importNotesFiles);
-  const openImportModal = useNotesStore((s) => s.openImportModal);
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
   const openSessionModal = useNotesStore((s) => s.openSessionModal);
   const currentSessionName = useNotesStore((s) => s.currentSessionName);
@@ -730,11 +728,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     className="plus-menu-item"
                     onClick={() => {
                       closePlusMenu();
-                      openLinkModal();
+                      openLinkModal('new-tab');
                     }}
                   >
-                    <FolderSync size={15} strokeWidth={1.8} className="plus-menu-icon" />
-                    <span>Open local folder (Sync)...</span>
+                    <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Add folder...</span>
                   </button>
 
                   <button
@@ -746,22 +744,10 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     }}
                   >
                     <FolderPlus size={15} strokeWidth={1.8} className="plus-menu-icon" />
-                    <span>New folder</span>
+                    <span>New empty folder</span>
                   </button>
 
                   <div className="plus-menu-divider" />
-
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      openImportModal('top-folder');
-                    }}
-                  >
-                    <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
-                    <span>Import folder copy...</span>
-                  </button>
 
                   <button
                     type="button"
@@ -829,13 +815,13 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
               <button
                 type="button"
                 className="folder-tab is-placeholder"
-                onClick={openLinkModal}
-                title="Open and sync a folder from your computer"
+                onClick={() => openLinkModal('new-tab')}
+                title="Add or sync a folder from your computer"
               >
                 <div className="folder-tab-top">
-                  <FolderSync size={16} strokeWidth={1.8} className="folder-tab-icon" />
+                  <FolderUp size={16} strokeWidth={1.8} className="folder-tab-icon" />
                 </div>
-                <span className="folder-tab-name">Open local folder</span>
+                <span className="folder-tab-name">Add folder</span>
               </button>
 
               <button
@@ -847,17 +833,6 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                   <Plus size={16} strokeWidth={1.8} className="folder-tab-icon" />
                 </div>
                 <span className="folder-tab-name">New folder</span>
-              </button>
-
-              <button
-                type="button"
-                className="folder-tab is-placeholder"
-                onClick={() => openImportModal('top-folder')}
-              >
-                <div className="folder-tab-top">
-                  <FolderUp size={16} strokeWidth={1.8} className="folder-tab-icon" />
-                </div>
-                <span className="folder-tab-name">Import folder</span>
               </button>
             </>
           ) : (
@@ -1031,11 +1006,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     className="plus-menu-item"
                     onClick={() => {
                       closePlusMenu();
-                      openLinkModal();
+                      openLinkModal('new-tab');
                     }}
                   >
-                    <FolderSync size={15} strokeWidth={1.8} className="plus-menu-icon" />
-                    <span>Open local folder (Sync)...</span>
+                    <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Add folder...</span>
                   </button>
 
                   <button
@@ -1047,22 +1022,10 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     }}
                   >
                     <FolderPlus size={15} strokeWidth={1.8} className="plus-menu-icon" />
-                    <span>New folder</span>
+                    <span>New empty folder</span>
                   </button>
 
                   <div className="plus-menu-divider" />
-
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      openImportModal('top-folder');
-                    }}
-                  >
-                    <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
-                    <span>Import folder copy...</span>
-                  </button>
 
                   <button
                     type="button"

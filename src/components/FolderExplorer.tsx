@@ -6,6 +6,9 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Columns2,
   Copy,
   FilePlus,
   Files,
@@ -23,6 +26,7 @@ import {
   PanelTopClose,
   PanelTopOpen,
   Pencil,
+  Rows2,
   Trash2,
   Unlink,
 } from 'lucide-react';
@@ -30,7 +34,9 @@ import { useClickOutside } from '../hooks/useDomInteractions';
 import { resolveWorkspaceConnections } from '../lib/catalogUtils';
 import { isPdfNote, NOTE_FILE_ACCEPT } from '../lib/fileUtils';
 import { getBasename } from '../lib/pathUtils';
+import { findLeaf, getAllLeaves } from '../lib/paneLayoutTree';
 import {
+  collectAllSubfolderIds,
   DEFAULT_SIDEBAR_WIDTH,
   findAncestorFolderIds,
   findFolderNode,
@@ -74,6 +80,9 @@ export const FolderExplorer: React.FC = () => {
   const sidebarWidth = useNotesStore((s) => s.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH);
   const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
   const isSyncingFolderId = useNotesStore((s) => s.isSyncingFolderId);
+  const isSplitViewActive = useNotesStore((s) => s.isSplitViewActive);
+  const openInSplitView = useNotesStore((s) => s.openInSplitView);
+  const splitPane = useNotesStore((s) => s.splitPane);
 
   const toggleSidebar = useNotesStore((s) => s.toggleSidebar);
   const toggleNavbar = useNotesStore((s) => s.toggleNavbar);
@@ -89,10 +98,14 @@ export const FolderExplorer: React.FC = () => {
   const deleteNode = useNotesStore((s) => s.deleteNode);
   const clearPendingRenameNode = useNotesStore((s) => s.clearPendingRenameNode);
   const importNotesFiles = useNotesStore((s) => s.importNotesFiles);
-  const openImportModal = useNotesStore((s) => s.openImportModal);
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
   const unlinkFolderFromDisk = useNotesStore((s) => s.unlinkFolderFromDisk);
   const toggleSubfolderCollapse = useNotesStore((s) => s.toggleSubfolderCollapse);
+  const toggleCollapseAllSubfolders = useNotesStore((s) => s.toggleCollapseAllSubfolders);
+  const collapseAllSubfolders = useNotesStore((s) => s.collapseAllSubfolders);
+  const expandAllSubfolders = useNotesStore((s) => s.expandAllSubfolders);
+  const paneLayout = useNotesStore((s) => s.paneLayout);
+  const activePaneId = useNotesStore((s) => s.activePaneId);
 
   const folder = useMemo(
     () => folders.find((f) => f.id === selectedFolderId) ?? null,
@@ -110,6 +123,29 @@ export const FolderExplorer: React.FC = () => {
     () => new Set(collapsedSubfolderIds),
     [collapsedSubfolderIds]
   );
+
+  const allSubfolderIds = useMemo(() => {
+    if (!folder) return [];
+    return collectAllSubfolderIds(folder.items);
+  }, [folder]);
+
+  const isAllSubfoldersCollapsed = useMemo(() => {
+    if (allSubfolderIds.length === 0) return false;
+    return allSubfolderIds.every((id) => collapsedSet.has(id));
+  }, [allSubfolderIds, collapsedSet]);
+
+  const openPaneNoteIds = useMemo(() => {
+    if (!isSplitViewActive || !paneLayout) return new Set<string>();
+    return new Set(getAllLeaves(paneLayout).map((l) => l.noteId).filter(Boolean) as string[]);
+  }, [isSplitViewActive, paneLayout]);
+
+  const currentActivePaneNoteId = useMemo(() => {
+    if (isSplitViewActive && paneLayout && activePaneId) {
+      const leaf = findLeaf(paneLayout, activePaneId);
+      if (leaf?.noteId) return leaf.noteId;
+    }
+    return selectedNoteId;
+  }, [isSplitViewActive, paneLayout, activePaneId, selectedNoteId]);
 
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
@@ -183,15 +219,6 @@ export const FolderExplorer: React.FC = () => {
           <span className="explorer-overline">SELECTED FOLDER</span>
           <div className="explorer-header-row">
             <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>No folder selected</span>
-            <button
-              type="button"
-              className="explorer-menu-btn"
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-              onClick={toggleSidebar}
-            >
-              <PanelLeftClose size={17} strokeWidth={1.8} />
-            </button>
           </div>
         </div>
         <div className="explorer-empty">
@@ -406,9 +433,10 @@ export const FolderExplorer: React.FC = () => {
         );
       }
 
-      const isSelected = node.id === selectedNoteId;
+      const isSelected = node.id === currentActivePaneNoteId;
+      const isSecondarySelected = isSplitViewActive && !isSelected && openPaneNoteIds.has(node.id);
       const isEditingNote = editingNodeId === node.id;
-      const isLinkedNote = !isSelected && connections.linkedNoteIds.has(node.id);
+      const isLinkedNote = !isSelected && !isSecondarySelected && connections.linkedNoteIds.has(node.id);
       const isContextTarget = contextMenu?.kind === 'note' && contextMenu.note.id === node.id;
       const isPdf = isPdfNote(node);
       const noteLevelClass = depth > 0 ? 'is-child-note' : 'is-root-note';
@@ -419,12 +447,18 @@ export const FolderExplorer: React.FC = () => {
           role="button"
           tabIndex={0}
           className={`explorer-row is-note ${noteLevelClass} ${isSelected ? 'is-selected' : ''} ${
-            isLinkedNote ? 'is-linked-note' : ''
-          } ${isContextTarget ? 'is-context-open' : ''}`}
+            isSecondarySelected ? 'is-secondary-selected' : ''
+          } ${isLinkedNote ? 'is-linked-note' : ''} ${isContextTarget ? 'is-context-open' : ''}`}
           style={{ paddingLeft: `${indentPx}px` }}
           onClick={() => {
             setFocusedFolderId(null);
             selectNote(node.id);
+          }}
+          onMouseDown={(e) => {
+            if (e.button === 1 && folder) {
+              e.preventDefault();
+              openInSplitView(folder.id, node.id);
+            }
           }}
           onDoubleClick={(e) => startNoteRename(node, e)}
           onContextMenu={(e) => openNoteContextMenu(e, node, parentFolderId)}
@@ -547,6 +581,34 @@ export const FolderExplorer: React.FC = () => {
           </div>
 
           <div className="explorer-header-actions" ref={folderMenuRef}>
+            {/* Collapse / Expand all subfolders in explorer */}
+            <button
+              type="button"
+              className="explorer-menu-btn"
+              title={
+                allSubfolderIds.length === 0
+                  ? 'No subfolders to collapse'
+                  : isAllSubfoldersCollapsed
+                  ? 'Expand all subfolders'
+                  : 'Collapse all subfolders'
+              }
+              aria-label={
+                allSubfolderIds.length === 0
+                  ? 'No subfolders to collapse'
+                  : isAllSubfoldersCollapsed
+                  ? 'Expand all subfolders'
+                  : 'Collapse all subfolders'
+              }
+              disabled={allSubfolderIds.length === 0}
+              onClick={toggleCollapseAllSubfolders}
+            >
+              {isAllSubfoldersCollapsed ? (
+                <ChevronsUpDown size={17} strokeWidth={1.8} />
+              ) : (
+                <ChevronsDownUp size={17} strokeWidth={1.8} />
+              )}
+            </button>
+
             {/* List/Menu button for extended folder options */}
             <button
               type="button"
@@ -556,17 +618,6 @@ export const FolderExplorer: React.FC = () => {
               onClick={() => setIsFolderMenuOpen((v) => !v)}
             >
               <List size={17} strokeWidth={1.8} />
-            </button>
-
-            {/* Collapse sidebar button */}
-            <button
-              type="button"
-              className="explorer-menu-btn"
-              title="Collapse sidebar"
-              aria-label="Collapse sidebar"
-              onClick={toggleSidebar}
-            >
-              <PanelLeftClose size={17} strokeWidth={1.8} />
             </button>
 
             {isFolderMenuOpen && (
@@ -590,7 +641,7 @@ export const FolderExplorer: React.FC = () => {
                     className="dropdown-menu-item"
                     onClick={() => {
                       closeFolderMenu();
-                      openLinkModal();
+                      openLinkModal('current-tab');
                     }}
                   >
                     <FolderSync size={15} strokeWidth={1.8} />
@@ -617,11 +668,11 @@ export const FolderExplorer: React.FC = () => {
                   className="dropdown-menu-item"
                   onClick={() => {
                     closeFolderMenu();
-                    openImportModal('subfolder');
+                    openLinkModal('subfolder');
                   }}
                 >
                   <FolderUp size={15} strokeWidth={1.8} />
-                  <span>Import subfolder...</span>
+                  <span>Add subfolder...</span>
                 </button>
 
                 <div className="dropdown-menu-divider" />
@@ -671,13 +722,39 @@ export const FolderExplorer: React.FC = () => {
                 <button
                   type="button"
                   className="dropdown-menu-item"
+                  disabled={allSubfolderIds.length === 0}
+                  onClick={() => {
+                    closeFolderMenu();
+                    collapseAllSubfolders();
+                  }}
+                >
+                  <ChevronsDownUp size={15} strokeWidth={1.8} />
+                  <span>Collapse all subfolders</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="dropdown-menu-item"
+                  disabled={allSubfolderIds.length === 0}
+                  onClick={() => {
+                    closeFolderMenu();
+                    expandAllSubfolders();
+                  }}
+                >
+                  <ChevronsUpDown size={15} strokeWidth={1.8} />
+                  <span>Expand all subfolders</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="dropdown-menu-item"
                   onClick={() => {
                     closeFolderMenu();
                     toggleSidebar();
                   }}
                 >
                   <PanelLeftClose size={15} strokeWidth={1.8} />
-                  <span>Collapse sidebar</span>
+                  <span>Hide sidebar panel</span>
                 </button>
 
                 <button
@@ -774,6 +851,38 @@ export const FolderExplorer: React.FC = () => {
               >
                 <FileText size={14} strokeWidth={1.8} />
                 <span>Open note</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetNote = contextMenu.note;
+                  closeContextMenu();
+                  if (folder) {
+                    splitPane('horizontal', folder.id, targetNote.id);
+                  }
+                }}
+              >
+                <Columns2 size={14} strokeWidth={1.8} />
+                <span>Split right</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetNote = contextMenu.note;
+                  closeContextMenu();
+                  if (folder) {
+                    splitPane('vertical', folder.id, targetNote.id);
+                  }
+                }}
+              >
+                <Rows2 size={14} strokeWidth={1.8} />
+                <span>Split down</span>
               </button>
 
               <button
@@ -1014,11 +1123,11 @@ export const FolderExplorer: React.FC = () => {
                 role="menuitem"
                 onClick={() => {
                   closeContextMenu();
-                  openImportModal('subfolder');
+                  openLinkModal('subfolder');
                 }}
               >
                 <FolderUp size={14} strokeWidth={1.8} />
-                <span>Import subfolder...</span>
+                <span>Add subfolder...</span>
               </button>
             </>
           )}

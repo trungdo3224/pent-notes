@@ -7,6 +7,12 @@ export interface HeadingItem {
   line: number;
 }
 
+export interface HeadingNode extends HeadingItem {
+  children: HeadingNode[];
+  parentId: string | null;
+  depth: number;
+}
+
 export interface TagItem {
   tag: string;
   count: number;
@@ -103,6 +109,43 @@ export function extractHeadings(markdown: string): HeadingItem[] {
   }
 
   return headings;
+}
+
+/**
+ * Builds a hierarchical tree of headings based on their markdown heading level (# = 1, ## = 2...).
+ * Lower level numbers are parents of subsequent higher level numbers.
+ */
+export function buildHeadingTree(headings: HeadingItem[]): HeadingNode[] {
+  const roots: HeadingNode[] = [];
+  const stack: HeadingNode[] = [];
+
+  for (const h of headings) {
+    const node: HeadingNode = {
+      ...h,
+      children: [],
+      parentId: null,
+      depth: 0,
+    };
+
+    while (stack.length > 0 && stack[stack.length - 1].level >= h.level) {
+      stack.pop();
+    }
+
+    if (stack.length === 0) {
+      node.depth = 0;
+      node.parentId = null;
+      roots.push(node);
+    } else {
+      const parent = stack[stack.length - 1];
+      node.depth = parent.depth + 1;
+      node.parentId = parent.id;
+      parent.children.push(node);
+    }
+
+    stack.push(node);
+  }
+
+  return roots;
 }
 
 export function extractTags(markdown: string): TagItem[] {

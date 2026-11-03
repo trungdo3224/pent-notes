@@ -1,45 +1,83 @@
-import React, { useEffect, useState } from 'react';
-import { Check, FolderSync, HardDrive, LoaderCircle, Sparkles, X } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  FolderOpen,
+  FolderPlus,
+  HardDrive,
+  LoaderCircle,
+  X,
+} from 'lucide-react';
 import { useEscapeKey } from '../hooks/useDomInteractions';
+import { buildExplorerTreeFromFiles } from '../lib/fileUtils';
+import { fsApi } from '../lib/fsApi';
 import { useNotesStore } from '../store/useNotesStore';
-
-const SAMPLE_LOCAL_PATHS = [
-  'C:\\Users\\Skdu\\Desktop\\Techie\\pentest-book',
-  'C:\\Users\\Skdu\\Desktop\\Techie\\Web-pentest\\Web-pentest-vault',
-] as const;
+import { LinkModalTargetMode } from '../types'
 
 export const LinkFolderModal: React.FC = () => {
   const isOpen = useNotesStore((s) => s.isLinkModalOpen);
+  const initialTargetMode = useNotesStore((s) => s.linkModalTargetMode);
   const closeLinkModal = useNotesStore((s) => s.closeLinkModal);
   const folders = useNotesStore((s) => s.folders);
   const selectedFolderId = useNotesStore((s) => s.selectedFolderId);
   const openLocalFolderAsTab = useNotesStore((s) => s.openLocalFolderAsTab);
   const linkFolderToDisk = useNotesStore((s) => s.linkFolderToDisk);
+  const importFolder = useNotesStore((s) => s.importFolder);
 
   const activeFolder = folders.find((f) => f.id === selectedFolderId) ?? null;
 
-  const [folderPath, setFolderPath] = useState<string>(SAMPLE_LOCAL_PATHS[0]);
-  const [targetMode, setTargetMode] = useState<'new-tab' | 'current-tab'>('new-tab');
+  const [folderPath, setFolderPath] = useState<string>("");
+  const [targetMode, setTargetMode] = useState<LinkModalTargetMode>('new-tab');
   const [customName, setCustomName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+
+  const setFolderInputElement = useCallback((el: HTMLInputElement | null) => {
+    folderInputRef.current = el;
+    if (el) {
+      el.setAttribute('webkitdirectory', '');
+      el.setAttribute('directory', '');
+      el.setAttribute('mozdirectory', '');
+    }
+  }, []);
+
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      setTargetMode(activeFolder ? initialTargetMode : 'new-tab');
+    } else {
       setError('');
       setBusy(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialTargetMode, activeFolder]);
 
   useEscapeKey(isOpen && !busy, closeLinkModal);
 
   if (!isOpen) return null;
 
+  const handleFolderFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = '';
+    if (selectedFiles.length === 0) return;
+
+    setBusy(true);
+    setError('');
+    try {
+      const { rootName, items } = await buildExplorerTreeFromFiles(selectedFiles, customName);
+      const placement: LinkModalTargetMode = activeFolder ? targetMode : 'new-tab';
+      importFolder(rootName, items, placement);
+      closeLinkModal();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to read selected folder.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleaned = folderPath.replace(/^["']+|["']+$/g, '').trim();
     if (!cleaned) {
-      setError('Please provide a folder path.');
+      setError('Please provide a folder path or use Browse.');
       return;
     }
 
@@ -51,12 +89,16 @@ export const LinkFolderModal: React.FC = () => {
         if (!ok) {
           throw new Error('Failed to link and sync local folder.');
         }
+      } else if (targetMode === 'subfolder' && activeFolder) {
+        const result = await fsApi.scanFolder(cleaned);
+        const folderName = customName.trim() || result.rootName || 'New Folder';
+        importFolder(folderName, result.items, 'subfolder', result.rootPath);
       } else {
         await openLocalFolderAsTab(cleaned, customName);
       }
       closeLinkModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to open local folder.');
+      setError(err instanceof Error ? err.message : 'Failed to add local folder.');
     } finally {
       setBusy(false);
     }
@@ -73,12 +115,20 @@ export const LinkFolderModal: React.FC = () => {
         className="modal add-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Open or link local folder"
+        aria-label="Add folder"
       >
+        <input
+          ref={setFolderInputElement}
+          type="file"
+          multiple
+          hidden
+          onChange={(e) => void handleFolderFilesSelected(e)}
+        />
+
         <div className="modal-heading">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FolderSync size={20} className="primary-accent-icon" />
-            <h2>Direct Local Folder Sync</h2>
+            <FolderPlus size={20} className="primary-accent-icon" />
+            <h2>Add Folder</h2>
           </div>
           <button
             type="button"
@@ -93,16 +143,17 @@ export const LinkFolderModal: React.FC = () => {
 
         <div className="modal-illustration">
           <HardDrive size={30} strokeWidth={1.4} />
-          <span>REAL-TIME TWO-WAY DISK SYNC</span>
+          <span>ADD OR SYNC A FOLDER FROM YOUR COMPUTER</span>
         </div>
 
         <p className="modal-description">
-          Open a local folder directly from your disk. All notes (<code>.md</code>) and subfolders
-          load instantly. Notes you write or edit are saved straight to disk files in real time.
+          Browse a folder from your computer, or paste a local directory path for real-time two-way
+          disk sync of all notes (<code>.md</code>, <code>.txt</code>, <code>.pdf</code>) and
+          subfolders.
         </p>
 
         {/* Quick presets */}
-        <div className="link-presets-container">
+        {/* <div className="link-presets-container">
           <span className="link-presets-title">
             <Sparkles size={12} /> Detected Local Folders:
           </span>
@@ -120,30 +171,39 @@ export const LinkFolderModal: React.FC = () => {
               </button>
             ))}
           </div>
-        </div>
+        </div> */}
 
-        <form onSubmit={(e) => void handleSubmit(e)}>
+        <form onSubmit={(e) => void handleSubmit(e)} className="add-folder-form">
           <label className="field-label" htmlFor="local-folder-path-input">
-            Local folder path<span>Absolute Windows path</span>
+            Local folder path
           </label>
-          <input
-            id="local-folder-path-input"
-            type="text"
-            className="form-input"
-            placeholder="C:\Users\you\Desktop\my-vault"
-            value={folderPath}
-            onChange={(e) => setFolderPath(e.target.value)}
-            disabled={busy}
-            autoFocus
-          />
-          <p className="field-help">
-            You can copy any directory path from File Explorer address bar and paste here.
-          </p>
+          <div className="folder-path-input-row">
+            <input
+              id="local-folder-path-input"
+              type="text"
+              className="form-input"
+              placeholder="C:\Users\you\Desktop\my-vault"
+              value={folderPath}
+              onChange={(e) => setFolderPath(e.target.value)}
+              disabled={busy}
+              autoFocus
+            />
+            <button
+              type="button"
+              className="subtle-btn browse-folder-btn"
+              onClick={() => folderInputRef.current?.click()}
+              disabled={busy}
+              title="Browse and select a folder from your computer"
+            >
+              <FolderOpen size={15} />
+              <span>Browse...</span>
+            </button>
+          </div>
 
-          {targetMode === 'new-tab' && (
+          {targetMode !== 'current-tab' && (
             <>
               <label className="field-label" htmlFor="local-tab-custom-name">
-                Tab display name<span>Optional</span>
+                Folder display name<span>Optional</span>
               </label>
               <input
                 id="local-tab-custom-name"
@@ -172,7 +232,17 @@ export const LinkFolderModal: React.FC = () => {
                     onChange={() => setTargetMode('new-tab')}
                     disabled={busy}
                   />
-                  <span>Open as a new top-level tab</span>
+                  <span>Open as a new tab</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name="link-target"
+                    checked={targetMode === 'subfolder'}
+                    onChange={() => setTargetMode('subfolder')}
+                    disabled={busy}
+                  />
+                  <span>Open as a subfolder inside &ldquo;{activeFolder.name}&rdquo;</span>
                 </label>
                 <label className="radio-option">
                   <input
@@ -208,8 +278,8 @@ export const LinkFolderModal: React.FC = () => {
               className="primary-subtle-btn"
               disabled={busy || !folderPath.trim()}
             >
-              {busy ? <LoaderCircle size={15} className="spin" /> : <FolderSync size={15} />}
-              <span>{busy ? 'Scanning & Syncing...' : 'Open & Sync Folder'}</span>
+              {busy ? <LoaderCircle size={15} className="spin" /> : <FolderPlus size={15} />}
+              <span>{busy ? 'Adding Folder...' : 'Add Folder'}</span>
             </button>
           </div>
         </form>

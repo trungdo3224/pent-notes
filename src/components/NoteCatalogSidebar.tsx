@@ -1,6 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   BookOpen,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Clock,
   Copy,
   ExternalLink,
@@ -16,19 +20,21 @@ import {
 } from 'lucide-react';
 import { useCopyFeedback } from '../hooks/useDomInteractions';
 import {
+  buildHeadingTree,
   calculateNoteStats,
   extractAllWorkspaceTags,
   extractHeadings,
   extractTags,
+  HeadingNode,
   scrollToHeading,
 } from '../lib/catalogUtils';
+import { findLeaf } from '../lib/paneLayoutTree';
 import {
   DEFAULT_RIGHT_SIDEBAR_WIDTH,
+  findNoteAndPath,
   resolveActiveNoteData,
   useNotesStore,
 } from '../store/useNotesStore';
-
-const MIN_HEADINGS_FOR_FILTER = 4;
 
 interface NoteCatalogSidebarProps {
   onOpenSearchWithQuery?: (query: string) => void;
@@ -44,6 +50,12 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
   const isCollapsed = useNotesStore((s) => s.isRightSidebarCollapsed);
   const width = useNotesStore((s) => s.rightSidebarWidth ?? DEFAULT_RIGHT_SIDEBAR_WIDTH);
   const activeTab = useNotesStore((s) => s.rightSidebarTab ?? 'outline');
+  const isSplitViewActive = useNotesStore((s) => s.isSplitViewActive);
+  const activePane = useNotesStore((s) => s.activePane);
+  const secondaryFolderId = useNotesStore((s) => s.secondaryFolderId);
+  const secondaryNoteId = useNotesStore((s) => s.secondaryNoteId);
+  const paneLayout = useNotesStore((s) => s.paneLayout);
+  const activePaneId = useNotesStore((s) => s.activePaneId);
 
   const toggleRightSidebar = useNotesStore((s) => s.toggleRightSidebar);
   const setRightSidebarTab = useNotesStore((s) => s.setRightSidebarTab);
@@ -56,10 +68,49 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
     [folders, selectedFolderId]
   );
 
-  const activeNoteData = useMemo(
-    () => resolveActiveNoteData(activeFolder, selectedNoteByFolder, sortOrder),
-    [activeFolder, selectedNoteByFolder, sortOrder]
-  );
+  const activeNoteData = useMemo(() => {
+    if (paneLayout && activePaneId) {
+      const activeLeaf = findLeaf(paneLayout, activePaneId);
+      if (activeLeaf && activeLeaf.noteId) {
+        if (activeLeaf.folderId) {
+          const secFolder = folders.find((f) => f.id === activeLeaf.folderId);
+          if (secFolder) {
+            const found = findNoteAndPath(secFolder.items, activeLeaf.noteId, [secFolder.name]);
+            if (found) return found;
+          }
+        }
+        for (const f of folders) {
+          const found = findNoteAndPath(f.items, activeLeaf.noteId, [f.name]);
+          if (found) return found;
+        }
+      }
+    }
+    if (isSplitViewActive && activePane === 'secondary' && secondaryNoteId) {
+      if (secondaryFolderId) {
+        const secFolder = folders.find((f) => f.id === secondaryFolderId);
+        if (secFolder) {
+          const found = findNoteAndPath(secFolder.items, secondaryNoteId, [secFolder.name]);
+          if (found) return found;
+        }
+      }
+      for (const f of folders) {
+        const found = findNoteAndPath(f.items, secondaryNoteId, [f.name]);
+        if (found) return found;
+      }
+    }
+    return resolveActiveNoteData(activeFolder, selectedNoteByFolder, sortOrder);
+  }, [
+    paneLayout,
+    activePaneId,
+    isSplitViewActive,
+    activePane,
+    secondaryFolderId,
+    secondaryNoteId,
+    folders,
+    activeFolder,
+    selectedNoteByFolder,
+    sortOrder,
+  ]);
 
   const note = activeNoteData?.note ?? null;
 
@@ -68,11 +119,91 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
     return extractHeadings(note.content);
   }, [note?.content]);
 
-  const filteredHeadings = useMemo(() => {
-    if (!headingFilter.trim()) return headings;
+  const [collapsedHeadingIds, setCollapsedHeadingIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setCollapsedHeadingIds(new Set());
+  }, [note?.id]);
+
+  const { headingTree, collapsibleSubheaderIds } = useMemo(() => {
+    const tree = buildHeadingTree(headings);
+    const collapsibleIds: string[] = [];
+
+    function collectSubheadingsWithChildren(nodes: HeadingNode[]) {
+      for (const node of nodes) {
+        if (node.children.length > 0) {
+          collapsibleIds.push(node.id);
+          collectSubheadingsWithChildren(node.children);
+        }
+      }
+    }
+
+    if (tree.length === 1 && tree[0].children.length > 0) {
+      const secondLevelHasChildren = tree[0].children.some((c) => c.children.length > 0);
+      if (secondLevelHasChildren) {
+        // Document title (#) and primary sections (##) remain open;
+        // any subheaders under the primary sections collapse into them.
+        collectSubheadingsWithChildren(tree[0].children);
+      } else {
+        // Document title (#) is the parent header; its subheaders collapse into it.
+        collapsibleIds.push(tree[0].id);
+      }
+    } else {
+      // Multiple top-level headings: top-level parent headers remain open;
+      // any heading with children collapses its subheaders into it.
+      collectSubheadingsWithChildren(tree);
+    }
+
+    return { headingTree: tree, collapsibleSubheaderIds: collapsibleIds };
+  }, [headings]);
+
+  const hasCollapsibleSubheaders = collapsibleSubheaderIds.length > 0;
+  const isAllSubheadersCollapsed =
+    hasCollapsibleSubheaders &&
+    collapsibleSubheaderIds.every((id) => collapsedHeadingIds.has(id));
+
+  const toggleHeadingCollapse = (headingId: string) => {
+    setCollapsedHeadingIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(headingId)) {
+        next.delete(headingId);
+      } else {
+        next.add(headingId);
+      }
+      return next;
+    });
+  };
+
+  const toggleCollapseAllSubheaders = () => {
+    if (!hasCollapsibleSubheaders) return;
+    if (isAllSubheadersCollapsed) {
+      setCollapsedHeadingIds(new Set());
+    } else {
+      setCollapsedHeadingIds(new Set(collapsibleSubheaderIds));
+    }
+  };
+
+  const filteredHeadingTree = useMemo(() => {
+    if (!headingFilter.trim()) return headingTree;
     const q = headingFilter.toLowerCase();
-    return headings.filter((h) => h.text.toLowerCase().includes(q));
-  }, [headings, headingFilter]);
+
+    function filterNodes(nodes: HeadingNode[]): HeadingNode[] {
+      const res: HeadingNode[] = [];
+      for (const node of nodes) {
+        const matchesSelf = node.text.toLowerCase().includes(q);
+        const matchedChildren = filterNodes(node.children);
+        if (matchesSelf || matchedChildren.length > 0) {
+          res.push({
+            ...node,
+            children: matchedChildren,
+          });
+        }
+      }
+      return res;
+    }
+
+    return filterNodes(headingTree);
+  }, [headingTree, headingFilter]);
 
   const noteTags = useMemo(() => {
     if (!note) return [];
@@ -87,6 +218,55 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
     if (!note) return null;
     return calculateNoteStats(note.content);
   }, [note?.content]);
+
+  const renderHeadingNodes = (nodes: HeadingNode[]): React.ReactNode => {
+    return nodes.map((node) => {
+      const hasChildren = node.children.length > 0;
+      const isCollapsed = headingFilter.trim() ? false : collapsedHeadingIds.has(node.id);
+      const indentLevel = Math.max(0, node.level - 1);
+
+      return (
+        <React.Fragment key={node.id}>
+          <div
+            role="button"
+            tabIndex={0}
+            className={`outline-item level-${node.level} ${isCollapsed ? 'is-collapsed' : ''}`}
+            style={{ paddingLeft: `${6 + indentLevel * 12}px` }}
+            onClick={() => scrollToHeading(node.text, node.level)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                scrollToHeading(node.text, node.level);
+              }
+            }}
+            title={`Jump to line ${node.line}: ${node.text}`}
+          >
+            {hasChildren ? (
+              <button
+                type="button"
+                className="outline-chevron-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleHeadingCollapse(node.id);
+                }}
+                title={isCollapsed ? 'Expand subheaders' : 'Collapse subheaders'}
+                aria-label={isCollapsed ? 'Expand subheaders' : 'Collapse subheaders'}
+              >
+                {isCollapsed ? <ChevronRight size={13} strokeWidth={2} /> : <ChevronDown size={13} strokeWidth={2} />}
+              </button>
+            ) : (
+              <span className="outline-chevron-spacer" />
+            )}
+
+            <span className={`outline-level-dot dot-level-${node.level}`} />
+            <span className="outline-item-text">{node.text}</span>
+          </div>
+
+          {!isCollapsed && hasChildren && renderHeadingNodes(node.children)}
+        </React.Fragment>
+      );
+    });
+  };
 
   if (isCollapsed) return null;
 
@@ -166,16 +346,49 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
             {/* Outline / Table of Contents Tab */}
             {activeTab === 'outline' && (
               <div className="catalog-outline-view">
-                {headings.length > MIN_HEADINGS_FOR_FILTER && (
-                  <div className="catalog-search-wrapper">
-                    <Search size={12} className="catalog-search-icon" />
-                    <input
-                      type="text"
-                      className="catalog-search-input"
-                      placeholder="Filter headings..."
-                      value={headingFilter}
-                      onChange={(e) => setHeadingFilter(e.target.value)}
-                    />
+                {headings.length > 0 && (
+                  <div className="catalog-outline-toolbar">
+                    <div className="catalog-search-wrapper">
+                      <Search size={12} className="catalog-search-icon" />
+                      <input
+                        type="text"
+                        className="catalog-search-input"
+                        placeholder="Filter headings..."
+                        value={headingFilter}
+                        onChange={(e) => setHeadingFilter(e.target.value)}
+                      />
+                      {headingFilter && (
+                        <button
+                          type="button"
+                          className="catalog-search-clear"
+                          onClick={() => setHeadingFilter('')}
+                          title="Clear filter"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="catalog-toolbar-btn"
+                      title={
+                        !hasCollapsibleSubheaders
+                          ? 'No subheaders to collapse'
+                          : isAllSubheadersCollapsed
+                          ? 'Expand all subheaders'
+                          : 'Collapse all subheaders'
+                      }
+                      aria-label={isAllSubheadersCollapsed ? 'Expand all subheaders' : 'Collapse all subheaders'}
+                      disabled={!hasCollapsibleSubheaders}
+                      onClick={toggleCollapseAllSubheaders}
+                    >
+                      {isAllSubheadersCollapsed ? (
+                        <ChevronsUpDown size={14} strokeWidth={1.8} />
+                      ) : (
+                        <ChevronsDownUp size={14} strokeWidth={1.8} />
+                      )}
+                    </button>
                   </div>
                 )}
 
@@ -186,28 +399,13 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                       Use <code># Heading 1</code> or <code>## Heading 2</code> to create sections.
                     </span>
                   </div>
-                ) : filteredHeadings.length === 0 ? (
+                ) : filteredHeadingTree.length === 0 ? (
                   <div className="catalog-empty">
                     <p>No headings match &ldquo;{headingFilter}&rdquo;</p>
                   </div>
                 ) : (
                   <nav className="catalog-outline-tree" aria-label="Table of Contents">
-                    {filteredHeadings.map((h) => {
-                      const indentLevel = Math.max(0, h.level - 1);
-                      return (
-                        <button
-                          key={h.id}
-                          type="button"
-                          className={`outline-item level-${h.level}`}
-                          style={{ paddingLeft: `${8 + indentLevel * 12}px` }}
-                          onClick={() => scrollToHeading(h.text, h.level)}
-                          title={`Jump to line ${h.line}: ${h.text}`}
-                        >
-                          <span className={`outline-level-dot dot-level-${h.level}`} />
-                          <span className="outline-item-text">{h.text}</span>
-                        </button>
-                      );
-                    })}
+                    {renderHeadingNodes(filteredHeadingTree)}
                   </nav>
                 )}
               </div>

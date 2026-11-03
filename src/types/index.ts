@@ -42,13 +42,33 @@ export interface TopLevelFolder {
   groupId?: string;
 }
 
-export type EditorViewMode = 'write' | 'split' | 'preview';
+export type EditorViewMode = 'write' | 'preview';
 
-export type PdfViewMode = 'pdf' | 'split' | 'notes';
+export type PdfViewMode = 'pdf' | 'notes';
+
+export type SplitDirection = 'horizontal' | 'vertical';
+
+export interface PaneLeafNode {
+  id: string;
+  type: 'leaf';
+  folderId: string | null;
+  noteId: string | null;
+  viewMode: EditorViewMode;
+}
+
+export interface PaneBranchNode {
+  id: string;
+  type: 'branch';
+  direction: SplitDirection;
+  children: PaneLayoutNode[];
+  sizes: number[];
+}
+
+export type PaneLayoutNode = PaneLeafNode | PaneBranchNode;
 
 export type SortOrder = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc';
 
-export type ImportTargetMode = 'top-folder' | 'subfolder' | 'note';
+export type LinkModalTargetMode = 'new-tab' | 'subfolder' | 'current-tab';
 
 export type CatalogTab = 'outline' | 'tags' | 'info';
 
