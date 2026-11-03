@@ -579,23 +579,23 @@ export const FolderExplorer: React.FC = () => {
           </div>
 
           <div className="explorer-header-actions" ref={folderMenuRef}>
-            {/* Collapse / Expand all subfolders in explorer */}
+            {/* Collapse / Expand all folders in explorer */}
             <button
               type="button"
               className="explorer-menu-btn"
               title={
                 allSubfolderIds.length === 0
-                  ? 'No subfolders to collapse'
+                  ? 'No folders to collapse'
                   : isAllSubfoldersCollapsed
-                  ? 'Expand all subfolders'
-                  : 'Collapse all subfolders'
+                  ? 'Expand all folders'
+                  : 'Collapse all folders'
               }
               aria-label={
                 allSubfolderIds.length === 0
-                  ? 'No subfolders to collapse'
+                  ? 'No folders to collapse'
                   : isAllSubfoldersCollapsed
-                  ? 'Expand all subfolders'
-                  : 'Collapse all subfolders'
+                  ? 'Expand all folders'
+                  : 'Collapse all folders'
               }
               disabled={allSubfolderIds.length === 0}
               onClick={toggleCollapseAllSubfolders}

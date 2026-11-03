@@ -65,8 +65,72 @@ import {
   TopLevelFolder,
 } from '../types';
 
+export interface ExplorerFolderClassification {
+  /**
+   * Main container folder IDs that should remain open during "collapse all".
+   * This is non-empty only when there is a single top-level wrapper folder
+   * that contains nested subfolders (e.g. 'Academy Learning Paths').
+   */
+  mainFolderIds: string[];
+  /**
+   * All folder IDs that should be collapsed/expanded by the toggle action.
+   */
+  collapsibleFolderIds: string[];
+}
+
+/**
+ * Recursively collects all folder IDs present in the given explorer node list.
+ */
+export function collectAllFolderIds(nodes: ExplorerNode[]): string[] {
+  const ids: string[] = [];
+  for (const node of nodes) {
+    if (node.type === 'folder') {
+      ids.push(node.id);
+      ids.push(...collectAllFolderIds(node.children));
+    }
+  }
+  return ids;
+}
+
+/**
+ * Classifies folders in the explorer tree into main container folders vs collapsible folders.
+ * - Single wrapper folder with nested subfolders: Keeps wrapper open, collapses subfolders.
+ * - Single folder with only notes: That folder is collapsible.
+ * - Multiple top-level folders (e.g. module folders): All folders and their descendants are collapsible.
+ * - No folders (flat notes): Empty classification.
+ */
+export function classifyExplorerFolders(nodes: ExplorerNode[]): ExplorerFolderClassification {
+  const topLevelFolders = nodes.filter((n): n is FolderItem => n.type === 'folder');
+
+  if (topLevelFolders.length === 0) {
+    return { mainFolderIds: [], collapsibleFolderIds: [] };
+  }
+
+  if (topLevelFolders.length === 1) {
+    const singleRoot = topLevelFolders[0];
+    const nestedFolderIds = collectAllFolderIds(singleRoot.children);
+
+    if (nestedFolderIds.length > 0) {
+      return {
+        mainFolderIds: [singleRoot.id],
+        collapsibleFolderIds: nestedFolderIds,
+      };
+    }
+
+    return {
+      mainFolderIds: [],
+      collapsibleFolderIds: [singleRoot.id],
+    };
+  }
+
+  return {
+    mainFolderIds: [],
+    collapsibleFolderIds: collectAllFolderIds(nodes),
+  };
+}
+
 export function collectMainFolderIds(nodes: ExplorerNode[]): string[] {
-  return nodes.filter((n): n is FolderItem => n.type === 'folder').map((f) => f.id);
+  return classifyExplorerFolders(nodes).mainFolderIds;
 }
 
 export function collectNestedSubfolderIds(nodes: ExplorerNode[], currentDepth = 0): string[] {
@@ -83,12 +147,11 @@ export function collectNestedSubfolderIds(nodes: ExplorerNode[], currentDepth = 
 }
 
 /**
- * Collects all subfolder IDs (nested at depth >= 1) under the main/parent folders.
- * Main folders (depth === 0) are excluded so that collapsing/expanding subfolders
- * keeps the main folder open.
+ * Collects all folder IDs that should be toggled by the collapse/expand action.
+ * Adapts dynamically to single-root wrapper tabs and multi-folder tabs.
  */
 export function collectAllSubfolderIds(nodes: ExplorerNode[]): string[] {
-  return collectNestedSubfolderIds(nodes, 0);
+  return classifyExplorerFolders(nodes).collapsibleFolderIds;
 }
 
 export {
@@ -1297,13 +1360,13 @@ export const useNotesStore = create<NotesState>()(
         const state = get();
         const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
         if (!currentFolder) return;
-        const mainFolderIds = new Set(collectMainFolderIds(currentFolder.items));
-        const subfolderIds = collectNestedSubfolderIds(currentFolder.items, 0);
-        if (subfolderIds.length === 0) return;
-        // Keep main/parent folders (depth 0) open, and collapse all nested subfolders (depth >= 1)
-        const nextCollapsed = state.collapsedSubfolderIds.filter((id) => !mainFolderIds.has(id));
+        const { mainFolderIds, collapsibleFolderIds } = classifyExplorerFolders(currentFolder.items);
+        if (collapsibleFolderIds.length === 0) return;
+        // Keep main/parent container folders open, and collapse all target collapsible folders
+        const mainSet = new Set(mainFolderIds);
+        const nextCollapsed = state.collapsedSubfolderIds.filter((id) => !mainSet.has(id));
         set({
-          collapsedSubfolderIds: Array.from(new Set([...nextCollapsed, ...subfolderIds])),
+          collapsedSubfolderIds: Array.from(new Set([...nextCollapsed, ...collapsibleFolderIds])),
         });
       },
 
@@ -1314,12 +1377,10 @@ export const useNotesStore = create<NotesState>()(
           set({ collapsedSubfolderIds: [] });
           return;
         }
-        const mainFolderIds = new Set(collectMainFolderIds(currentFolder.items));
-        const subfolderIds = new Set(collectNestedSubfolderIds(currentFolder.items, 0));
+        const { mainFolderIds, collapsibleFolderIds } = classifyExplorerFolders(currentFolder.items);
+        const toExpand = new Set([...mainFolderIds, ...collapsibleFolderIds]);
         set({
-          collapsedSubfolderIds: state.collapsedSubfolderIds.filter(
-            (id) => !subfolderIds.has(id) && !mainFolderIds.has(id)
-          ),
+          collapsedSubfolderIds: state.collapsedSubfolderIds.filter((id) => !toExpand.has(id)),
         });
       },
 
@@ -1327,10 +1388,10 @@ export const useNotesStore = create<NotesState>()(
         const state = get();
         const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
         if (!currentFolder) return;
-        const subfolderIds = collectNestedSubfolderIds(currentFolder.items, 0);
-        if (subfolderIds.length === 0) return;
+        const { collapsibleFolderIds } = classifyExplorerFolders(currentFolder.items);
+        if (collapsibleFolderIds.length === 0) return;
         const collapsedSet = new Set(state.collapsedSubfolderIds);
-        const allAreCollapsed = subfolderIds.every((id) => collapsedSet.has(id));
+        const allAreCollapsed = collapsibleFolderIds.every((id) => collapsedSet.has(id));
         if (allAreCollapsed) {
           get().expandAllSubfolders();
         } else {
