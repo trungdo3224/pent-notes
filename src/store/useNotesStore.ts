@@ -46,6 +46,8 @@ import {
   ImportTargetMode,
   NoteItem,
   SortOrder,
+  TabGroup,
+  TabGroupColorId,
   TopLevelFolder,
 } from '../types';
 
@@ -135,9 +137,31 @@ function areNodeTreesEqual(a: ExplorerNode[], b: ExplorerNode[]): boolean {
   return true;
 }
 
+const TAB_GROUP_COLORS: TabGroupColorId[] = [
+  'cyan',
+  'emerald',
+  'amber',
+  'purple',
+  'rose',
+  'blue',
+];
+
+function cleanupEmptyTabGroups(folders: TopLevelFolder[], tabGroups: TabGroup[]): TabGroup[] {
+  const firstIndexByGroup = new Map<string, number>();
+  folders.forEach((f, idx) => {
+    if (f.groupId && !firstIndexByGroup.has(f.groupId)) {
+      firstIndexByGroup.set(f.groupId, idx);
+    }
+  });
+  return tabGroups
+    .filter((g) => firstIndexByGroup.has(g.id))
+    .sort((a, b) => (firstIndexByGroup.get(a.id) ?? 0) - (firstIndexByGroup.get(b.id) ?? 0));
+}
+
 export interface NotesState {
   // Persisted workspace state
   folders: TopLevelFolder[];
+  tabGroups: TabGroup[];
   selectedFolderId: string | null;
   selectedNoteByFolder: Record<string, string | null>;
   collapsedSubfolderIds: string[];
@@ -163,6 +187,7 @@ export interface NotesState {
   isSyncingFolderId: string | null;
   importModalMode: ImportTargetMode | null;
   pendingRenameFolderId: string | null;
+  pendingRenameGroupId: string | null;
   pendingRenameNodeId: string | null;
   shouldFocusNoteTitle: boolean;
 
@@ -172,6 +197,26 @@ export interface NotesState {
   createTopFolder: () => void;
   renameTopFolder: (folderId: string, newName: string) => void;
   deleteTopFolder: (folderId: string) => void;
+  reorderTopFolders: (
+    draggedFolderId: string,
+    targetFolderId: string,
+    position: 'before' | 'after',
+    targetGroupId?: string | null
+  ) => void;
+  reorderTabGroup: (
+    draggedGroupId: string,
+    targetId: string,
+    targetKind: 'folder' | 'group',
+    position: 'before' | 'after'
+  ) => void;
+  createTabGroupFromFolder: (folderId: string, name?: string, color?: TabGroupColorId) => string;
+  assignFolderToTabGroup: (folderId: string, groupId: string | null) => void;
+  renameTabGroup: (groupId: string, newName: string) => void;
+  setTabGroupColor: (groupId: string, color: TabGroupColorId) => void;
+  toggleTabGroupCollapse: (groupId: string) => void;
+  ungroupTabGroup: (groupId: string) => void;
+  deleteTabGroupAndFolders: (groupId: string) => void;
+  clearPendingRenameGroup: () => void;
 
   selectNote: (noteId: string) => void;
   navigateToNote: (topFolderId: string, noteId: string) => void;
@@ -235,6 +280,7 @@ export const useNotesStore = create<NotesState>()(
   persist(
     (set, get) => ({
       folders: [],
+      tabGroups: [],
       selectedFolderId: null,
       selectedNoteByFolder: {},
       collapsedSubfolderIds: [],
@@ -259,6 +305,7 @@ export const useNotesStore = create<NotesState>()(
       isSyncingFolderId: null,
       importModalMode: null,
       pendingRenameFolderId: null,
+      pendingRenameGroupId: null,
       pendingRenameNodeId: null,
       shouldFocusNoteTitle: false,
 
@@ -290,6 +337,203 @@ export const useNotesStore = create<NotesState>()(
           folders: mapFolderById(state.folders, folderId, (f) => ({ ...f, name: newName })),
         })),
 
+      reorderTopFolders: (draggedFolderId, targetFolderId, position, targetGroupId) =>
+        set((state) => {
+          if (draggedFolderId === targetFolderId) return state;
+          const fromIndex = state.folders.findIndex((f) => f.id === draggedFolderId);
+          const targetIndex = state.folders.findIndex((f) => f.id === targetFolderId);
+          if (fromIndex === -1 || targetIndex === -1) return state;
+
+          const nextFolders = [...state.folders];
+          const [draggedFolder] = nextFolders.splice(fromIndex, 1);
+          const targetFolder = state.folders[targetIndex];
+          const resolvedGroupId =
+            targetGroupId !== undefined ? (targetGroupId ?? undefined) : targetFolder.groupId;
+          const updatedDraggedFolder: TopLevelFolder = {
+            ...draggedFolder,
+            groupId: resolvedGroupId,
+          };
+
+          const nextTargetIndex = nextFolders.findIndex((f) => f.id === targetFolderId);
+          const insertIndex = position === 'before' ? nextTargetIndex : nextTargetIndex + 1;
+          nextFolders.splice(insertIndex, 0, updatedDraggedFolder);
+
+          return {
+            folders: nextFolders,
+            tabGroups: cleanupEmptyTabGroups(nextFolders, state.tabGroups),
+          };
+        }),
+
+      reorderTabGroup: (draggedGroupId, targetId, targetKind, position) =>
+        set((state) => {
+          if (targetKind === 'group' && draggedGroupId === targetId) return state;
+
+          const groupFolders = state.folders.filter((f) => f.groupId === draggedGroupId);
+          if (groupFolders.length === 0) return state;
+
+          const remainingFolders = state.folders.filter((f) => f.groupId !== draggedGroupId);
+          let insertIndex = -1;
+
+          if (targetKind === 'group') {
+            let firstTargetIdx = -1;
+            let lastTargetIdx = -1;
+            for (let i = 0; i < remainingFolders.length; i++) {
+              if (remainingFolders[i].groupId === targetId) {
+                if (firstTargetIdx === -1) firstTargetIdx = i;
+                lastTargetIdx = i;
+              }
+            }
+            if (firstTargetIdx === -1) return state;
+            insertIndex = position === 'before' ? firstTargetIdx : lastTargetIdx + 1;
+          } else {
+            const targetFolderIdx = remainingFolders.findIndex((f) => f.id === targetId);
+            if (targetFolderIdx === -1) return state;
+            const otherGroupId = remainingFolders[targetFolderIdx].groupId;
+            if (otherGroupId) {
+              let firstOtherIdx = -1;
+              let lastOtherIdx = -1;
+              for (let i = 0; i < remainingFolders.length; i++) {
+                if (remainingFolders[i].groupId === otherGroupId) {
+                  if (firstOtherIdx === -1) firstOtherIdx = i;
+                  lastOtherIdx = i;
+                }
+              }
+              insertIndex = position === 'before' ? firstOtherIdx : lastOtherIdx + 1;
+            } else {
+              insertIndex = position === 'before' ? targetFolderIdx : targetFolderIdx + 1;
+            }
+          }
+
+          const nextFolders = [...remainingFolders];
+          nextFolders.splice(insertIndex, 0, ...groupFolders);
+
+          return {
+            folders: nextFolders,
+            tabGroups: cleanupEmptyTabGroups(nextFolders, state.tabGroups),
+          };
+        }),
+
+      createTabGroupFromFolder: (folderId, name, color) => {
+        const state = get();
+        const nextColor =
+          color ?? TAB_GROUP_COLORS[state.tabGroups.length % TAB_GROUP_COLORS.length];
+        const newGroup: TabGroup = {
+          id: createId('grp'),
+          name: name?.trim() || `Group ${state.tabGroups.length + 1}`,
+          color: nextColor,
+          collapsed: false,
+        };
+        set((s) => {
+          const nextFolders = mapFolderById(s.folders, folderId, (f) => ({
+            ...f,
+            groupId: newGroup.id,
+          }));
+          return {
+            folders: nextFolders,
+            tabGroups: cleanupEmptyTabGroups(nextFolders, [...s.tabGroups, newGroup]),
+            pendingRenameGroupId: newGroup.id,
+          };
+        });
+        return newGroup.id;
+      },
+
+      assignFolderToTabGroup: (folderId, groupId) =>
+        set((state) => {
+          const folderIndex = state.folders.findIndex((f) => f.id === folderId);
+          if (folderIndex === -1) return state;
+
+          const nextFolders = [...state.folders];
+          const [targetFolder] = nextFolders.splice(folderIndex, 1);
+          const updatedFolder: TopLevelFolder = {
+            ...targetFolder,
+            groupId: groupId ?? undefined,
+          };
+
+          if (groupId) {
+            let lastMemberIndex = -1;
+            for (let i = 0; i < nextFolders.length; i++) {
+              if (nextFolders[i].groupId === groupId) {
+                lastMemberIndex = i;
+              }
+            }
+            const insertAt = lastMemberIndex !== -1 ? lastMemberIndex + 1 : folderIndex;
+            nextFolders.splice(insertAt, 0, updatedFolder);
+            return {
+              folders: nextFolders,
+              tabGroups: cleanupEmptyTabGroups(
+                nextFolders,
+                state.tabGroups.map((g) => (g.id === groupId ? { ...g, collapsed: false } : g))
+              ),
+            };
+          } else {
+            let lastSiblingIndex = folderIndex;
+            const prevGroupId = targetFolder.groupId;
+            if (prevGroupId) {
+              for (let i = 0; i < nextFolders.length; i++) {
+                if (nextFolders[i].groupId === prevGroupId) {
+                  lastSiblingIndex = i + 1;
+                }
+              }
+            }
+            nextFolders.splice(lastSiblingIndex, 0, updatedFolder);
+            return {
+              folders: nextFolders,
+              tabGroups: cleanupEmptyTabGroups(nextFolders, state.tabGroups),
+            };
+          }
+        }),
+
+      renameTabGroup: (groupId, newName) =>
+        set((state) => ({
+          tabGroups: state.tabGroups.map((g) =>
+            g.id === groupId ? { ...g, name: newName.trim() || g.name } : g
+          ),
+        })),
+
+      setTabGroupColor: (groupId, color) =>
+        set((state) => ({
+          tabGroups: state.tabGroups.map((g) => (g.id === groupId ? { ...g, color } : g)),
+        })),
+
+      toggleTabGroupCollapse: (groupId) =>
+        set((state) => ({
+          tabGroups: state.tabGroups.map((g) =>
+            g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
+          ),
+        })),
+
+      ungroupTabGroup: (groupId) =>
+        set((state) => ({
+          folders: state.folders.map((f) =>
+            f.groupId === groupId ? { ...f, groupId: undefined } : f
+          ),
+          tabGroups: state.tabGroups.filter((g) => g.id !== groupId),
+        })),
+
+      deleteTabGroupAndFolders: (groupId) =>
+        set((state) => {
+          const removedFolderIds = new Set(
+            state.folders.filter((f) => f.groupId === groupId).map((f) => f.id)
+          );
+          const nextFolders = state.folders.filter((f) => f.groupId !== groupId);
+          const nextNoteMap = { ...state.selectedNoteByFolder };
+          for (const id of removedFolderIds) {
+            delete nextNoteMap[id];
+          }
+          const nextSelectedId =
+            state.selectedFolderId && removedFolderIds.has(state.selectedFolderId)
+              ? (nextFolders[0]?.id ?? null)
+              : state.selectedFolderId;
+          return {
+            folders: nextFolders,
+            tabGroups: state.tabGroups.filter((g) => g.id !== groupId),
+            selectedFolderId: nextSelectedId,
+            selectedNoteByFolder: nextNoteMap,
+          };
+        }),
+
+      clearPendingRenameGroup: () => set({ pendingRenameGroupId: null }),
+
       deleteTopFolder: (folderId) =>
         set((state) => {
           const index = state.folders.findIndex((f) => f.id === folderId);
@@ -303,6 +547,7 @@ export const useNotesStore = create<NotesState>()(
           delete nextNoteMap[folderId];
           return {
             folders: nextFolders,
+            tabGroups: cleanupEmptyTabGroups(nextFolders, state.tabGroups),
             selectedFolderId: nextSelectedId,
             selectedNoteByFolder: nextNoteMap,
           };
@@ -927,6 +1172,7 @@ export const useNotesStore = create<NotesState>()(
       storage: createJSONStorage(() => workspaceStorage),
       partialize: (state) => ({
         folders: state.folders,
+        tabGroups: state.tabGroups,
         selectedFolderId: state.selectedFolderId,
         selectedNoteByFolder: state.selectedNoteByFolder,
         collapsedSubfolderIds: state.collapsedSubfolderIds,

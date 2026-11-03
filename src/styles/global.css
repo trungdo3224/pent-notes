@@ -400,6 +400,302 @@ textarea {
   transform: none;
 }
 
+/* Folder Tab Drag & Drop Reordering */
+.folder-tab[draggable='true'] {
+  cursor: grab;
+}
+
+.folder-tab[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.folder-tab.is-dragging {
+  opacity: 0.42;
+  border-style: dashed;
+  border-color: var(--forest);
+  box-shadow: none;
+}
+
+.folder-tab.is-drop-before::before,
+.folder-tab.is-drop-after::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 999px;
+  background-color: var(--forest);
+  box-shadow: 0 0 10px var(--forest);
+  pointer-events: none;
+  z-index: 15;
+}
+
+.folder-tab.is-drop-before::before {
+  left: -5px;
+}
+
+.folder-tab.is-drop-after::after {
+  right: -5px;
+}
+
+.folder-tab.is-context-open {
+  border-color: var(--forest);
+  box-shadow: 0 0 0 2px var(--glow);
+}
+
+/* Tab Groups */
+.tab-group-container {
+  --group-color: #22d3ee;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  border-radius: 10px;
+  background-color: color-mix(in srgb, var(--group-color) 8%, var(--bg-tab));
+  border: 1px solid color-mix(in srgb, var(--group-color) 32%, var(--border-tab));
+  border-bottom: 2px solid color-mix(in srgb, var(--group-color) 65%, transparent);
+  flex-shrink: 0;
+  transition: all 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tab-group-container.is-dragging {
+  opacity: 0.45;
+  transform: scale(0.97);
+}
+
+.tab-group-container.is-drop-before::before,
+.tab-group-container.is-drop-after::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  border-radius: 999px;
+  background-color: var(--forest);
+  box-shadow: 0 0 10px var(--forest);
+  pointer-events: none;
+  z-index: 15;
+}
+
+.tab-group-container.is-drop-before::before {
+  left: -5px;
+}
+
+.tab-group-container.is-drop-after::after {
+  right: -5px;
+}
+
+.tab-group-container.is-slim {
+  padding: 2px 4px;
+  border-radius: 8px;
+  gap: 4px;
+}
+
+.tab-group-container.is-collapsed {
+  padding: 2px 3px;
+  background-color: color-mix(in srgb, var(--group-color) 11%, var(--bg-tab));
+}
+
+.tab-group-container.has-active-tab {
+  border-color: color-mix(in srgb, var(--group-color) 55%, var(--border-tab));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--group-color) 15%, transparent);
+}
+
+.tab-group-container.is-drop-target {
+  background-color: color-mix(in srgb, var(--group-color) 20%, var(--bg-tab));
+  border-color: var(--group-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--group-color) 35%, transparent);
+}
+
+.tab-group-container.is-color-cyan {
+  --group-color: #22d3ee;
+}
+
+.tab-group-container.is-color-emerald {
+  --group-color: #34d399;
+}
+
+.tab-group-container.is-color-amber {
+  --group-color: #fbbf24;
+}
+
+.tab-group-container.is-color-purple {
+  --group-color: #c084fc;
+}
+
+.tab-group-container.is-color-rose {
+  --group-color: #fb7185;
+}
+
+.tab-group-container.is-color-blue {
+  --group-color: #60a5fa;
+}
+
+.tab-group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background-color: color-mix(in srgb, var(--group-color) 18%, var(--bg-navbar));
+  border: 1px solid color-mix(in srgb, var(--group-color) 42%, transparent);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+  transition: all 0.14s ease;
+}
+
+.tab-group-chip:active {
+  cursor: grabbing;
+}
+
+.tab-group-container.is-slim .tab-group-chip {
+  height: 24px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.tab-group-chip:hover {
+  background-color: color-mix(in srgb, var(--group-color) 26%, var(--bg-navbar));
+  border-color: color-mix(in srgb, var(--group-color) 65%, transparent);
+}
+
+.tab-group-chip.is-context-open {
+  border-color: var(--group-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--group-color) 30%, transparent);
+}
+
+.tab-group-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--group-color);
+  box-shadow: 0 0 6px var(--group-color);
+  flex-shrink: 0;
+}
+
+.tab-group-name {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.tab-group-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--group-color) 24%, transparent);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tab-group-chevron {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  transition: transform 0.14s ease, color 0.14s ease;
+}
+
+.tab-group-chip:hover .tab-group-chevron {
+  color: var(--ink);
+}
+
+.tab-group-input {
+  width: 84px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--group-color);
+  background-color: var(--bg-navbar);
+  color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  outline: none;
+}
+
+.tab-group-items {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.context-group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.context-group-dot.is-color-cyan,
+.group-color-swatch.is-color-cyan {
+  background-color: #22d3ee;
+}
+
+.context-group-dot.is-color-emerald,
+.group-color-swatch.is-color-emerald {
+  background-color: #34d399;
+}
+
+.context-group-dot.is-color-amber,
+.group-color-swatch.is-color-amber {
+  background-color: #fbbf24;
+}
+
+.context-group-dot.is-color-purple,
+.group-color-swatch.is-color-purple {
+  background-color: #c084fc;
+}
+
+.context-group-dot.is-color-rose,
+.group-color-swatch.is-color-rose {
+  background-color: #fb7185;
+}
+
+.context-group-dot.is-color-blue,
+.group-color-swatch.is-color-blue {
+  background-color: #60a5fa;
+}
+
+.group-color-picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.group-color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.group-color-swatch:hover {
+  transform: scale(1.16);
+}
+
+.group-color-swatch.is-active {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--bg-card);
+  transform: scale(1.12);
+}
+
 .folder-tab:hover {
   background-color: var(--bg-tab-hover);
   border-color: var(--border-tab-hover);

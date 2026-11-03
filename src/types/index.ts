@@ -19,11 +19,27 @@ export interface FolderItem {
 
 export type ExplorerNode = FolderItem | NoteItem;
 
+export type TabGroupColorId =
+  | 'cyan'
+  | 'emerald'
+  | 'amber'
+  | 'purple'
+  | 'rose'
+  | 'blue';
+
+export interface TabGroup {
+  id: string;
+  name: string;
+  color: TabGroupColorId;
+  collapsed?: boolean;
+}
+
 export interface TopLevelFolder {
   id: string;
   name: string;
   items: ExplorerNode[];
   localPath?: string;
+  groupId?: string;
 }
 
 export type EditorViewMode = 'write' | 'split' | 'preview';
