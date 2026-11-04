@@ -3,10 +3,12 @@
   "private": true,
   "version": "1.1.0",
   "type": "module",
+  "main": "./out/main/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "dev:electron": "electron-vite dev",
+    "build:electron": "electron-vite build",
+    "preview:electron": "electron-vite preview"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",
