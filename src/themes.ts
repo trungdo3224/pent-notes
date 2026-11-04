@@ -64,6 +64,19 @@ export function applyTheme(id: ThemeId): void {
   const theme = themes.find((item) => item.id === id) ?? themes[0];
   document.documentElement.dataset.theme = theme.id;
   document.documentElement.style.colorScheme = theme.mode;
+
+  if (typeof window !== 'undefined') {
+    if (window.electronAPI) {
+      document.documentElement.classList.add('app-is-electron');
+      const isDark = theme.mode === 'dark';
+      const bgColor = isDark ? '#161b25' : '#f1f4f8';
+      const symbolColor = isDark ? '#f8fafc' : '#0f172a';
+      void window.electronAPI.window?.setTitleBarOverlay?.({
+        color: bgColor,
+        symbolColor: symbolColor,
+      });
+    }
+  }
 }
 
 export function saveTheme(id: ThemeId): void {

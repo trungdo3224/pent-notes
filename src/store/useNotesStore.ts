@@ -40,6 +40,13 @@ import {
 } from '../lib/treeUtils';
 import { applyTheme, initialTheme, saveTheme, ThemeId } from '../themes';
 import {
+  applyFontSettings,
+  DEFAULT_FONT_SETTINGS,
+  FontSettings,
+  initialFontSettings,
+  saveFontSettings,
+} from '../lib/fontSettings';
+import {
   createBranchId,
   createLeafNode,
   findLeaf,
@@ -273,6 +280,7 @@ export interface NotesState {
   tabGroups: TabGroup[];
   selectedFolderId: string | null;
   selectedNoteByFolder: Record<string, string | null>;
+  openNotesByFolder: Record<string, string[]>;
   collapsedSubfolderIds: string[];
   viewMode: EditorViewMode;
   isSidebarCollapsed: boolean;
@@ -298,6 +306,9 @@ export interface NotesState {
 
   // Transient UI state
   isHydrated: boolean;
+  isSettingsModalOpen: boolean;
+  settingsActiveTab: 'theme' | 'fonts' | 'layout';
+  fontSettings: FontSettings;
   isThemeModalOpen: boolean;
   isLinkModalOpen: boolean;
   linkModalTargetMode: LinkModalTargetMode;
@@ -338,6 +349,7 @@ export interface NotesState {
   clearPendingRenameGroup: () => void;
 
   selectNote: (noteId: string) => void;
+  closeNoteTab: (noteId: string, folderId?: string) => void;
   navigateToNote: (topFolderId: string, noteId: string) => void;
   toggleNoteLink: (activeNoteId: string, targetNoteId: string) => void;
   createNote: (parentFolderId: string | null) => Promise<string | null>;
@@ -409,6 +421,11 @@ export interface NotesState {
   setSessionName: (name: string) => void;
   openThemeModal: () => void;
   closeThemeModal: () => void;
+  openSettingsModal: (tab?: 'theme' | 'fonts' | 'layout') => void;
+  closeSettingsModal: () => void;
+  setSettingsActiveTab: (tab: 'theme' | 'fonts' | 'layout') => void;
+  updateFontSettings: (updates: Partial<FontSettings>) => void;
+  resetFontSettings: () => void;
   clearPendingRenameFolder: () => void;
   clearPendingRenameNode: () => void;
   clearFocusNoteTitle: () => void;
@@ -426,6 +443,7 @@ export const useNotesStore = create<NotesState>()(
       tabGroups: [],
       selectedFolderId: null,
       selectedNoteByFolder: {},
+      openNotesByFolder: {},
       collapsedSubfolderIds: [],
       viewMode: 'obsidian',
       isSidebarCollapsed: false,
@@ -449,6 +467,9 @@ export const useNotesStore = create<NotesState>()(
       activePane: 'primary',
 
       isHydrated: false,
+      isSettingsModalOpen: false,
+      settingsActiveTab: 'theme',
+      fontSettings: initialFontSettings(),
       isThemeModalOpen: false,
       isLinkModalOpen: false,
       linkModalTargetMode: 'new-tab',
@@ -710,6 +731,10 @@ export const useNotesStore = create<NotesState>()(
       selectNote: (noteId) =>
         set((state) => {
           if (!state.selectedFolderId) return state;
+          const folderId = state.selectedFolderId;
+          const currentOpen = state.openNotesByFolder[folderId] ?? [];
+          const nextOpen = currentOpen.includes(noteId) ? currentOpen : [...currentOpen, noteId];
+
           const leaves = getAllLeaves(state.paneLayout);
           if (state.isSplitViewActive && state.activePaneId && leaves.length > 1) {
             const updatedLayout = updateLeafInTree(state.paneLayout!, state.activePaneId, (l) => ({
@@ -724,6 +749,10 @@ export const useNotesStore = create<NotesState>()(
               secondaryFolderId: secLeaf?.folderId ?? null,
               secondaryNoteId: secLeaf?.noteId ?? null,
               secondaryViewMode: secLeaf?.viewMode ?? 'preview',
+              openNotesByFolder: {
+                ...state.openNotesByFolder,
+                [folderId]: nextOpen,
+              },
               selectedNoteByFolder:
                 state.activePaneId === updatedLeaves[0]?.id
                   ? { ...state.selectedNoteByFolder, [state.selectedFolderId]: noteId }
@@ -731,6 +760,10 @@ export const useNotesStore = create<NotesState>()(
             };
           }
           return {
+            openNotesByFolder: {
+              ...state.openNotesByFolder,
+              [folderId]: nextOpen,
+            },
             selectedNoteByFolder: {
               ...state.selectedNoteByFolder,
               [state.selectedFolderId]: noteId,
@@ -738,8 +771,43 @@ export const useNotesStore = create<NotesState>()(
           };
         }),
 
+      closeNoteTab: (noteId, folderId) =>
+        set((state) => {
+          const targetFolderId = folderId || state.selectedFolderId;
+          if (!targetFolderId) return state;
+
+          const currentOpen = state.openNotesByFolder[targetFolderId] || [];
+          const nextOpen = currentOpen.filter((id) => id !== noteId);
+
+          let nextSelected = state.selectedNoteByFolder[targetFolderId];
+          if (nextSelected === noteId) {
+            const closedIdx = currentOpen.indexOf(noteId);
+            if (nextOpen.length === 0) {
+              nextSelected = null;
+            } else if (closedIdx >= nextOpen.length) {
+              nextSelected = nextOpen[nextOpen.length - 1];
+            } else {
+              nextSelected = nextOpen[closedIdx];
+            }
+          }
+
+          return {
+            openNotesByFolder: {
+              ...state.openNotesByFolder,
+              [targetFolderId]: nextOpen,
+            },
+            selectedNoteByFolder: {
+              ...state.selectedNoteByFolder,
+              [targetFolderId]: nextSelected,
+            },
+          };
+        }),
+
       navigateToNote: (topFolderId, noteId) =>
         set((state) => {
+          const currentOpen = state.openNotesByFolder[topFolderId] ?? [];
+          const nextOpen = currentOpen.includes(noteId) ? currentOpen : [...currentOpen, noteId];
+
           const targetTopFolder = state.folders.find((f) => f.id === topFolderId);
           const ancestors = targetTopFolder
             ? (findAncestorFolderIds(targetTopFolder.items, noteId) ?? [])
@@ -762,6 +830,10 @@ export const useNotesStore = create<NotesState>()(
               secondaryNoteId: secLeaf?.noteId ?? null,
               secondaryViewMode: secLeaf?.viewMode ?? 'preview',
               collapsedSubfolderIds: state.collapsedSubfolderIds.filter((id) => !ancestorSet.has(id)),
+              openNotesByFolder: {
+                ...state.openNotesByFolder,
+                [topFolderId]: nextOpen,
+              },
               selectedNoteByFolder:
                 state.activePaneId === updatedLeaves[0]?.id
                   ? { ...state.selectedNoteByFolder, [topFolderId]: noteId }
@@ -771,6 +843,10 @@ export const useNotesStore = create<NotesState>()(
 
           return {
             selectedFolderId: topFolderId,
+            openNotesByFolder: {
+              ...state.openNotesByFolder,
+              [topFolderId]: nextOpen,
+            },
             selectedNoteByFolder: {
               ...state.selectedNoteByFolder,
               [topFolderId]: noteId,
@@ -863,6 +939,13 @@ export const useNotesStore = create<NotesState>()(
             ...s.selectedNoteByFolder,
             [currentFolder.id]: newNote.id,
           },
+          openNotesByFolder: {
+            ...s.openNotesByFolder,
+            [currentFolder.id]: [
+              ...(s.openNotesByFolder[currentFolder.id] || []),
+              newNote.id,
+            ],
+          },
           collapsedSubfolderIds: nextCollapsed,
           viewMode: s.viewMode === 'preview' ? 'write' : s.viewMode,
           shouldFocusNoteTitle: true,
@@ -916,6 +999,13 @@ export const useNotesStore = create<NotesState>()(
           selectedNoteByFolder: {
             ...s.selectedNoteByFolder,
             [currentFolder.id]: duplicated.id,
+          },
+          openNotesByFolder: {
+            ...s.openNotesByFolder,
+            [currentFolder.id]: [
+              ...(s.openNotesByFolder[currentFolder.id] || []),
+              duplicated.id,
+            ],
           },
         }));
 
@@ -1034,6 +1124,12 @@ export const useNotesStore = create<NotesState>()(
             ...folder,
             items: removeNodeFromTree(folder.items, nodeId),
           })),
+          openNotesByFolder: Object.fromEntries(
+            Object.entries(s.openNotesByFolder).map(([fId, ids]) => [
+              fId,
+              ids.filter((id) => id !== nodeId),
+            ])
+          ),
           collapsedSubfolderIds: s.collapsedSubfolderIds.filter((id) => id !== nodeId),
           ...(isSecondaryDeleted ? { secondaryNoteId: null } : {}),
         }));
@@ -1331,6 +1427,10 @@ export const useNotesStore = create<NotesState>()(
             selectedNoteByFolder: {
               ...state.selectedNoteByFolder,
               [newTopFolder.id]: firstNoteId,
+            },
+            openNotesByFolder: {
+              ...state.openNotesByFolder,
+              [newTopFolder.id]: firstNoteId ? [firstNoteId] : [],
             },
             lastSyncTimeByFolder: {
               ...state.lastSyncTimeByFolder,
@@ -1724,8 +1824,27 @@ export const useNotesStore = create<NotesState>()(
         set({ currentSessionName: name });
         void sessionApi.renameSession(get().currentSessionId, name);
       },
-      openThemeModal: () => set({ isThemeModalOpen: true }),
-      closeThemeModal: () => set({ isThemeModalOpen: false }),
+      openThemeModal: () =>
+        set({ isSettingsModalOpen: true, isThemeModalOpen: true, settingsActiveTab: 'theme' }),
+      closeThemeModal: () => set({ isSettingsModalOpen: false, isThemeModalOpen: false }),
+      openSettingsModal: (tab = 'theme') =>
+        set({ isSettingsModalOpen: true, isThemeModalOpen: true, settingsActiveTab: tab }),
+      closeSettingsModal: () => set({ isSettingsModalOpen: false, isThemeModalOpen: false }),
+      setSettingsActiveTab: (tab) => set({ settingsActiveTab: tab }),
+
+      updateFontSettings: (updates) => {
+        const next = { ...get().fontSettings, ...updates };
+        applyFontSettings(next);
+        saveFontSettings(next);
+        set({ fontSettings: next });
+      },
+
+      resetFontSettings: () => {
+        const next = { ...DEFAULT_FONT_SETTINGS };
+        applyFontSettings(next);
+        saveFontSettings(next);
+        set({ fontSettings: next });
+      },
       clearPendingRenameFolder: () => set({ pendingRenameFolderId: null }),
       clearPendingRenameNode: () => set({ pendingRenameNodeId: null }),
       clearFocusNoteTitle: () => set({ shouldFocusNoteTitle: false }),
@@ -1738,6 +1857,7 @@ export const useNotesStore = create<NotesState>()(
         tabGroups: state.tabGroups,
         selectedFolderId: state.selectedFolderId,
         selectedNoteByFolder: state.selectedNoteByFolder,
+        openNotesByFolder: state.openNotesByFolder,
         collapsedSubfolderIds: state.collapsedSubfolderIds,
         viewMode: state.viewMode,
         isSidebarCollapsed: state.isSidebarCollapsed,
@@ -1749,6 +1869,7 @@ export const useNotesStore = create<NotesState>()(
         editorSplitRatio: state.editorSplitRatio,
         sortOrder: state.sortOrder,
         theme: state.theme,
+        fontSettings: state.fontSettings,
         lastSyncTimeByFolder: state.lastSyncTimeByFolder,
         isSplitViewActive: state.isSplitViewActive,
         splitDirection: state.splitDirection,
@@ -1763,6 +1884,12 @@ export const useNotesStore = create<NotesState>()(
           if (state.theme) {
             applyTheme(state.theme);
             saveTheme(state.theme);
+          }
+          if (state.fontSettings) {
+            applyFontSettings(state.fontSettings);
+            saveFontSettings(state.fontSettings);
+          } else {
+            applyFontSettings(initialFontSettings());
           }
           if ((state.viewMode as string) === 'split') {
             state.setViewMode('write');

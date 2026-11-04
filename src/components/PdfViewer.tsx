@@ -35,6 +35,9 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
       return pdfData;
     }
     if (filePath) {
+      if (typeof window !== 'undefined' && window.electronAPI?.fs?.getRawUrl) {
+        return window.electronAPI.fs.getRawUrl(filePath);
+      }
       return `/api/fs/raw?path=${encodeURIComponent(filePath)}`;
     }
     return '';

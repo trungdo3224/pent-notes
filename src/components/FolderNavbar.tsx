@@ -17,6 +17,7 @@ import {
   Plus,
   Radio,
   Search,
+  Settings,
   Trash2,
   Unlink,
 } from 'lucide-react';
@@ -90,6 +91,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const openSessionModal = useNotesStore((s) => s.openSessionModal);
   const currentSessionName = useNotesStore((s) => s.currentSessionName);
   const theme = useNotesStore((s) => s.theme);
+  const openSettingsModal = useNotesStore((s) => s.openSettingsModal);
   const openThemeModal = useNotesStore((s) => s.openThemeModal);
 
   const activeThemeObj = themes.find((t) => t.id === theme);
@@ -768,26 +770,25 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     className="plus-menu-item"
                     onClick={() => {
                       closePlusMenu();
-                      openThemeModal();
+                      openSettingsModal();
                     }}
                   >
-                    <Palette size={15} strokeWidth={1.8} className="plus-menu-icon" />
-                    <span>Themes & Colors</span>
+                    <Settings size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Settings</span>
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Theme palette button */}
+            {/* Settings button (Themes, Fonts, Layout) */}
             <button
               type="button"
-              className="navbar-icon-btn navbar-theme-btn"
-              onClick={openThemeModal}
-              title={`Themes & Accents: ${activeThemeObj?.name ?? 'Theme'}`}
-              aria-label="Themes & Accents"
+              className="navbar-icon-btn navbar-settings-btn"
+              onClick={() => openSettingsModal()}
+              title={`Settings (Themes, Fonts, Layout)`}
+              aria-label="Settings"
             >
-              <Palette size={16} strokeWidth={1.8} />
-              <span className="navbar-theme-dot" />
+              <Settings size={16} strokeWidth={1.8} />
             </button>
 
             {/* Collapse navbar button */}
@@ -1046,11 +1047,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     className="plus-menu-item"
                     onClick={() => {
                       closePlusMenu();
-                      openThemeModal();
+                      openSettingsModal();
                     }}
                   >
-                    <Palette size={15} strokeWidth={1.8} className="plus-menu-icon" />
-                    <span>Themes & Colors</span>
+                    <Settings size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <span>Settings</span>
                   </button>
                 </div>
               )}
@@ -1058,13 +1059,12 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
 
             <button
               type="button"
-              className="navbar-icon-btn navbar-theme-btn is-compact"
-              onClick={openThemeModal}
-              title={`Themes & Accents: ${activeThemeObj?.name ?? 'Theme'}`}
-              aria-label="Themes & Accents"
+              className="navbar-icon-btn navbar-settings-btn is-compact"
+              onClick={() => openSettingsModal()}
+              title={`Settings (Themes, Fonts, Layout)`}
+              aria-label="Settings"
             >
-              <Palette size={14} strokeWidth={1.9} />
-              <span className="navbar-theme-dot" />
+              <Settings size={14} strokeWidth={1.9} />
             </button>
 
             <button

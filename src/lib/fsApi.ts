@@ -9,6 +9,9 @@ export interface ScanResult {
 
 export const fsApi = {
   async scanFolder(folderPath: string): Promise<ScanResult> {
+    if (typeof window !== 'undefined' && window.electronAPI?.fs) {
+      return await window.electronAPI.fs.scanFolder(folderPath);
+    }
     return postJson<ScanResult>(
       '/api/fs/scan',
       { path: folderPath },
@@ -17,6 +20,10 @@ export const fsApi = {
   },
 
   async writeFile(filePath: string, content: string): Promise<void> {
+    if (typeof window !== 'undefined' && window.electronAPI?.fs) {
+      await window.electronAPI.fs.writeFile(filePath, content);
+      return;
+    }
     await postJson<{ ok: boolean }>(
       '/api/fs/write-file',
       { path: filePath, content },
@@ -25,6 +32,9 @@ export const fsApi = {
   },
 
   async createFile(parentPath: string, name?: string, content?: string): Promise<NoteItem> {
+    if (typeof window !== 'undefined' && window.electronAPI?.fs) {
+      return await window.electronAPI.fs.createFile(parentPath, name, content);
+    }
     const data = await postJson<{ note: NoteItem }>(
       '/api/fs/create-file',
       { parentPath, name, content },
@@ -34,6 +44,9 @@ export const fsApi = {
   },
 
   async createFolder(parentPath: string, name?: string): Promise<FolderItem> {
+    if (typeof window !== 'undefined' && window.electronAPI?.fs) {
+      return await window.electronAPI.fs.createFolder(parentPath, name);
+    }
     const data = await postJson<{ folder: FolderItem }>(
       '/api/fs/create-folder',
       { parentPath, name },
@@ -43,6 +56,9 @@ export const fsApi = {
   },
 
   async renamePath(oldPath: string, newPath: string): Promise<string> {
+    if (typeof window !== 'undefined' && window.electronAPI?.fs) {
+      return await window.electronAPI.fs.renamePath(oldPath, newPath);
+    }
     const data = await postJson<{ path: string }>(
       '/api/fs/rename',
       { oldPath, newPath },
@@ -52,6 +68,10 @@ export const fsApi = {
   },
 
   async deletePath(targetPath: string): Promise<void> {
+    if (typeof window !== 'undefined' && window.electronAPI?.fs) {
+      await window.electronAPI.fs.deletePath(targetPath);
+      return;
+    }
     await postJson<{ ok: boolean }>(
       '/api/fs/delete',
       { path: targetPath },

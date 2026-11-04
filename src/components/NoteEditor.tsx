@@ -35,6 +35,7 @@ import {
 import { EditorViewMode, NoteItem } from '../types';
 import { MarkdownEditor } from './MarkdownEditor';
 import { MilkdownViewer } from './MilkdownViewer';
+import { NoteTabsBar } from './NoteTabsBar';
 import { PaneSplitTree } from './PaneSplitTree';
 import { PdfViewer } from './PdfViewer';
 import { SplitHandleMenu } from './SplitHandleMenu';
@@ -373,6 +374,8 @@ export const NoteEditor: React.FC = () => {
 
   return (
     <main className="editor-pane">
+      <NoteTabsBar />
+
       {/* Top Bar */}
       <div className="editor-topbar">
         <div className="editor-topbar-left">

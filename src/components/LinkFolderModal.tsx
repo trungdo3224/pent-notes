@@ -10,7 +10,7 @@ import { useEscapeKey } from '../hooks/useDomInteractions';
 import { buildExplorerTreeFromFiles } from '../lib/fileUtils';
 import { fsApi } from '../lib/fsApi';
 import { useNotesStore } from '../store/useNotesStore';
-import { LinkModalTargetMode } from '../types'
+import { LinkModalTargetMode } from '../types';
 
 export const LinkFolderModal: React.FC = () => {
   const isOpen = useNotesStore((s) => s.isLinkModalOpen);
@@ -24,7 +24,7 @@ export const LinkFolderModal: React.FC = () => {
 
   const activeFolder = folders.find((f) => f.id === selectedFolderId) ?? null;
 
-  const [folderPath, setFolderPath] = useState<string>("");
+  const [folderPath, setFolderPath] = useState<string>('');
   const [targetMode, setTargetMode] = useState<LinkModalTargetMode>('new-tab');
   const [customName, setCustomName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -53,6 +53,21 @@ export const LinkFolderModal: React.FC = () => {
   useEscapeKey(isOpen && !busy, closeLinkModal);
 
   if (!isOpen) return null;
+
+  const handleBrowseFolderClick = async () => {
+    if (typeof window !== 'undefined' && window.electronAPI?.dialog?.selectFolder) {
+      try {
+        const selected = await window.electronAPI.dialog.selectFolder();
+        if (selected) {
+          setFolderPath(selected);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to open folder picker.');
+      }
+      return;
+    }
+    folderInputRef.current?.click();
+  };
 
   const handleFolderFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
@@ -141,38 +156,6 @@ export const LinkFolderModal: React.FC = () => {
           </button>
         </div>
 
-        <div className="modal-illustration">
-          <HardDrive size={30} strokeWidth={1.4} />
-          <span>ADD OR SYNC A FOLDER FROM YOUR COMPUTER</span>
-        </div>
-
-        <p className="modal-description">
-          Browse a folder from your computer, or paste a local directory path for real-time two-way
-          disk sync of all notes (<code>.md</code>, <code>.txt</code>, <code>.pdf</code>) and
-          subfolders.
-        </p>
-
-        {/* Quick presets */}
-        {/* <div className="link-presets-container">
-          <span className="link-presets-title">
-            <Sparkles size={12} /> Detected Local Folders:
-          </span>
-          <div className="link-presets-list">
-            {SAMPLE_LOCAL_PATHS.map((preset) => (
-              <button
-                key={preset}
-                type="button"
-                className={`link-preset-chip ${folderPath === preset ? 'is-active' : ''}`}
-                onClick={() => setFolderPath(preset)}
-                disabled={busy}
-              >
-                <span>{preset}</span>
-                {folderPath === preset && <Check size={12} />}
-              </button>
-            ))}
-          </div>
-        </div> */}
-
         <form onSubmit={(e) => void handleSubmit(e)} className="add-folder-form">
           <label className="field-label" htmlFor="local-folder-path-input">
             Local folder path
@@ -191,7 +174,7 @@ export const LinkFolderModal: React.FC = () => {
             <button
               type="button"
               className="subtle-btn browse-folder-btn"
-              onClick={() => folderInputRef.current?.click()}
+              onClick={() => void handleBrowseFolderClick()}
               disabled={busy}
               title="Browse and select a folder from your computer"
             >

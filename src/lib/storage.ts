@@ -81,6 +81,21 @@ async function idbDelete(key: string): Promise<void> {
 }
 
 async function serverGet(sessionId: string): Promise<StoredEnvelope | null> {
+  if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
+    try {
+      const data = await window.electronAPI.sessions.get(sessionId);
+      if (data && typeof data.payload === 'string' && data.payload !== 'null') {
+        return {
+          savedAt: data.updatedAt || Date.now(),
+          payload: data.payload,
+        };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   try {
     const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
       method: 'GET',
@@ -105,6 +120,19 @@ async function serverSet(
   envelope: StoredEnvelope,
   keepalive = false
 ): Promise<void> {
+  if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
+    try {
+      await window.electronAPI.sessions.save(
+        sessionId,
+        getTabSessionName(),
+        envelope.payload
+      );
+      return;
+    } catch {
+      return;
+    }
+  }
+
   try {
     await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
       method: 'PUT',
@@ -138,58 +166,53 @@ function scheduleServerWrite(sessionId: string, envelope: StoredEnvelope): void 
   }, SERVER_WRITE_DEBOUNCE_MS);
 }
 
+function flushServerWriteImmediate(sessionId: string): void {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  if (pendingEnvelope) {
+    const toWrite = pendingEnvelope;
+    pendingEnvelope = null;
+    void serverSet(sessionId, toWrite, true);
+  }
+}
+
 if (typeof window !== 'undefined') {
-  const flushPending = () => {
-    if (pendingEnvelope) {
-      if (saveTimer) {
-        clearTimeout(saveTimer);
-        saveTimer = null;
-      }
-      const toWrite = pendingEnvelope;
-      pendingEnvelope = null;
-      void serverSet(getTabSessionId(), toWrite, true);
-    }
+  const flushCurrent = () => {
+    const sessionId = getTabSessionId();
+    flushServerWriteImmediate(sessionId);
   };
-  window.addEventListener('pagehide', flushPending);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      flushPending();
-    }
-  });
+  window.addEventListener('beforeunload', flushCurrent);
+  window.addEventListener('pagehide', flushCurrent);
 }
 
 function getSessionStorageKey(name: string): { sessionId: string; idbKey: string } {
   const sessionId = getTabSessionId();
-  return { sessionId, idbKey: `${name}:${sessionId}` };
+  return {
+    sessionId,
+    idbKey: `${name}:${sessionId}`,
+  };
 }
 
 export const workspaceStorage: StateStorage = {
   async getItem(name: string): Promise<string | null> {
     const { sessionId, idbKey } = getSessionStorageKey(name);
-    const [localEnv, diskEnv] = await Promise.all([idbGet(idbKey), serverGet(sessionId)]);
+    const cachedEnvelope = await idbGet(idbKey);
 
-    if (localEnv && diskEnv) {
-      if (diskEnv.savedAt >= localEnv.savedAt) {
-        if (diskEnv.savedAt > localEnv.savedAt) {
-          void idbSet(idbKey, diskEnv);
+    try {
+      const remoteEnvelope = await serverGet(sessionId);
+      if (remoteEnvelope && remoteEnvelope.payload) {
+        if (!cachedEnvelope || remoteEnvelope.savedAt >= cachedEnvelope.savedAt) {
+          await idbSet(idbKey, remoteEnvelope);
+          return remoteEnvelope.payload;
         }
-        return diskEnv.payload;
       }
-      void serverSet(sessionId, localEnv);
-      return localEnv.payload;
+    } catch {
+      // Remote unavailable, fall back to cached IDB value
     }
 
-    if (diskEnv) {
-      void idbSet(idbKey, diskEnv);
-      return diskEnv.payload;
-    }
-
-    if (localEnv) {
-      void serverSet(sessionId, localEnv);
-      return localEnv.payload;
-    }
-
-    return null;
+    return cachedEnvelope ? cachedEnvelope.payload : null;
   },
 
   async setItem(name: string, value: string): Promise<void> {
@@ -205,6 +228,16 @@ export const workspaceStorage: StateStorage = {
   async removeItem(name: string): Promise<void> {
     const { sessionId, idbKey } = getSessionStorageKey(name);
     await idbDelete(idbKey);
+
+    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
+      try {
+        await window.electronAPI.sessions.delete(sessionId);
+      } catch {
+        // Ignore
+      }
+      return;
+    }
+
     try {
       await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
     } catch {

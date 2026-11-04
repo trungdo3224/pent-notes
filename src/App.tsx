@@ -6,8 +6,9 @@ import { NoteCatalogSidebar } from './components/NoteCatalogSidebar';
 import { NoteEditor } from './components/NoteEditor';
 import { SearchModal } from './components/SearchModal';
 import { SessionModal } from './components/SessionModal';
-import { ThemeModal } from './components/ThemeModal';
+import { SettingsModal } from './components/SettingsModal';
 import { usePointerDrag } from './hooks/useDomInteractions';
+import { applyFontSettings } from './lib/fontSettings';
 import {
   DEFAULT_RIGHT_SIDEBAR_WIDTH,
   DEFAULT_SIDEBAR_WIDTH,
@@ -20,7 +21,10 @@ export const App: React.FC = () => {
   const selectedFolderId = useNotesStore((s) => s.selectedFolderId);
   const isHydrated = useNotesStore((s) => s.isHydrated);
   const theme = useNotesStore((s) => s.theme);
-  const isThemeModalOpen = useNotesStore((s) => s.isThemeModalOpen);
+  const fontSettings = useNotesStore((s) => s.fontSettings);
+  const isSettingsModalOpen = useNotesStore((s) => s.isSettingsModalOpen);
+  const openSettingsModal = useNotesStore((s) => s.openSettingsModal);
+  const closeSettingsModal = useNotesStore((s) => s.closeSettingsModal);
   const isSidebarCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
   const isRightSidebarCollapsed = useNotesStore((s) => s.isRightSidebarCollapsed);
   const setSidebarWidth = useNotesStore((s) => s.setSidebarWidth);
@@ -41,7 +45,8 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     applyTheme(theme);
-  }, [theme]);
+    applyFontSettings(fontSettings);
+  }, [theme, fontSettings]);
 
   const activeLocalPath = useMemo(
     () => folders.find((f) => f.id === selectedFolderId)?.localPath ?? null,
@@ -112,11 +117,14 @@ export const App: React.FC = () => {
       } else if (e.key === ']' || e.key === '}') {
         e.preventDefault();
         toggleRightSidebar();
+      } else if (e.key === ',') {
+        e.preventDefault();
+        openSettingsModal();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleSidebar, toggleNavbar, toggleRightSidebar]);
+  }, [toggleSidebar, toggleNavbar, toggleRightSidebar, openSettingsModal]);
 
   return (
     <div className="app-shell">
@@ -183,8 +191,8 @@ export const App: React.FC = () => {
       <LinkFolderModal />
       <SessionModal />
 
-      {isThemeModalOpen && (
-        <ThemeModal theme={theme} onChoose={chooseTheme} onClose={closeThemeModal} />
+      {isSettingsModalOpen && (
+        <SettingsModal onClose={closeSettingsModal} />
       )}
     </div>
   );

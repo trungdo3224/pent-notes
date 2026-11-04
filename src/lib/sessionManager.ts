@@ -95,6 +95,9 @@ export function setTabSessionName(name: string): void {
 
 export const sessionApi = {
   async listSessions(): Promise<SessionInfo[]> {
+    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
+      return (await window.electronAPI.sessions.list()) as SessionInfo[];
+    }
     return requestJson<SessionInfo[]>(
       '/api/sessions',
       { method: 'GET', cache: 'no-store' },
@@ -103,6 +106,11 @@ export const sessionApi = {
   },
 
   async getSession(id: string): Promise<SessionData> {
+    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
+      const data = (await window.electronAPI.sessions.get(id)) as SessionData;
+      setTabSessionName(data.name);
+      return data;
+    }
     const data = await requestJson<SessionData>(
       `/api/sessions/${encodeURIComponent(id)}`,
       { method: 'GET', cache: 'no-store' },
@@ -113,6 +121,10 @@ export const sessionApi = {
   },
 
   async saveSession(id: string, payload: string, name?: string): Promise<void> {
+    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
+      await window.electronAPI.sessions.save(id, name, payload);
+      return;
+    }
     await requestJson<{ ok: boolean }>(
       `/api/sessions/${encodeURIComponent(id)}`,
       {
@@ -125,6 +137,16 @@ export const sessionApi = {
   },
 
   async createSession(name?: string, cloneFromId?: string): Promise<SessionData> {
+    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
+      const newId = generateSessionId();
+      let initialPayload = 'null';
+      if (cloneFromId) {
+        const source = await window.electronAPI.sessions.get(cloneFromId);
+        if (source && source.payload) initialPayload = source.payload;
+      }
+      await window.electronAPI.sessions.save(newId, name, initialPayload);
+      return (await window.electronAPI.sessions.get(newId)) as SessionData;
+    }
     const data = await postJson<{ session: SessionData }>(
       '/api/sessions',
       { name, cloneFromId },
@@ -134,6 +156,14 @@ export const sessionApi = {
   },
 
   async renameSession(id: string, newName: string): Promise<void> {
+    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
+      const session = await window.electronAPI.sessions.get(id);
+      await window.electronAPI.sessions.save(id, newName, session.payload);
+      if (id === getTabSessionId()) {
+        setTabSessionName(newName);
+      }
+      return;
+    }
     await requestJson<{ ok: boolean }>(
       `/api/sessions/${encodeURIComponent(id)}`,
       {
@@ -149,6 +179,10 @@ export const sessionApi = {
   },
 
   async deleteSession(id: string): Promise<void> {
+    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
+      await window.electronAPI.sessions.delete(id);
+      return;
+    }
     await requestJson<{ ok: boolean }>(
       `/api/sessions/${encodeURIComponent(id)}`,
       { method: 'DELETE' },

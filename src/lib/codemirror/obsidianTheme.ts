@@ -10,14 +10,13 @@ export const obsidianEditorTheme = EditorView.theme({
     height: '100%',
     color: 'var(--text, #d1d9e6)',
     backgroundColor: 'transparent',
-    fontSize: '16px',
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif',
+    fontSize: 'var(--editor-font-size, 16px)',
+    fontFamily: 'var(--font-sans)',
   },
   '.cm-scroller': {
     overflow: 'auto',
     fontFamily: 'inherit',
-    lineHeight: '1.65',
+    lineHeight: 'var(--editor-line-height, 1.65)',
   },
   '.cm-content': {
     padding: '0 0 120px 0',
