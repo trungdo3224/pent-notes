@@ -39,6 +39,10 @@
   --link-highlight: #c084fc;
   --selection-text: #ffffff;
 
+  /* Subtle Scrollbars */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.24);
+
   /* System */
   --warning-bg: #2b2116;
   --warning-text: #fcd34d;
@@ -128,6 +132,10 @@
 
   /* Shared Button Text */
   --button-text: #ffffff;
+
+  /* Subtle Scrollbars */
+  --scrollbar-thumb: rgba(15, 23, 42, 0.12);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.24);
 
   /* System */
   --warning-bg: #fef3c7;
