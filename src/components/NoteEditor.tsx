@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  BookOpen,
   Check,
   ChevronDown,
   ChevronRight,
-  Eye,
   FileText,
   FileUp,
   Folder,
@@ -27,10 +27,13 @@ import {
 import { isPdfNote, NOTE_FILE_ACCEPT, readFileAsDataUrl } from '../lib/fileUtils';
 import { getAllLeaves } from '../lib/paneLayoutTree';
 import {
+  findNoteByTitle,
+  isObsidianMode,
   resolveActiveNoteData,
   useNotesStore,
 } from '../store/useNotesStore';
 import { EditorViewMode, NoteItem } from '../types';
+import { MarkdownEditor } from './MarkdownEditor';
 import { MilkdownViewer } from './MilkdownViewer';
 import { PaneSplitTree } from './PaneSplitTree';
 import { PdfViewer } from './PdfViewer';
@@ -62,6 +65,8 @@ export const NoteEditor: React.FC = () => {
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
   const clearFocusNoteTitle = useNotesStore((s) => s.clearFocusNoteTitle);
   const closeSplitView = useNotesStore((s) => s.closeSplitView);
+  const selectFolder = useNotesStore((s) => s.selectFolder);
+  const selectNote = useNotesStore((s) => s.selectNote);
 
   const [isLinkPickerOpen, setIsLinkPickerOpen] = useState(false);
   const [linkFilter, setLinkFilter] = useState('');
@@ -112,6 +117,28 @@ export const NoteEditor: React.FC = () => {
       return title.includes(q) || folderPath.includes(q);
     });
   }, [folders, note?.id, linkFilter]);
+
+  const wikilinkNotes = useMemo(() => {
+    return listConnectableNotes(folders, null).map((item) => ({
+      id: item.note.id,
+      title: item.note.title.trim() || 'Untitled',
+      folderPath: [item.topFolderName, ...item.subfolderNames].join(' / '),
+    }));
+  }, [folders]);
+
+  const handleOpenWikilink = useCallback(
+    (targetTitle: string) => {
+      for (const f of folders) {
+        const found = findNoteByTitle(f.items, targetTitle);
+        if (found) {
+          selectFolder(f.id);
+          selectNote(found.id);
+          return;
+        }
+      }
+    },
+    [folders, selectFolder, selectNote]
+  );
 
   useEffect(() => {
     if (shouldFocusTitle && note && titleInputRef.current) {
@@ -228,25 +255,6 @@ export const NoteEditor: React.FC = () => {
     );
   }
 
-  const handleTextareaKeyDown = (
-    e: React.KeyboardEvent<HTMLTextAreaElement>,
-    targetNote: NoteItem
-  ) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      const updated = `${targetNote.content.slice(0, start)}  ${targetNote.content.slice(end)}`;
-      updateNote(targetNote.id, { content: updated });
-
-      requestAnimationFrame(() => {
-        target.selectionStart = start + 2;
-        target.selectionEnd = start + 2;
-      });
-    }
-  };
-
   const handleAttachPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
@@ -308,18 +316,19 @@ export const NoteEditor: React.FC = () => {
             onChange={(e) => updateNote(targetNote.id, { title: e.target.value })}
           />
 
-          {targetViewMode === 'write' ? (
-            <textarea
-              className="note-content-textarea"
-              placeholder="Start writing in Markdown..."
-              value={targetNote.content}
-              onChange={(e) => updateNote(targetNote.id, { content: e.target.value })}
-              onKeyDown={(e) => handleTextareaKeyDown(e, targetNote)}
-              spellCheck
+          {isObsidianMode(targetViewMode) ? (
+            <MarkdownEditor
+              key={`editor-obsidian-${targetNote.id}`}
+              content={targetNote.content}
+              onChange={(val) => updateNote(targetNote.id, { content: val })}
+              mode="live"
+              readonly={false}
+              notes={wikilinkNotes}
+              onOpenWikilink={handleOpenWikilink}
             />
           ) : (
             <MilkdownViewer
-              key={`preview-main-${targetNote.id}`}
+              key={`editor-notebook-${targetNote.id}`}
               content={targetNote.content}
               onChange={(val) => updateNote(targetNote.id, { content: val })}
               readonly={false}
@@ -407,26 +416,26 @@ export const NoteEditor: React.FC = () => {
                 {primaryWords} {primaryWords === 1 ? 'word' : 'words'}
               </span>
 
-              {/* View Mode Toggle: Write vs Preview */}
+              {/* Markdown Style Mode Toggle: Obsidian vs Notebook */}
               {!isPrimaryPdf && (
-                <div className="editor-mode-switch" role="group" aria-label="Editor view mode">
+                <div className="editor-mode-switch" role="group" aria-label="Editor markdown style mode">
                   <button
                     type="button"
-                    className={`mode-btn ${viewMode === 'write' ? 'is-active' : ''}`}
-                    onClick={() => setViewMode('write')}
-                    title="Write mode (Raw Markdown)"
+                    className={`mode-btn ${isObsidianMode(viewMode) ? 'is-active' : ''}`}
+                    onClick={() => setViewMode('obsidian')}
+                    title="OFM"
+                    aria-label="Obsidian Flavored Markdown"
                   >
                     <PenLine size={13} />
-                    {/* <span>Write</span> */}
                   </button>
                   <button
                     type="button"
-                    className={`mode-btn ${viewMode === 'preview' ? 'is-active' : ''}`}
-                    onClick={() => setViewMode('preview')}
-                    title="Preview mode (Rich Markdown)"
+                    className={`mode-btn ${!isObsidianMode(viewMode) ? 'is-active' : ''}`}
+                    onClick={() => setViewMode('notebook')}
+                    title="Notebook"
+                    aria-label="Notebook Style"
                   >
-                    <Eye size={13} />
-                    {/* <span>Preview</span> */}
+                    <BookOpen size={13} />
                   </button>
                 </div>
               )}

@@ -26,6 +26,7 @@ import {
   findFolderNode,
   findNodeById,
   findNoteAndPath,
+  findNoteByTitle,
   findNoteNode,
   insertIntoTree,
   matchAndPreserveIds,
@@ -154,12 +155,17 @@ export function collectAllSubfolderIds(nodes: ExplorerNode[]): string[] {
   return classifyExplorerFolders(nodes).collapsibleFolderIds;
 }
 
+export function isObsidianMode(mode?: EditorViewMode): boolean {
+  return mode === 'obsidian' || mode === 'write' || !mode;
+}
+
 export {
   findAncestorFolderIds,
   findDefaultNoteId,
   findFolderNode,
   findNodeById,
   findNoteAndPath,
+  findNoteByTitle,
   findNoteNode,
   naturalCompare,
   resolveActiveNoteData,
@@ -421,7 +427,7 @@ export const useNotesStore = create<NotesState>()(
       selectedFolderId: null,
       selectedNoteByFolder: {},
       collapsedSubfolderIds: [],
-      viewMode: 'write',
+      viewMode: 'obsidian',
       isSidebarCollapsed: false,
       isNavbarCollapsed: false,
       isRightSidebarCollapsed: false,

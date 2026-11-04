@@ -42,7 +42,7 @@ export interface TopLevelFolder {
   groupId?: string;
 }
 
-export type EditorViewMode = 'write' | 'preview';
+export type EditorViewMode = 'obsidian' | 'notebook' | 'write' | 'preview';
 
 export type PdfViewMode = 'pdf' | 'notes';
 

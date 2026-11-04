@@ -1,9 +1,9 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  BookOpen,
   Check,
   ChevronDown,
   ChevronRight,
-  Eye,
   FileText,
   Folder,
   HardDrive,
@@ -15,9 +15,10 @@ import {
 import { useClickOutside } from '../hooks/useDomInteractions';
 import { countWords, listConnectableNotes, resolveWorkspaceConnections } from '../lib/catalogUtils';
 import { isPdfNote } from '../lib/fileUtils';
-import { findNoteAndPath } from '../lib/treeUtils';
-import { useNotesStore } from '../store/useNotesStore';
-import { NoteItem, PaneLeafNode, TopLevelFolder } from '../types';
+import { findNoteAndPath, findNoteByTitle } from '../lib/treeUtils';
+import { isObsidianMode, useNotesStore } from '../store/useNotesStore';
+import { PaneLeafNode, TopLevelFolder } from '../types';
+import { MarkdownEditor } from './MarkdownEditor';
 import { MilkdownViewer } from './MilkdownViewer';
 import { PdfViewer } from './PdfViewer';
 
@@ -92,24 +93,29 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
     [folders, note]
   );
 
+  const wikilinkNotes = useMemo(() => {
+    return listConnectableNotes(folders, null).map((item) => ({
+      id: item.note.id,
+      title: item.note.title.trim() || 'Untitled',
+      folderPath: [item.topFolderName, ...item.subfolderNames].join(' / '),
+    }));
+  }, [folders]);
+
+  const handleOpenWikilink = useCallback(
+    (targetTitle: string) => {
+      for (const f of folders) {
+        const found = findNoteByTitle(f.items, targetTitle);
+        if (found) {
+          setPaneNote(leaf.id, f.id, found.id);
+          return;
+        }
+      }
+    },
+    [folders, leaf.id, setPaneNote]
+  );
+
   const isPdf = note ? isPdfNote(note) : false;
   const words = note ? countWords(note.content) : 0;
-
-  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, targetNote: NoteItem) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const target = e.currentTarget;
-      const start = target.selectionStart;
-      const end = target.selectionEnd;
-      const updated = `${targetNote.content.slice(0, start)}  ${targetNote.content.slice(end)}`;
-      updateNote(targetNote.id, { content: updated });
-
-      requestAnimationFrame(() => {
-        target.selectionStart = start + 2;
-        target.selectionEnd = start + 2;
-      });
-    }
-  };
 
   return (
     <section
@@ -236,28 +242,30 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
               <span className="editor-meta">{words}w</span>
 
               {!isPdf && (
-                <div className="editor-mode-switch" role="group" aria-label="Pane view mode">
+                <div className="editor-mode-switch" role="group" aria-label="Pane markdown style mode">
                   <button
                     type="button"
-                    className={`mode-btn ${leaf.viewMode === 'write' ? 'is-active' : ''}`}
+                    className={`mode-btn ${isObsidianMode(leaf.viewMode) ? 'is-active' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setPaneViewMode(leaf.id, 'write');
+                      setPaneViewMode(leaf.id, 'obsidian');
                     }}
-                    title="Write mode"
+                    title="Obsidian Style (Markdown, wikilinks, Live Preview)"
+                    aria-label="Obsidian Style"
                   >
                     <PenLine size={12} />
                   </button>
                   <button
                     type="button"
-                    className={`mode-btn ${leaf.viewMode === 'preview' ? 'is-active' : ''}`}
+                    className={`mode-btn ${!isObsidianMode(leaf.viewMode) ? 'is-active' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setPaneViewMode(leaf.id, 'preview');
+                      setPaneViewMode(leaf.id, 'notebook');
                     }}
-                    title="Preview mode"
+                    title="Notebook Style (Milkdown Crepe block WYSIWYG, slash menus)"
+                    aria-label="Notebook Style"
                   >
-                    <Eye size={12} />
+                    <BookOpen size={12} />
                   </button>
                 </div>
               )}
@@ -306,19 +314,19 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                 onFocus={onSelect}
               />
 
-              {leaf.viewMode === 'write' ? (
-                <textarea
-                  className="note-content-textarea"
-                  placeholder="Start writing in Markdown..."
-                  value={note.content}
-                  onChange={(e) => updateNote(note.id, { content: e.target.value })}
-                  onKeyDown={(e) => handleTextareaKeyDown(e, note)}
-                  onFocus={onSelect}
-                  spellCheck
+              {isObsidianMode(leaf.viewMode) ? (
+                <MarkdownEditor
+                  key={`editor-obsidian-${leaf.id}-${note.id}`}
+                  content={note.content}
+                  onChange={(val) => updateNote(note.id, { content: val })}
+                  mode="live"
+                  readonly={false}
+                  notes={wikilinkNotes}
+                  onOpenWikilink={handleOpenWikilink}
                 />
               ) : (
                 <MilkdownViewer
-                  key={`preview-${leaf.id}-${note.id}`}
+                  key={`editor-notebook-${leaf.id}-${note.id}`}
                   content={note.content}
                   onChange={(val) => updateNote(note.id, { content: val })}
                   readonly={false}

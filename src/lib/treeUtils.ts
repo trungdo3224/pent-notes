@@ -111,6 +111,21 @@ export function findNoteNode(nodes: ExplorerNode[], noteId: string): NoteItem | 
   return null;
 }
 
+export function findNoteByTitle(nodes: ExplorerNode[], targetTitle: string): NoteItem | null {
+  const normalized = targetTitle.trim().toLowerCase();
+  if (!normalized) return null;
+  for (const node of nodes) {
+    if (node.type === 'note' && node.title.trim().toLowerCase() === normalized) {
+      return node;
+    }
+    if (node.type === 'folder') {
+      const found = findNoteByTitle(node.children, targetTitle);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 export function findNodeById(nodes: ExplorerNode[], targetId: string): ExplorerNode | null {
   for (const node of nodes) {
     if (node.id === targetId) return node;

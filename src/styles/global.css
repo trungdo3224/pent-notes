@@ -2172,15 +2172,14 @@ textarea {
 
 .note-title-input {
   width: 100%;
-  padding: 0 0 14px;
-  margin-bottom: 18px;
+  padding: 0;
+  margin-bottom: 16px;
   border: none;
-  border-bottom: 1px solid var(--border-subtle);
   background: transparent;
   color: var(--text-primary);
-  font-size: 26px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
   outline: none;
   caret-color: var(--caret);
 }
@@ -2717,6 +2716,148 @@ body.is-col-resizing * {
   font-weight: 650;
   letter-spacing: -0.02em;
   color: var(--text-primary);
+}
+
+/* ==========================================================================
+   OBSIDIAN-STYLE CODEMIRROR 6 MARKDOWN EDITOR
+   ========================================================================== */
+.obsidian-editor-wrapper {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.obsidian-editor-wrapper .cm-editor {
+  flex: 1;
+  width: 100%;
+  background: transparent;
+  outline: none !important;
+}
+
+.obsidian-editor-wrapper .cm-scroller {
+  overflow-y: auto;
+}
+
+/* Obsidian Wikilink Pill */
+.cm-wikilink {
+  color: var(--link-highlight, #c084fc) !important;
+  background-color: color-mix(in srgb, var(--link-highlight, #c084fc) 14%, transparent);
+  border-radius: 4px;
+  padding: 1px 5px;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.cm-wikilink:hover {
+  background-color: color-mix(in srgb, var(--link-highlight, #c084fc) 28%, transparent);
+  text-decoration-color: var(--link-highlight, #c084fc);
+}
+
+/* Interactive Checkboxes in Live Preview */
+.cm-task-widget {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 7px;
+  vertical-align: middle;
+}
+
+.cm-task-checkbox {
+  appearance: auto;
+  cursor: pointer;
+  accent-color: var(--forest, #00e5ff);
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  vertical-align: middle;
+}
+
+/* Obsidian Headings in Live Preview */
+.cm-heading-line {
+  line-height: 1.35;
+}
+
+.cm-heading-1 {
+  font-size: 1.85em;
+  font-weight: 700;
+  color: var(--heading, #f1f5f9);
+  padding-top: 0.6em !important;
+  padding-bottom: 0.2em !important;
+}
+
+.cm-heading-2 {
+  font-size: 1.45em;
+  font-weight: 650;
+  color: var(--heading, #f1f5f9);
+  padding-top: 0.5em !important;
+  padding-bottom: 0.2em !important;
+}
+
+.cm-heading-3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  color: var(--heading, #f1f5f9);
+  padding-top: 0.4em !important;
+  padding-bottom: 0.15em !important;
+}
+
+.cm-heading-4 {
+  font-size: 1.12em;
+  font-weight: 600;
+  color: var(--heading, #f1f5f9);
+  padding-top: 0.3em !important;
+}
+
+.cm-heading-5 {
+  font-size: 1.05em;
+  font-weight: 600;
+  color: var(--heading, #f1f5f9);
+}
+
+.cm-heading-6 {
+  font-size: 1.0em;
+  font-weight: 600;
+  color: var(--muted, #8b9bb4);
+}
+
+.cm-heading-marker-dim {
+  opacity: 0.28;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  user-select: none;
+}
+
+/* Blockquotes in Live Preview */
+.cm-blockquote-line {
+  border-left: 3px solid var(--forest, #00e5ff) !important;
+  background: color-mix(in srgb, var(--forest, #00e5ff) 5%, transparent);
+  padding-left: 14px !important;
+  color: var(--muted, #8b9bb4);
+  font-style: italic;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Horizontal Rule in Live Preview */
+.cm-hr-line {
+  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  margin: 10px 0;
+}
+
+/* Codeblock Background & Fences */
+.cm-codeblock-line {
+  background-color: var(--code-bg, #12161f);
+  font-family: var(--font-mono, "JetBrains Mono", monospace) !important;
+  font-size: 0.88em !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+.cm-codeblock-fence {
+  color: var(--muted, #8b9bb4) !important;
+  font-weight: 600;
 }
 
 /* Milkdown Crepe Integration */
