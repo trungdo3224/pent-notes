@@ -1,4 +1,4 @@
-import { ExplorerNode, NoteItem, TopLevelFolder } from '../types';
+import { ExplorerNode, NoteItem, TopLevelFolder } from "../types";
 
 export interface HeadingItem {
   id: string;
@@ -31,7 +31,7 @@ export interface LinkedNoteInfo {
   topFolderId: string;
   topFolderName: string;
   subfolderNames: string[];
-  direction: 'outgoing' | 'incoming' | 'bidirectional';
+  direction: "outgoing" | "incoming" | "bidirectional";
 }
 
 export interface WorkspaceNoteOption {
@@ -76,14 +76,14 @@ function mapToSortedTagItems(tagCounts: Map<string, number>): TagItem[] {
 export function extractHeadings(markdown: string): HeadingItem[] {
   if (!markdown) return [];
   const headings: HeadingItem[] = [];
-  const lines = markdown.split('\n');
+  const lines = markdown.split("\n");
   let inCodeBlock = false;
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
     const trimmed = rawLine.trim();
 
-    if (trimmed.startsWith('```')) {
+    if (trimmed.startsWith("```")) {
       inCodeBlock = !inCodeBlock;
       continue;
     }
@@ -93,13 +93,13 @@ export function extractHeadings(markdown: string): HeadingItem[] {
     if (match) {
       const level = match[1].length;
       const text = match[2]
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-        .replace(/[*_`~]/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/[*_`~]/g, "")
         .trim();
 
       if (text) {
         headings.push({
-          id: `h-${i + 1}-${level}-${text.slice(0, 15).replace(/\s+/g, '-')}`,
+          id: `h-${i + 1}-${level}-${text.slice(0, 15).replace(/\s+/g, "-")}`,
           level,
           text,
           line: i + 1,
@@ -151,7 +151,7 @@ export function buildHeadingTree(headings: HeadingItem[]): HeadingNode[] {
 export function extractTags(markdown: string): TagItem[] {
   if (!markdown) return [];
   const tagCounts = new Map<string, number>();
-  const lines = markdown.split('\n');
+  const lines = markdown.split("\n");
   let inCodeBlock = false;
   let inFrontmatter = false;
 
@@ -159,26 +159,26 @@ export function extractTags(markdown: string): TagItem[] {
     const rawLine = lines[i];
     const trimmed = rawLine.trim();
 
-    if (i === 0 && trimmed === '---') {
+    if (i === 0 && trimmed === "---") {
       inFrontmatter = true;
       continue;
     }
     if (inFrontmatter) {
-      if (trimmed === '---') {
+      if (trimmed === "---") {
         inFrontmatter = false;
         continue;
       }
       const matchTags = trimmed.match(/^tags:\s*\[(.*)\]/);
       if (matchTags) {
-        matchTags[1].split(',').forEach((rawTag) => {
-          const clean = rawTag.trim().replace(/^['"#]+|['"]+$/g, '');
+        matchTags[1].split(",").forEach((rawTag) => {
+          const clean = rawTag.trim().replace(/^['"#]+|['"]+$/g, "");
           if (clean) tagCounts.set(clean, (tagCounts.get(clean) || 0) + 1);
         });
       }
       continue;
     }
 
-    if (trimmed.startsWith('```')) {
+    if (trimmed.startsWith("```")) {
       inCodeBlock = !inCodeBlock;
       continue;
     }
@@ -187,7 +187,7 @@ export function extractTags(markdown: string): TagItem[] {
     const tagMatches = rawLine.match(HASHTAG_REGEX);
     if (tagMatches) {
       for (const match of tagMatches) {
-        const clean = match.trim().replace(/^#/, '');
+        const clean = match.trim().replace(/^#/, "");
         if (HEX_COLOR_REGEX.test(clean)) continue;
         tagCounts.set(clean, (tagCounts.get(clean) || 0) + 1);
       }
@@ -201,11 +201,14 @@ export function extractAllWorkspaceTags(folders: TopLevelFolder[]): TagItem[] {
   const tagCounts = new Map<string, number>();
 
   function scanNode(node: ExplorerNode) {
-    if (node.type === 'note') {
+    if (node.type === "note") {
       for (const tagItem of extractTags(node.content)) {
-        tagCounts.set(tagItem.tag, (tagCounts.get(tagItem.tag) || 0) + tagItem.count);
+        tagCounts.set(
+          tagItem.tag,
+          (tagCounts.get(tagItem.tag) || 0) + tagItem.count,
+        );
       }
-    } else if (node.type === 'folder' && Array.isArray(node.children)) {
+    } else if (node.type === "folder" && Array.isArray(node.children)) {
       for (const child of node.children) {
         scanNode(child);
       }
@@ -227,35 +230,35 @@ const NOTE_EXTENSION_REGEX = /\.(md|markdown|txt)$/i;
 const EXTERNAL_PROTOCOL_REGEX = /^(https?:|mailto:|tel:|data:|javascript:)/i;
 
 function normalizeLinkKey(raw: string): string {
-  let cleaned = raw.replace(/\\+/g, '').trim();
+  let cleaned = raw.replace(/\\+/g, "").trim();
   try {
     cleaned = decodeURIComponent(cleaned);
   } catch {
     // Keep raw string if malformed URI component
   }
   cleaned = cleaned
-    .split('|')[0]
-    .split('#')[0]
+    .split("|")[0]
+    .split("#")[0]
     .trim()
-    .replace(/\\/g, '/')
-    .replace(/^(\.\/|\.\.\/)+/, '')
-    .replace(/^\/+|\/+$/g, '')
-    .replace(NOTE_EXTENSION_REGEX, '')
+    .replace(/\\/g, "/")
+    .replace(/^(\.\/|\.\.\/)+/, "")
+    .replace(/^\/+|\/+$/g, "")
+    .replace(NOTE_EXTENSION_REGEX, "")
     .trim()
     .toLowerCase();
   return cleaned;
 }
 
-export function extractNoteLinks(markdown: string): string[] {
+function extractNoteLinks(markdown: string): string[] {
   if (!markdown) return [];
   const links: string[] = [];
   const seen = new Set<string>();
-  const lines = markdown.split('\n');
+  const lines = markdown.split("\n");
   let inCodeBlock = false;
 
   for (const rawLine of lines) {
     const trimmed = rawLine.trim();
-    if (trimmed.startsWith('```')) {
+    if (trimmed.startsWith("```")) {
       inCodeBlock = !inCodeBlock;
       continue;
     }
@@ -264,7 +267,11 @@ export function extractNoteLinks(markdown: string): string[] {
     // 1. Obsidian-style wikilinks: [[Target]] or Milkdown escaped \[\[Target\]\]
     const wikiMatches = rawLine.matchAll(/\\?\[\\?\[([^\]]+?)\\?\]\\?\]/g);
     for (const match of wikiMatches) {
-      const target = match[1].replace(/\\+/g, '').split('|')[0].split('#')[0].trim();
+      const target = match[1]
+        .replace(/\\+/g, "")
+        .split("|")[0]
+        .split("#")[0]
+        .trim();
       if (target && !seen.has(target)) {
         seen.add(target);
         links.push(target);
@@ -274,11 +281,15 @@ export function extractNoteLinks(markdown: string): string[] {
     // 2. Standard internal markdown links: [Label](target.md) (excluding images ![...] and external URLs)
     const mdMatches = rawLine.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/g);
     for (const match of mdMatches) {
-      const rawHref = match[1].trim().replace(/^<|>$/g, '');
-      if (!rawHref || rawHref.startsWith('#') || EXTERNAL_PROTOCOL_REGEX.test(rawHref)) {
+      const rawHref = match[1].trim().replace(/^<|>$/g, "");
+      if (
+        !rawHref ||
+        rawHref.startsWith("#") ||
+        EXTERNAL_PROTOCOL_REGEX.test(rawHref)
+      ) {
         continue;
       }
-      const target = rawHref.split('#')[0].trim();
+      const target = rawHref.split("#")[0].trim();
       if (target && !seen.has(target)) {
         seen.add(target);
         links.push(target);
@@ -289,8 +300,11 @@ export function extractNoteLinks(markdown: string): string[] {
   return links;
 }
 
-export function appendWikiLinkToContent(content: string, targetTitle: string): string {
-  const cleanTitle = targetTitle.trim() || 'Untitled';
+export function appendWikiLinkToContent(
+  content: string,
+  targetTitle: string,
+): string {
+  const cleanTitle = targetTitle.trim() || "Untitled";
   const linkToken = `[[${cleanTitle}]]`;
   const trimmed = content.trimEnd();
   if (!trimmed) {
@@ -299,28 +313,34 @@ export function appendWikiLinkToContent(content: string, targetTitle: string): s
   return `${trimmed}\n\n${linkToken}`;
 }
 
-export function removeWikiLinkFromContent(content: string, targetTitle: string): string {
+export function removeWikiLinkFromContent(
+  content: string,
+  targetTitle: string,
+): string {
   if (!content) return content;
   const targetKey = normalizeLinkKey(targetTitle);
   if (!targetKey) return content;
 
-  const updated = content.replace(/\\?\[\\?\[([^\]]+?)\\?\]\\?\]/g, (fullMatch, inner: string) => {
-    const innerKey = normalizeLinkKey(inner);
-    const segments = innerKey.split('/');
-    const baseKey = segments[segments.length - 1]?.trim() || '';
-    if (innerKey === targetKey || baseKey === targetKey) {
-      return '';
-    }
-    return fullMatch;
-  });
+  const updated = content.replace(
+    /\\?\[\\?\[([^\]]+?)\\?\]\\?\]/g,
+    (fullMatch, inner: string) => {
+      const innerKey = normalizeLinkKey(inner);
+      const segments = innerKey.split("/");
+      const baseKey = segments[segments.length - 1]?.trim() || "";
+      if (innerKey === targetKey || baseKey === targetKey) {
+        return "";
+      }
+      return fullMatch;
+    },
+  );
 
-  return updated.replace(/\n{3,}/g, '\n\n').trimEnd();
+  return updated.replace(/\n{3,}/g, "\n\n").trimEnd();
 }
 
 export function calculateNoteStats(content: string): NoteStats {
   const chars = content.length;
   const words = countWords(content);
-  const lines = content.split('\n').length;
+  const lines = content.split("\n").length;
   const readTimeMin = Math.max(1, Math.ceil(words / WORDS_PER_MINUTE));
   const wikiLinks = extractNoteLinks(content);
 
@@ -337,26 +357,32 @@ interface IndexedWorkspaceNote {
   outgoingKeys: Set<string>;
 }
 
-function indexWorkspaceNotes(folders: TopLevelFolder[]): IndexedWorkspaceNote[] {
+function indexWorkspaceNotes(
+  folders: TopLevelFolder[],
+): IndexedWorkspaceNote[] {
   const indexed: IndexedWorkspaceNote[] = [];
 
   function walkNodes(
     nodes: ExplorerNode[],
     topFolder: TopLevelFolder,
     subfolderIds: string[],
-    subfolderNames: string[]
+    subfolderNames: string[],
   ) {
     for (const node of nodes) {
-      if (node.type === 'note') {
-        const titleKey = normalizeLinkKey(node.title || '');
+      if (node.type === "note") {
+        const titleKey = normalizeLinkKey(node.title || "");
         const matchKeys = new Set<string>();
         if (titleKey) {
           matchKeys.add(titleKey);
           if (subfolderNames.length > 0) {
-            const relPath = normalizeLinkKey([...subfolderNames, titleKey].join('/'));
+            const relPath = normalizeLinkKey(
+              [...subfolderNames, titleKey].join("/"),
+            );
             if (relPath) matchKeys.add(relPath);
           }
-          const fullPath = normalizeLinkKey([topFolder.name, ...subfolderNames, titleKey].join('/'));
+          const fullPath = normalizeLinkKey(
+            [topFolder.name, ...subfolderNames, titleKey].join("/"),
+          );
           if (fullPath) matchKeys.add(fullPath);
         }
 
@@ -365,7 +391,7 @@ function indexWorkspaceNotes(folders: TopLevelFolder[]): IndexedWorkspaceNote[] 
           const normalized = normalizeLinkKey(rawLink);
           if (normalized) {
             outgoingKeys.add(normalized);
-            const segments = normalized.split('/');
+            const segments = normalized.split("/");
             const baseKey = segments[segments.length - 1]?.trim();
             if (baseKey) {
               outgoingKeys.add(baseKey);
@@ -382,12 +408,12 @@ function indexWorkspaceNotes(folders: TopLevelFolder[]): IndexedWorkspaceNote[] 
           matchKeys,
           outgoingKeys,
         });
-      } else if (node.type === 'folder' && Array.isArray(node.children)) {
+      } else if (node.type === "folder" && Array.isArray(node.children)) {
         walkNodes(
           node.children,
           topFolder,
           [...subfolderIds, node.id],
-          [...subfolderNames, node.name]
+          [...subfolderNames, node.name],
         );
       }
     }
@@ -404,7 +430,7 @@ function indexWorkspaceNotes(folders: TopLevelFolder[]): IndexedWorkspaceNote[] 
 
 export function listConnectableNotes(
   folders: TopLevelFolder[],
-  excludeNoteId: string | null
+  excludeNoteId: string | null,
 ): WorkspaceNoteOption[] {
   return indexWorkspaceNotes(folders)
     .filter((item) => item.note.id !== excludeNoteId)
@@ -426,7 +452,7 @@ function setsIntersect(a: Set<string>, b: Set<string>): boolean {
 export function resolveWorkspaceConnections(
   folders: TopLevelFolder[],
   activeNoteId: string | null,
-  activeContent?: string
+  activeContent?: string,
 ): WorkspaceConnections {
   const empty: WorkspaceConnections = {
     linkedNotes: [],
@@ -455,7 +481,7 @@ export function resolveWorkspaceConnections(
       const linkKey = normalizeLinkKey(raw);
       if (linkKey) {
         activeIndexed.outgoingKeys.add(linkKey);
-        const segments = linkKey.split('/');
+        const segments = linkKey.split("/");
         const baseKey = segments[segments.length - 1]?.trim();
         if (baseKey) {
           activeIndexed.outgoingKeys.add(baseKey);
@@ -467,16 +493,22 @@ export function resolveWorkspaceConnections(
   for (const candidate of allNotes) {
     if (candidate.note.id === activeNoteId) continue;
 
-    const activeLinksToCandidate = setsIntersect(activeIndexed.outgoingKeys, candidate.matchKeys);
-    const candidateLinksToActive = setsIntersect(candidate.outgoingKeys, activeIndexed.matchKeys);
+    const activeLinksToCandidate = setsIntersect(
+      activeIndexed.outgoingKeys,
+      candidate.matchKeys,
+    );
+    const candidateLinksToActive = setsIntersect(
+      candidate.outgoingKeys,
+      activeIndexed.matchKeys,
+    );
 
     if (activeLinksToCandidate || candidateLinksToActive) {
-      const direction: LinkedNoteInfo['direction'] =
+      const direction: LinkedNoteInfo["direction"] =
         activeLinksToCandidate && candidateLinksToActive
-          ? 'bidirectional'
+          ? "bidirectional"
           : activeLinksToCandidate
-            ? 'outgoing'
-            : 'incoming';
+            ? "outgoing"
+            : "incoming";
 
       empty.linkedNotes.push({
         note: candidate.note,
@@ -491,17 +523,20 @@ export function resolveWorkspaceConnections(
       empty.linkedTopFolderIds.add(candidate.topFolderId);
       empty.linkedTopFolderCounts.set(
         candidate.topFolderId,
-        (empty.linkedTopFolderCounts.get(candidate.topFolderId) ?? 0) + 1
+        (empty.linkedTopFolderCounts.get(candidate.topFolderId) ?? 0) + 1,
       );
       if (!empty.firstLinkedNoteByTopFolder.has(candidate.topFolderId)) {
-        empty.firstLinkedNoteByTopFolder.set(candidate.topFolderId, candidate.note.id);
+        empty.firstLinkedNoteByTopFolder.set(
+          candidate.topFolderId,
+          candidate.note.id,
+        );
       }
 
       for (const subfolderId of candidate.ancestorSubfolderIds) {
         empty.linkedSubfolderIds.add(subfolderId);
         empty.linkedSubfolderCounts.set(
           subfolderId,
-          (empty.linkedSubfolderCounts.get(subfolderId) ?? 0) + 1
+          (empty.linkedSubfolderCounts.get(subfolderId) ?? 0) + 1,
         );
       }
     }
@@ -511,45 +546,53 @@ export function resolveWorkspaceConnections(
 }
 
 export function scrollToHeading(headingText: string, level: number): boolean {
-  if (typeof document === 'undefined') return false;
+  if (typeof document === "undefined") return false;
 
   const targetTag = `H${level}`;
   const cleanTarget = headingText.trim().toLowerCase();
 
   const elements = Array.from(
     document.querySelectorAll<HTMLElement>(
-      '.editor-pane h1, .editor-pane h2, .editor-pane h3, .editor-pane h4, .editor-pane h5, .editor-pane h6'
-    )
+      ".editor-pane h1, .editor-pane h2, .editor-pane h3, .editor-pane h4, .editor-pane h5, .editor-pane h6",
+    ),
   );
 
   const exactMatch = elements.find(
-    (el) => el.tagName === targetTag && el.textContent?.trim().toLowerCase() === cleanTarget
+    (el) =>
+      el.tagName === targetTag &&
+      el.textContent?.trim().toLowerCase() === cleanTarget,
   );
   const foundEl =
     exactMatch ??
-    elements.find((el) => el.textContent?.trim().toLowerCase().includes(cleanTarget)) ??
+    elements.find((el) =>
+      el.textContent?.trim().toLowerCase().includes(cleanTarget),
+    ) ??
     null;
 
   if (foundEl) {
-    foundEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    foundEl.classList.add('heading-jump-highlight');
+    foundEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    foundEl.classList.add("heading-jump-highlight");
     setTimeout(() => {
-      foundEl.classList.remove('heading-jump-highlight');
+      foundEl.classList.remove("heading-jump-highlight");
     }, HEADING_HIGHLIGHT_DURATION_MS);
     return true;
   }
 
-  const textarea = document.querySelector<HTMLTextAreaElement>('.editor-textarea');
+  const textarea =
+    document.querySelector<HTMLTextAreaElement>(".editor-textarea");
   if (textarea) {
     const val = textarea.value;
-    const prefix = `${'#'.repeat(level)} `;
+    const prefix = `${"#".repeat(level)} `;
     let idx = val.indexOf(prefix + headingText);
     if (idx === -1) idx = val.indexOf(headingText);
     if (idx !== -1) {
       textarea.focus();
       textarea.setSelectionRange(idx, idx + headingText.length);
-      const linesBefore = val.slice(0, idx).split('\n').length;
-      textarea.scrollTop = Math.max(0, (linesBefore - 3) * TEXTAREA_LINE_HEIGHT_PX);
+      const linesBefore = val.slice(0, idx).split("\n").length;
+      textarea.scrollTop = Math.max(
+        0,
+        (linesBefore - 3) * TEXTAREA_LINE_HEIGHT_PX,
+      );
       return true;
     }
   }

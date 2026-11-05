@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowDown01,
   ArrowUp10,
@@ -28,11 +34,11 @@ import {
   Rows2,
   Trash2,
   Unlink,
-} from 'lucide-react';
-import { useClickOutside } from '../hooks/useDomInteractions';
-import { resolveWorkspaceConnections } from '../lib/catalogUtils';
-import { isPdfNote, NOTE_FILE_ACCEPT } from '../lib/fileUtils';
-import { findLeaf, getAllLeaves } from '../lib/paneLayoutTree';
+} from "lucide-react";
+import { useClickOutside } from "../hooks/useDomInteractions";
+import { resolveWorkspaceConnections } from "../lib/catalogUtils";
+import { isPdfNote, NOTE_FILE_ACCEPT } from "../lib/fileUtils";
+import { findLeaf, getAllLeaves } from "../lib/paneLayoutTree";
 import {
   collectAllSubfolderIds,
   DEFAULT_SIDEBAR_WIDTH,
@@ -41,28 +47,28 @@ import {
   resolveActiveNoteData,
   sortExplorerNodes,
   useNotesStore,
-} from '../store/useNotesStore';
-import { ExplorerNode, FolderItem, NoteItem } from '../types';
+} from "../store/useNotesStore";
+import { ExplorerNode, FolderItem, NoteItem } from "../types";
 
 const BASE_INDENT_PX = 14;
 const DEPTH_INDENT_STEP_PX = 16;
 
 type ExplorerContextMenuState =
   | {
-      kind: 'note';
+      kind: "note";
       note: NoteItem;
       parentFolderId: string | null;
       x: number;
       y: number;
     }
   | {
-      kind: 'subfolder';
+      kind: "subfolder";
       subfolder: FolderItem;
       x: number;
       y: number;
     }
   | {
-      kind: 'root';
+      kind: "root";
       x: number;
       y: number;
     };
@@ -82,9 +88,10 @@ export const FolderExplorer: React.FC = () => {
   const pendingRenameNodeId = useNotesStore((s) => s.pendingRenameNodeId);
   const isCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
-  const sidebarWidth = useNotesStore((s) => s.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH);
-  const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
-  // const isSyncingFolderId = useNotesStore((s) => s.isSyncingFolderId);
+  const sidebarWidth = useNotesStore(
+    (s) => s.sidebarWidth ?? DEFAULT_SIDEBAR_WIDTH,
+  );
+  const sortOrder = useNotesStore((s) => s.sortOrder ?? "name-asc");
   const isSplitViewActive = useNotesStore((s) => s.isSplitViewActive);
   const openInSplitView = useNotesStore((s) => s.openInSplitView);
   const splitPane = useNotesStore((s) => s.splitPane);
@@ -105,8 +112,12 @@ export const FolderExplorer: React.FC = () => {
   const importNotesFiles = useNotesStore((s) => s.importNotesFiles);
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
   const unlinkFolderFromDisk = useNotesStore((s) => s.unlinkFolderFromDisk);
-  const toggleSubfolderCollapse = useNotesStore((s) => s.toggleSubfolderCollapse);
-  const toggleCollapseAllSubfolders = useNotesStore((s) => s.toggleCollapseAllSubfolders);
+  const toggleSubfolderCollapse = useNotesStore(
+    (s) => s.toggleSubfolderCollapse,
+  );
+  const toggleCollapseAllSubfolders = useNotesStore(
+    (s) => s.toggleCollapseAllSubfolders,
+  );
   const collapseAllSubfolders = useNotesStore((s) => s.collapseAllSubfolders);
   const expandAllSubfolders = useNotesStore((s) => s.expandAllSubfolders);
   const paneLayout = useNotesStore((s) => s.paneLayout);
@@ -114,19 +125,19 @@ export const FolderExplorer: React.FC = () => {
 
   const folder = useMemo(
     () => folders.find((f) => f.id === selectedFolderId) ?? null,
-    [folders, selectedFolderId]
+    [folders, selectedFolderId],
   );
 
-  // const isSyncingThis = Boolean(folder && isSyncingFolderId === folder.id);
-
   const selectedNoteId = useMemo(
-    () => resolveActiveNoteData(folder, selectedNoteByFolder, sortOrder)?.note.id ?? null,
-    [folder, selectedNoteByFolder, sortOrder]
+    () =>
+      resolveActiveNoteData(folder, selectedNoteByFolder, sortOrder)?.note.id ??
+      null,
+    [folder, selectedNoteByFolder, sortOrder],
   );
 
   const collapsedSet = useMemo(
     () => new Set(collapsedSubfolderIds),
-    [collapsedSubfolderIds]
+    [collapsedSubfolderIds],
   );
 
   const allSubfolderIds = useMemo(() => {
@@ -141,7 +152,11 @@ export const FolderExplorer: React.FC = () => {
 
   const openPaneNoteIds = useMemo(() => {
     if (!isSplitViewActive || !paneLayout) return new Set<string>();
-    return new Set(getAllLeaves(paneLayout).map((l) => l.noteId).filter(Boolean) as string[]);
+    return new Set(
+      getAllLeaves(paneLayout)
+        .map((l) => l.noteId)
+        .filter(Boolean) as string[],
+    );
   }, [isSplitViewActive, paneLayout]);
 
   const currentActivePaneNoteId = useMemo(() => {
@@ -153,10 +168,11 @@ export const FolderExplorer: React.FC = () => {
   }, [isSplitViewActive, paneLayout, activePaneId, selectedNoteId]);
 
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [draftName, setDraftName] = useState('');
+  const [draftName, setDraftName] = useState("");
   const [isFolderMenuOpen, setIsFolderMenuOpen] = useState(false);
   const [focusedFolderId, setFocusedFolderId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<ExplorerContextMenuState | null>(null);
+  const [contextMenu, setContextMenu] =
+    useState<ExplorerContextMenuState | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
   const skipCommitRef = useRef(false);
@@ -171,10 +187,10 @@ export const FolderExplorer: React.FC = () => {
   useEffect(() => {
     if (!contextMenu) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setContextMenu(null);
+      if (e.key === "Escape") setContextMenu(null);
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [contextMenu]);
 
   useEffect(() => {
@@ -191,7 +207,7 @@ export const FolderExplorer: React.FC = () => {
 
   const connections = useMemo(
     () => resolveWorkspaceConnections(folders, selectedNoteId),
-    [folders, selectedNoteId]
+    [folders, selectedNoteId],
   );
 
   useEffect(() => {
@@ -216,7 +232,11 @@ export const FolderExplorer: React.FC = () => {
   const visibleFlatNodes = useMemo(() => {
     if (!folder?.items) return [];
     const flat: FlatExplorerNode[] = [];
-    const walk = (items: ExplorerNode[], depth: number, parentId: string | null) => {
+    const walk = (
+      items: ExplorerNode[],
+      depth: number,
+      parentId: string | null,
+    ) => {
       const ordered = sortExplorerNodes(items, sortOrder);
       for (const item of ordered) {
         flat.push({
@@ -226,7 +246,7 @@ export const FolderExplorer: React.FC = () => {
           parentFolderId: parentId,
         });
         if (
-          item.type === 'folder' &&
+          item.type === "folder" &&
           !collapsedSet.has(item.id) &&
           Array.isArray(item.children) &&
           item.children.length > 0
@@ -261,7 +281,7 @@ export const FolderExplorer: React.FC = () => {
       setTreeScrollTop(e.currentTarget.scrollTop);
       closeContextMenu();
     },
-    [closeContextMenu]
+    [closeContextMenu],
   );
 
   if (isCollapsed) {
@@ -274,7 +294,9 @@ export const FolderExplorer: React.FC = () => {
         <div className="explorer-header">
           <span className="explorer-overline">SELECTED FOLDER</span>
           <div className="explorer-header-row">
-            <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>No folder selected</span>
+            <span style={{ fontSize: "14px", color: "var(--text-muted)" }}>
+              No folder selected
+            </span>
           </div>
         </div>
         <div className="explorer-empty">
@@ -322,7 +344,11 @@ export const FolderExplorer: React.FC = () => {
     setEditingNodeId(null);
   };
 
-  const clampMenuPosition = (clientX: number, clientY: number, menuHeight = 250) => {
+  const clampMenuPosition = (
+    clientX: number,
+    clientY: number,
+    menuHeight = 250,
+  ) => {
     const menuWidth = 215;
     return {
       x: Math.min(clientX, window.innerWidth - menuWidth - 8),
@@ -333,25 +359,25 @@ export const FolderExplorer: React.FC = () => {
   const openNoteContextMenu = (
     e: React.MouseEvent,
     node: NoteItem,
-    parentFolderId: string | null
+    parentFolderId: string | null,
   ) => {
     e.preventDefault();
     e.stopPropagation();
     const { x, y } = clampMenuPosition(e.clientX, e.clientY, 290);
-    setContextMenu({ kind: 'note', note: node, parentFolderId, x, y });
+    setContextMenu({ kind: "note", note: node, parentFolderId, x, y });
   };
 
   const openSubfolderContextMenu = (e: React.MouseEvent, node: FolderItem) => {
     e.preventDefault();
     e.stopPropagation();
     const { x, y } = clampMenuPosition(e.clientX, e.clientY, 210);
-    setContextMenu({ kind: 'subfolder', subfolder: node, x, y });
+    setContextMenu({ kind: "subfolder", subfolder: node, x, y });
   };
 
   const openRootContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     const { x, y } = clampMenuPosition(e.clientX, e.clientY, 190);
-    setContextMenu({ kind: 'root', x, y });
+    setContextMenu({ kind: "root", x, y });
   };
 
   const ITEM_HEIGHT = 38;
@@ -359,10 +385,13 @@ export const FolderExplorer: React.FC = () => {
   const totalTreeCount = visibleFlatNodes.length;
   const totalTreeHeight = totalTreeCount * ITEM_HEIGHT;
 
-  const startIndex = Math.max(0, Math.floor(treeScrollTop / ITEM_HEIGHT) - OVERSCAN);
+  const startIndex = Math.max(
+    0,
+    Math.floor(treeScrollTop / ITEM_HEIGHT) - OVERSCAN,
+  );
   const endIndex = Math.min(
     totalTreeCount,
-    Math.ceil((treeScrollTop + treeViewportHeight) / ITEM_HEIGHT) + OVERSCAN
+    Math.ceil((treeScrollTop + treeViewportHeight) / ITEM_HEIGHT) + OVERSCAN,
   );
 
   const visibleSlice = visibleFlatNodes.slice(startIndex, endIndex);
@@ -372,31 +401,35 @@ export const FolderExplorer: React.FC = () => {
     const { node, depth, parentFolderId } = flatItem;
     const indentPx = BASE_INDENT_PX + depth * DEPTH_INDENT_STEP_PX;
 
-    if (node.type === 'folder') {
+    if (node.type === "folder") {
       const isCollapsedFolder = collapsedSet.has(node.id);
       const isEditing = editingNodeId === node.id;
       const isParentLevel = depth === 0;
       const isSelectedParent = activeFolderIdSet.has(node.id);
-      const linkedNoteCount = connections.linkedSubfolderCounts.get(node.id) ?? 0;
+      const linkedNoteCount =
+        connections.linkedSubfolderCounts.get(node.id) ?? 0;
       const isLinkedFolder = linkedNoteCount > 0;
       const isContextTarget =
-        contextMenu?.kind === 'subfolder' && contextMenu.subfolder.id === node.id;
-      const folderLevelClass = isParentLevel ? 'is-parent-folder' : 'is-child-folder';
-      const folderSelectedClass = isSelectedParent ? 'is-selected-parent' : '';
-      const folderLinkedClass = isLinkedFolder ? 'is-linked-folder' : '';
+        contextMenu?.kind === "subfolder" &&
+        contextMenu.subfolder.id === node.id;
+      const folderLevelClass = isParentLevel
+        ? "is-parent-folder"
+        : "is-child-folder";
+      const folderSelectedClass = isSelectedParent ? "is-selected-parent" : "";
+      const folderLinkedClass = isLinkedFolder ? "is-linked-folder" : "";
 
       return (
         <div
           key={node.id}
-          className={`explorer-group ${isParentLevel ? 'is-root-group' : 'is-nested-group'} ${
-            isSelectedParent ? 'is-active-group' : ''
-          } ${isLinkedFolder ? 'is-linked-group' : ''}`}
+          className={`explorer-group ${isParentLevel ? "is-root-group" : "is-nested-group"} ${
+            isSelectedParent ? "is-active-group" : ""
+          } ${isLinkedFolder ? "is-linked-group" : ""}`}
         >
           <div
             role="button"
             tabIndex={0}
             className={`explorer-row is-folder ${folderLevelClass} ${folderSelectedClass} ${folderLinkedClass} ${
-              isContextTarget ? 'is-context-open' : ''
+              isContextTarget ? "is-context-open" : ""
             }`}
             style={{ paddingLeft: `${indentPx}px` }}
             onClick={() => {
@@ -407,7 +440,7 @@ export const FolderExplorer: React.FC = () => {
             onContextMenu={(e) => openSubfolderContextMenu(e, node)}
             onKeyDown={(e) => {
               if (isEditing) return;
-              if (e.key === 'Enter' || e.key === ' ') {
+              if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 setFocusedFolderId(node.id);
                 toggleSubfolderCollapse(node.id);
@@ -415,10 +448,18 @@ export const FolderExplorer: React.FC = () => {
             }}
           >
             <span className="explorer-chevron">
-              {isCollapsedFolder ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              {isCollapsedFolder ? (
+                <ChevronRight size={14} />
+              ) : (
+                <ChevronDown size={14} />
+              )}
             </span>
             {isCollapsedFolder ? (
-              <Folder size={16} strokeWidth={1.8} className="explorer-item-icon is-folder-icon" />
+              <Folder
+                size={16}
+                strokeWidth={1.8}
+                className="explorer-item-icon is-folder-icon"
+              />
             ) : (
               <FolderOpen
                 size={16}
@@ -438,9 +479,9 @@ export const FolderExplorer: React.FC = () => {
                 onBlur={() => commitSubfolderRename(node.id)}
                 onKeyDown={(e) => {
                   e.stopPropagation();
-                  if (e.key === 'Enter') {
+                  if (e.key === "Enter") {
                     commitSubfolderRename(node.id);
-                  } else if (e.key === 'Escape') {
+                  } else if (e.key === "Escape") {
                     skipCommitRef.current = true;
                     setEditingNodeId(null);
                   }
@@ -454,7 +495,7 @@ export const FolderExplorer: React.FC = () => {
               <span
                 className="explorer-link-badge is-folder-badge"
                 title={`${linkedNoteCount} ${
-                  linkedNoteCount === 1 ? 'note' : 'notes'
+                  linkedNoteCount === 1 ? "note" : "notes"
                 } inside connected to current note`}
               >
                 <Link2 size={11} strokeWidth={2.2} />
@@ -492,22 +533,26 @@ export const FolderExplorer: React.FC = () => {
     }
 
     const isSelected = node.id === currentActivePaneNoteId;
-    const isSecondarySelected = isSplitViewActive && !isSelected && openPaneNoteIds.has(node.id);
+    const isSecondarySelected =
+      isSplitViewActive && !isSelected && openPaneNoteIds.has(node.id);
     const isEditingNote = editingNodeId === node.id;
     const isLinkedNote =
-      !isSelected && !isSecondarySelected && connections.linkedNoteIds.has(node.id);
-    const isContextTarget = contextMenu?.kind === 'note' && contextMenu.note.id === node.id;
+      !isSelected &&
+      !isSecondarySelected &&
+      connections.linkedNoteIds.has(node.id);
+    const isContextTarget =
+      contextMenu?.kind === "note" && contextMenu.note.id === node.id;
     const isPdf = isPdfNote(node);
-    const noteLevelClass = depth > 0 ? 'is-child-note' : 'is-root-note';
+    const noteLevelClass = depth > 0 ? "is-child-note" : "is-root-note";
 
     return (
       <div
         key={node.id}
         role="button"
         tabIndex={0}
-        className={`explorer-row is-note ${noteLevelClass} ${isSelected ? 'is-selected' : ''} ${
-          isSecondarySelected ? 'is-secondary-selected' : ''
-        } ${isLinkedNote ? 'is-linked-note' : ''} ${isContextTarget ? 'is-context-open' : ''}`}
+        className={`explorer-row is-note ${noteLevelClass} ${isSelected ? "is-selected" : ""} ${
+          isSecondarySelected ? "is-secondary-selected" : ""
+        } ${isLinkedNote ? "is-linked-note" : ""} ${isContextTarget ? "is-context-open" : ""}`}
         style={{ paddingLeft: `${indentPx}px` }}
         onClick={() => {
           setFocusedFolderId(null);
@@ -523,7 +568,7 @@ export const FolderExplorer: React.FC = () => {
         onContextMenu={(e) => openNoteContextMenu(e, node, parentFolderId)}
         onKeyDown={(e) => {
           if (isEditingNote) return;
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             setFocusedFolderId(null);
             selectNote(node.id);
@@ -533,7 +578,7 @@ export const FolderExplorer: React.FC = () => {
         <FileText
           size={16}
           strokeWidth={1.75}
-          className={`explorer-item-icon explorer-note-icon ${isPdf ? 'is-pdf-icon' : ''}`}
+          className={`explorer-item-icon explorer-note-icon ${isPdf ? "is-pdf-icon" : ""}`}
         />
         {isEditingNote ? (
           <input
@@ -546,16 +591,18 @@ export const FolderExplorer: React.FC = () => {
             onBlur={() => commitNoteRename(node.id)}
             onKeyDown={(e) => {
               e.stopPropagation();
-              if (e.key === 'Enter') {
+              if (e.key === "Enter") {
                 commitNoteRename(node.id);
-              } else if (e.key === 'Escape') {
+              } else if (e.key === "Escape") {
                 skipCommitRef.current = true;
                 setEditingNodeId(null);
               }
             }}
           />
         ) : (
-          <span className="explorer-row-label">{node.title.trim() || 'Untitled'}</span>
+          <span className="explorer-row-label">
+            {node.title.trim() || "Untitled"}
+          </span>
         )}
         {isLinkedNote && !isEditingNote && (
           <span
@@ -575,13 +622,13 @@ export const FolderExplorer: React.FC = () => {
           {!isSelected && selectedNoteId && (
             <button
               type="button"
-              className={`icon-action-btn ${isLinkedNote ? 'is-linked-action' : ''}`}
+              className={`icon-action-btn ${isLinkedNote ? "is-linked-action" : ""}`}
               title={
                 isLinkedNote
-                  ? 'Unlink from current selected note'
-                  : 'Connect / link with current selected note'
+                  ? "Unlink from current selected note"
+                  : "Connect / link with current selected note"
               }
-              aria-label={isLinkedNote ? 'Unlink note' : 'Link note'}
+              aria-label={isLinkedNote ? "Unlink note" : "Link note"}
               onClick={(e) => {
                 e.stopPropagation();
                 toggleNoteLink(selectedNoteId, node.id);
@@ -626,7 +673,7 @@ export const FolderExplorer: React.FC = () => {
         hidden
         onChange={(e) => {
           const selected = e.target.files ? Array.from(e.target.files) : [];
-          e.target.value = '';
+          e.target.value = "";
           if (selected.length > 0) {
             void importNotesFiles(selected);
           }
@@ -638,7 +685,11 @@ export const FolderExplorer: React.FC = () => {
         <span className="explorer-overline">SELECTED FOLDER</span>
         <div className="explorer-header-row">
           <div className="explorer-folder-title" title={folder.name}>
-            <Folder size={18} strokeWidth={1.8} className="explorer-header-icon" />
+            <Folder
+              size={18}
+              strokeWidth={1.8}
+              className="explorer-header-icon"
+            />
             <span>{folder.name}</span>
           </div>
 
@@ -649,17 +700,17 @@ export const FolderExplorer: React.FC = () => {
               className="explorer-menu-btn"
               title={
                 allSubfolderIds.length === 0
-                  ? 'No folders to collapse'
+                  ? "No folders to collapse"
                   : isAllSubfoldersCollapsed
-                  ? 'Expand all folders'
-                  : 'Collapse all folders'
+                    ? "Expand all folders"
+                    : "Collapse all folders"
               }
               aria-label={
                 allSubfolderIds.length === 0
-                  ? 'No folders to collapse'
+                  ? "No folders to collapse"
                   : isAllSubfoldersCollapsed
-                  ? 'Expand all folders'
-                  : 'Collapse all folders'
+                    ? "Expand all folders"
+                    : "Collapse all folders"
               }
               disabled={allSubfolderIds.length === 0}
               onClick={toggleCollapseAllSubfolders}
@@ -674,7 +725,7 @@ export const FolderExplorer: React.FC = () => {
             {/* List/Menu button for extended folder options */}
             <button
               type="button"
-              className={`explorer-menu-btn ${isFolderMenuOpen ? 'is-active' : ''}`}
+              className={`explorer-menu-btn ${isFolderMenuOpen ? "is-active" : ""}`}
               title="Folder options"
               aria-label="Folder options"
               onClick={() => setIsFolderMenuOpen((v) => !v)}
@@ -703,7 +754,7 @@ export const FolderExplorer: React.FC = () => {
                     className="dropdown-menu-item"
                     onClick={() => {
                       closeFolderMenu();
-                      openLinkModal('current-tab');
+                      openLinkModal("current-tab");
                     }}
                   >
                     <FolderSync size={15} strokeWidth={1.8} />
@@ -730,7 +781,7 @@ export const FolderExplorer: React.FC = () => {
                   className="dropdown-menu-item"
                   onClick={() => {
                     closeFolderMenu();
-                    openLinkModal('subfolder');
+                    openLinkModal("subfolder");
                   }}
                 >
                   <FolderUp size={15} strokeWidth={1.8} />
@@ -738,45 +789,53 @@ export const FolderExplorer: React.FC = () => {
                 </button>
 
                 <div className="dropdown-menu-divider" />
-                <div className="dropdown-section-title">SORT NOTES & FOLDERS</div>
+                <div className="dropdown-section-title">
+                  SORT NOTES & FOLDERS
+                </div>
 
                 <button
                   type="button"
-                  className={`dropdown-menu-item ${sortOrder === 'name-asc' ? 'is-selected-sort' : ''}`}
+                  className={`dropdown-menu-item ${sortOrder === "name-asc" ? "is-selected-sort" : ""}`}
                   onClick={() => {
-                    setSortOrder('name-asc');
+                    setSortOrder("name-asc");
                     closeFolderMenu();
                   }}
                 >
                   <ArrowDown01 size={15} strokeWidth={1.8} />
                   <span style={{ flex: 1 }}>Numeric / A → Z</span>
-                  {sortOrder === 'name-asc' && <Check size={14} className="sort-check-icon" />}
+                  {sortOrder === "name-asc" && (
+                    <Check size={14} className="sort-check-icon" />
+                  )}
                 </button>
 
                 <button
                   type="button"
-                  className={`dropdown-menu-item ${sortOrder === 'name-desc' ? 'is-selected-sort' : ''}`}
+                  className={`dropdown-menu-item ${sortOrder === "name-desc" ? "is-selected-sort" : ""}`}
                   onClick={() => {
-                    setSortOrder('name-desc');
+                    setSortOrder("name-desc");
                     closeFolderMenu();
                   }}
                 >
                   <ArrowUp10 size={15} strokeWidth={1.8} />
                   <span style={{ flex: 1 }}>Numeric / Z → A</span>
-                  {sortOrder === 'name-desc' && <Check size={14} className="sort-check-icon" />}
+                  {sortOrder === "name-desc" && (
+                    <Check size={14} className="sort-check-icon" />
+                  )}
                 </button>
 
                 <button
                   type="button"
-                  className={`dropdown-menu-item ${sortOrder === 'date-desc' ? 'is-selected-sort' : ''}`}
+                  className={`dropdown-menu-item ${sortOrder === "date-desc" ? "is-selected-sort" : ""}`}
                   onClick={() => {
-                    setSortOrder('date-desc');
+                    setSortOrder("date-desc");
                     closeFolderMenu();
                   }}
                 >
                   <Calendar size={15} strokeWidth={1.8} />
                   <span style={{ flex: 1 }}>Newest modified</span>
-                  {sortOrder === 'date-desc' && <Check size={14} className="sort-check-icon" />}
+                  {sortOrder === "date-desc" && (
+                    <Check size={14} className="sort-check-icon" />
+                  )}
                 </button>
 
                 <div className="dropdown-menu-divider" />
@@ -832,7 +891,11 @@ export const FolderExplorer: React.FC = () => {
                   ) : (
                     <PanelTopClose size={15} strokeWidth={1.8} />
                   )}
-                  <span>{isNavbarCollapsed ? 'Expand top navbar' : 'Collapse top navbar'}</span>
+                  <span>
+                    {isNavbarCollapsed
+                      ? "Expand top navbar"
+                      : "Collapse top navbar"}
+                  </span>
                 </button>
 
                 <button
@@ -872,21 +935,27 @@ export const FolderExplorer: React.FC = () => {
         className="explorer-tree"
         onScroll={handleTreeScroll}
         onContextMenu={openRootContextMenu}
-        style={{ position: 'relative', overflowY: 'auto' }}
+        style={{ position: "relative", overflowY: "auto" }}
       >
         {totalTreeCount === 0 ? (
           <div className="explorer-empty">
             <p>No notes in this folder yet.</p>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
               Right-click here to create a note or subfolder.
             </span>
           </div>
         ) : (
-          <div style={{ height: `${totalTreeHeight}px`, position: 'relative', width: '100%' }}>
+          <div
+            style={{
+              height: `${totalTreeHeight}px`,
+              position: "relative",
+              width: "100%",
+            }}
+          >
             <div
               style={{
                 transform: `translateY(${topSpacerPx}px)`,
-                position: 'absolute',
+                position: "absolute",
                 top: 0,
                 left: 0,
                 right: 0,
@@ -907,11 +976,11 @@ export const FolderExplorer: React.FC = () => {
           role="menu"
           aria-label="Sidebar context actions"
         >
-          {contextMenu.kind === 'note' && (
+          {contextMenu.kind === "note" && (
             <>
               <div className="context-menu-header">
                 <FileText size={12} className="context-menu-header-icon" />
-                <span>{contextMenu.note.title.trim() || 'Untitled'}</span>
+                <span>{contextMenu.note.title.trim() || "Untitled"}</span>
               </div>
 
               <button
@@ -937,7 +1006,7 @@ export const FolderExplorer: React.FC = () => {
                   const targetNote = contextMenu.note;
                   closeContextMenu();
                   if (folder) {
-                    splitPane('horizontal', folder.id, targetNote.id);
+                    splitPane("horizontal", folder.id, targetNote.id);
                   }
                 }}
               >
@@ -953,7 +1022,7 @@ export const FolderExplorer: React.FC = () => {
                   const targetNote = contextMenu.note;
                   closeContextMenu();
                   if (folder) {
-                    splitPane('vertical', folder.id, targetNote.id);
+                    splitPane("vertical", folder.id, targetNote.id);
                   }
                 }}
               >
@@ -1035,7 +1104,7 @@ export const FolderExplorer: React.FC = () => {
                 className="dropdown-menu-item"
                 role="menuitem"
                 onClick={() => {
-                  const title = contextMenu.note.title.trim() || 'Untitled';
+                  const title = contextMenu.note.title.trim() || "Untitled";
                   closeContextMenu();
                   void navigator.clipboard?.writeText(`[[${title}]]`);
                 }}
@@ -1076,7 +1145,7 @@ export const FolderExplorer: React.FC = () => {
             </>
           )}
 
-          {contextMenu.kind === 'subfolder' && (
+          {contextMenu.kind === "subfolder" && (
             <>
               <div className="context-menu-header">
                 <Folder size={12} className="context-menu-header-icon" />
@@ -1145,7 +1214,7 @@ export const FolderExplorer: React.FC = () => {
             </>
           )}
 
-          {contextMenu.kind === 'root' && (
+          {contextMenu.kind === "root" && (
             <>
               <div className="context-menu-header">
                 <Folder size={12} className="context-menu-header-icon" />
@@ -1199,7 +1268,7 @@ export const FolderExplorer: React.FC = () => {
                 role="menuitem"
                 onClick={() => {
                   closeContextMenu();
-                  openLinkModal('subfolder');
+                  openLinkModal("subfolder");
                 }}
               >
                 <FolderUp size={14} strokeWidth={1.8} />

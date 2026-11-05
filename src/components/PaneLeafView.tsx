@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   Check,
@@ -11,16 +11,20 @@ import {
   PenLine,
   Search,
   X,
-} from 'lucide-react';
-import { useClickOutside } from '../hooks/useDomInteractions';
-import { countWords, listConnectableNotes, resolveWorkspaceConnections } from '../lib/catalogUtils';
-import { isPdfNote } from '../lib/fileUtils';
-import { findNoteAndPath, findNoteByTitle } from '../lib/treeUtils';
-import { isObsidianMode, useNotesStore } from '../store/useNotesStore';
-import { PaneLeafNode, TopLevelFolder } from '../types';
-import { MarkdownEditor } from './MarkdownEditor';
-import { MilkdownViewer } from './MilkdownViewer';
-import { PdfViewer } from './PdfViewer';
+} from "lucide-react";
+import { useClickOutside } from "../hooks/useDomInteractions";
+import {
+  countWords,
+  listConnectableNotes,
+  resolveWorkspaceConnections,
+} from "../lib/catalogUtils";
+import { isPdfNote } from "../lib/fileUtils";
+import { findNoteAndPath, findNoteByTitle } from "../lib/treeUtils";
+import { isObsidianMode, useNotesStore } from "../store/useNotesStore";
+import { PaneLeafNode, TopLevelFolder } from "../types";
+import { MarkdownEditor } from "./MarkdownEditor";
+import { MilkdownViewer } from "./MilkdownViewer";
+import { PdfViewer } from "./PdfViewer";
 
 interface PaneLeafViewProps {
   leaf: PaneLeafNode;
@@ -48,12 +52,12 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
   const loadNoteContent = useNotesStore((s) => s.loadNoteContent);
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [filterQuery, setFilterQuery] = useState('');
+  const [filterQuery, setFilterQuery] = useState("");
   const pickerRef = useRef<HTMLDivElement>(null);
 
   const closePicker = useCallback(() => {
     setIsPickerOpen(false);
-    setFilterQuery('');
+    setFilterQuery("");
   }, []);
   useClickOutside(pickerRef, isPickerOpen, closePicker);
 
@@ -83,31 +87,40 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
     if (!filterQuery.trim()) return all;
     const q = filterQuery.trim().toLowerCase();
     return all.filter((item) => {
-      const title = (item.note.title || 'Untitled').toLowerCase();
-      const folderPath = [item.topFolderName, ...item.subfolderNames].join('/').toLowerCase();
+      const title = (item.note.title || "Untitled").toLowerCase();
+      const folderPath = [item.topFolderName, ...item.subfolderNames]
+        .join("/")
+        .toLowerCase();
       return title.includes(q) || folderPath.includes(q);
     });
   }, [folders, filterQuery]);
 
-  const noteContent = note ? (activeNoteContents[note.id] ?? note.content ?? '') : '';
+  const noteContent = note
+    ? (activeNoteContents[note.id] ?? note.content ?? "")
+    : "";
 
   React.useEffect(() => {
-    if (note?.id && note?.filePath && activeNoteContents[note.id] === undefined) {
+    if (
+      note?.id &&
+      note?.filePath &&
+      activeNoteContents[note.id] === undefined
+    ) {
       void loadNoteContent(note.id, note.filePath);
     }
   }, [note?.id, note?.filePath, activeNoteContents, loadNoteContent]);
 
   // Connected notes for this note
   const connections = useMemo(
-    () => (note ? resolveWorkspaceConnections(folders, note.id, noteContent) : null),
-    [folders, note, noteContent]
+    () =>
+      note ? resolveWorkspaceConnections(folders, note.id, noteContent) : null,
+    [folders, note, noteContent],
   );
 
   const wikilinkNotes = useMemo(() => {
     return listConnectableNotes(folders, null).map((item) => ({
       id: item.note.id,
-      title: item.note.title.trim() || 'Untitled',
-      folderPath: [item.topFolderName, ...item.subfolderNames].join(' / '),
+      title: item.note.title.trim() || "Untitled",
+      folderPath: [item.topFolderName, ...item.subfolderNames].join(" / "),
     }));
   }, [folders]);
 
@@ -121,7 +134,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
         }
       }
     },
-    [folders, leaf.id, setPaneNote]
+    [folders, leaf.id, setPaneNote],
   );
 
   const isPdf = note ? isPdfNote(note) : false;
@@ -129,16 +142,16 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
 
   return (
     <section
-      className={`editor-split-col ${isActive ? 'is-active-pane' : ''}`}
+      className={`editor-split-col ${isActive ? "is-active-pane" : ""}`}
       onClick={onSelect}
-      style={{ flex: 1, height: '100%', width: '100%' }}
+      style={{ flex: 1, height: "100%", width: "100%" }}
     >
       {/* Pane Header */}
       <div className="editor-pane-header">
         <div className="editor-pane-header-left">
           <span
             className="editor-pane-tag"
-            title={`Pane ${index + 1} (${isActive ? 'Focused' : 'Click to focus'})`}
+            title={`Pane ${index + 1} (${isActive ? "Focused" : "Click to focus"})`}
             onClick={(e) => {
               e.stopPropagation();
               onSelect();
@@ -150,13 +163,27 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
           {note ? (
             <div className="editor-breadcrumb" aria-label="Note path">
               {breadcrumb.length > 0 && (
-                <Folder size={13} strokeWidth={1.9} className="breadcrumb-icon" />
+                <Folder
+                  size={13}
+                  strokeWidth={1.9}
+                  className="breadcrumb-icon"
+                />
               )}
               {breadcrumb.map((segment, idx) => (
                 <React.Fragment key={`${segment}-${idx}`}>
-                  {idx > 0 && <ChevronRight size={12} strokeWidth={2} className="breadcrumb-sep" />}
+                  {idx > 0 && (
+                    <ChevronRight
+                      size={12}
+                      strokeWidth={2}
+                      className="breadcrumb-sep"
+                    />
+                  )}
                   <span
-                    className={idx === breadcrumb.length - 1 ? 'breadcrumb-current' : 'breadcrumb-part'}
+                    className={
+                      idx === breadcrumb.length - 1
+                        ? "breadcrumb-current"
+                        : "breadcrumb-part"
+                    }
                     title={segment}
                   >
                     {segment}
@@ -205,16 +232,21 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                 </div>
                 <div className="editor-link-list">
                   {allWorkspaceNotes.length === 0 ? (
-                    <div className="editor-link-empty">No matching files found.</div>
+                    <div className="editor-link-empty">
+                      No matching files found.
+                    </div>
                   ) : (
                     allWorkspaceNotes.map((opt) => {
                       const isCurrent = note?.id === opt.note.id;
-                      const pathLabel = [opt.topFolderName, ...opt.subfolderNames].join(' / ');
+                      const pathLabel = [
+                        opt.topFolderName,
+                        ...opt.subfolderNames,
+                      ].join(" / ");
                       return (
                         <button
                           key={opt.note.id}
                           type="button"
-                          className={`editor-link-option ${isCurrent ? 'is-linked' : ''}`}
+                          className={`editor-link-option ${isCurrent ? "is-linked" : ""}`}
                           onClick={() => {
                             setPaneNote(leaf.id, opt.topFolderId, opt.note.id);
                             closePicker();
@@ -222,9 +254,11 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                         >
                           <div className="editor-link-option-info">
                             <span className="editor-link-option-title">
-                              {opt.note.title.trim() || 'Untitled'}
+                              {opt.note.title.trim() || "Untitled"}
                             </span>
-                            <span className="editor-link-option-path">{pathLabel}</span>
+                            <span className="editor-link-option-path">
+                              {pathLabel}
+                            </span>
                           </div>
                           {isCurrent && <Check size={13} strokeWidth={2.3} />}
                         </button>
@@ -252,13 +286,17 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
               <span className="editor-meta">{words}w</span>
 
               {!isPdf && (
-                <div className="editor-mode-switch" role="group" aria-label="Pane markdown style mode">
+                <div
+                  className="editor-mode-switch"
+                  role="group"
+                  aria-label="Pane markdown style mode"
+                >
                   <button
                     type="button"
-                    className={`mode-btn ${isObsidianMode(leaf.viewMode) ? 'is-active' : ''}`}
+                    className={`mode-btn ${isObsidianMode(leaf.viewMode) ? "is-active" : ""}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setPaneViewMode(leaf.id, 'obsidian');
+                      setPaneViewMode(leaf.id, "obsidian");
                     }}
                     title="Obsidian Style (Markdown, wikilinks, Live Preview)"
                     aria-label="Obsidian Style"
@@ -267,10 +305,10 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                   </button>
                   <button
                     type="button"
-                    className={`mode-btn ${!isObsidianMode(leaf.viewMode) ? 'is-active' : ''}`}
+                    className={`mode-btn ${!isObsidianMode(leaf.viewMode) ? "is-active" : ""}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setPaneViewMode(leaf.id, 'notebook');
+                      setPaneViewMode(leaf.id, "notebook");
                     }}
                     title="Notebook Style (Milkdown Crepe block WYSIWYG, slash menus)"
                     aria-label="Notebook Style"
@@ -329,7 +367,6 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                   key={`editor-obsidian-${leaf.id}-${note.id}`}
                   content={noteContent}
                   onChange={(val) => updateNote(note.id, { content: val })}
-                  mode="live"
                   readonly={false}
                   notes={wikilinkNotes}
                   onOpenWikilink={handleOpenWikilink}
@@ -345,10 +382,19 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
 
               {/* Connected Notes Footer */}
               {connections && connections.linkedNotes.length > 0 && (
-                <div className="connected-notes-footer" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="connected-notes-footer"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <div className="connected-notes-header">
-                    <Link2 size={13} strokeWidth={2} className="connected-notes-icon" />
-                    <span>Connected notes ({connections.linkedNotes.length})</span>
+                    <Link2
+                      size={13}
+                      strokeWidth={2}
+                      className="connected-notes-icon"
+                    />
+                    <span>
+                      Connected notes ({connections.linkedNotes.length})
+                    </span>
                   </div>
                   <div className="connected-notes-list">
                     {connections.linkedNotes.map((item) => (
@@ -356,11 +402,13 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                         <button
                           type="button"
                           className="connected-note-label-btn"
-                          onClick={() => setPaneNote(leaf.id, item.topFolderId, item.note.id)}
-                          title={`Open "${item.note.title.trim() || 'Untitled'}" here`}
+                          onClick={() =>
+                            setPaneNote(leaf.id, item.topFolderId, item.note.id)
+                          }
+                          title={`Open "${item.note.title.trim() || "Untitled"}" here`}
                         >
                           <span className="connected-note-title">
-                            {item.note.title.trim() || 'Untitled'}
+                            {item.note.title.trim() || "Untitled"}
                           </span>
                         </button>
 
@@ -368,7 +416,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                           type="button"
                           className="connected-note-unlink-btn"
                           onClick={() => toggleNoteLink(note.id, item.note.id)}
-                          title={`Unlink "${item.note.title.trim() || 'Untitled'}"`}
+                          title={`Unlink "${item.note.title.trim() || "Untitled"}"`}
                           aria-label="Unlink"
                         >
                           <X size={11} strokeWidth={2.2} />
@@ -386,7 +434,8 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
           <FileText size={36} strokeWidth={1.5} className="split-empty-icon" />
           <p className="split-empty-title">Pane {index + 1} Empty</p>
           <p className="split-empty-sub">
-            Click any note in the left sidebar, or use the file switcher above to open a note in this view.
+            Click any note in the left sidebar, or use the file switcher above
+            to open a note in this view.
           </p>
         </div>
       )}

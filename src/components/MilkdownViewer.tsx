@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from 'react';
-import { Crepe } from '@milkdown/crepe';
-import { editorViewOptionsCtx } from '@milkdown/kit/core';
-import { replaceAll } from '@milkdown/kit/utils';
-import '@milkdown/crepe/theme/common/style.css';
-import '@milkdown/crepe/theme/frame.css';
+import React, { useEffect, useRef } from "react";
+import { Crepe } from "@milkdown/crepe";
+import { editorViewOptionsCtx } from "@milkdown/kit/core";
+import { replaceAll } from "@milkdown/kit/utils";
+import "@milkdown/crepe/theme/common/style.css";
+import "@milkdown/crepe/theme/frame.css";
 
 /**
  * Normalizes copied HTML from external websites (such as PortSwigger, GitHub, StackOverflow)
@@ -15,32 +15,32 @@ function normalizePastedHTML(html: string): string {
   if (!html) return html;
   try {
     const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
+    const doc = parser.parseFromString(html, "text/html");
 
     let modified = false;
-    const codeElements = Array.from(doc.querySelectorAll('code'));
+    const codeElements = Array.from(doc.querySelectorAll("code"));
 
     codeElements.forEach((codeEl) => {
       // Skip if already wrapped in a <pre> tag
-      if (codeEl.closest('pre')) return;
+      if (codeEl.closest("pre")) return;
 
-      const hasBr = codeEl.querySelector('br') !== null;
-      const text = codeEl.textContent || '';
+      const hasBr = codeEl.querySelector("br") !== null;
+      const text = codeEl.textContent || "";
       const hasNewline = /[\r\n]/.test(text);
 
       if (hasBr || hasNewline) {
-        const pre = doc.createElement('pre');
+        const pre = doc.createElement("pre");
 
         // Extract language from class if available (e.g. class="hljs language-sql" or "language-sql")
-        const classNames = codeEl.className || '';
+        const classNames = codeEl.className || "";
         const langMatch = classNames.match(/(?:lang|language)-(\w+)/);
         if (langMatch) {
-          pre.setAttribute('data-language', langMatch[1]);
+          pre.setAttribute("data-language", langMatch[1]);
         }
 
         // Convert any <br> tags into newlines for preformatted block
-        codeEl.querySelectorAll('br').forEach((br) => {
-          br.replaceWith(doc.createTextNode('\n'));
+        codeEl.querySelectorAll("br").forEach((br) => {
+          br.replaceWith(doc.createTextNode("\n"));
         });
 
         codeEl.parentNode?.replaceChild(pre, codeEl);
@@ -51,7 +51,7 @@ function normalizePastedHTML(html: string): string {
 
     return modified ? doc.body.innerHTML : html;
   } catch (err) {
-    console.error('Failed to normalize pasted HTML:', err);
+    console.error("Failed to normalize pasted HTML:", err);
     return html;
   }
 }
@@ -67,7 +67,7 @@ export const MilkdownViewer: React.FC<MilkdownViewerProps> = ({
   content,
   onChange,
   readonly = false,
-  className = '',
+  className = "",
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const crepeRef = useRef<Crepe | null>(null);
@@ -84,7 +84,7 @@ export const MilkdownViewer: React.FC<MilkdownViewerProps> = ({
 
     const crepe = new Crepe({
       root: containerRef.current,
-      defaultValue: content || '',
+      defaultValue: content || "",
     });
 
     if (readonly) {
@@ -125,11 +125,11 @@ export const MilkdownViewer: React.FC<MilkdownViewerProps> = ({
         isReadyRef.current = true;
         // If content changed while mounting
         if (lastContentRef.current !== content) {
-          crepe.editor?.action(replaceAll(content || '', false));
+          crepe.editor?.action(replaceAll(content || "", false));
         }
       })
       .catch((err) => {
-        console.error('Failed to initialize Milkdown Crepe:', err);
+        console.error("Failed to initialize Milkdown Crepe:", err);
       });
 
     return () => {
@@ -146,9 +146,13 @@ export const MilkdownViewer: React.FC<MilkdownViewerProps> = ({
       isInternalChangeRef.current = false;
       return;
     }
-    if (isReadyRef.current && crepeRef.current && content !== lastContentRef.current) {
+    if (
+      isReadyRef.current &&
+      crepeRef.current &&
+      content !== lastContentRef.current
+    ) {
       lastContentRef.current = content;
-      crepeRef.current.editor?.action(replaceAll(content || '', false));
+      crepeRef.current.editor?.action(replaceAll(content || "", false));
     }
   }, [content]);
 
@@ -161,6 +165,3 @@ export const MilkdownViewer: React.FC<MilkdownViewerProps> = ({
 
   return <div ref={containerRef} className={`milkdown-wrapper ${className}`} />;
 };
-
-export default MilkdownViewer;
-

@@ -1,25 +1,25 @@
-import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import {
   appendWikiLinkToContent,
   removeWikiLinkFromContent,
   resolveWorkspaceConnections,
-} from '../lib/catalogUtils';
+} from "../lib/catalogUtils";
 import {
   buildNoteItemsFromFiles,
   createId,
   sanitizeFilename,
   todayDateString,
-} from '../lib/fileUtils';
-import { fsApi } from '../lib/fsApi';
-import { getDirname, joinPath } from '../lib/pathUtils';
+} from "../lib/fileUtils";
+import { fsApi } from "../lib/fsApi";
+import { getDirname, joinPath } from "../lib/pathUtils";
 import {
   getTabSessionId,
   getTabSessionName,
   sessionApi,
   setTabSessionName,
-} from '../lib/sessionManager';
-import { workspaceStorage } from '../lib/storage';
+} from "../lib/sessionManager";
+import { workspaceStorage } from "../lib/storage";
 import {
   findAncestorFolderIds,
   findDefaultNoteId,
@@ -30,22 +30,21 @@ import {
   findNoteNode,
   insertIntoTree,
   matchAndPreserveIds,
-  naturalCompare,
   NoteUpdates,
   removeNodeFromTree,
   resolveActiveNoteData,
   sortExplorerNodes,
   updateFolderInTree,
   updateNoteInTree,
-} from '../lib/treeUtils';
-import { applyTheme, initialTheme, saveTheme, ThemeId } from '../themes';
+} from "../lib/treeUtils";
+import { applyTheme, initialTheme, saveTheme, ThemeId } from "../themes";
 import {
   applyFontSettings,
   DEFAULT_FONT_SETTINGS,
   FontSettings,
   initialFontSettings,
   saveFontSettings,
-} from '../lib/fontSettings';
+} from "../lib/fontSettings";
 import {
   createBranchId,
   createLeafNode,
@@ -57,7 +56,7 @@ import {
   splitLeafInTree,
   toggleBranchDirection,
   updateLeafInTree,
-} from '../lib/paneLayoutTree';
+} from "../lib/paneLayoutTree";
 import {
   CatalogTab,
   EditorViewMode,
@@ -71,7 +70,7 @@ import {
   TabGroup,
   TabGroupColorId,
   TopLevelFolder,
-} from '../types';
+} from "../types";
 
 export interface ExplorerFolderClassification {
   /**
@@ -92,7 +91,7 @@ export interface ExplorerFolderClassification {
 export function collectAllFolderIds(nodes: ExplorerNode[]): string[] {
   const ids: string[] = [];
   for (const node of nodes) {
-    if (node.type === 'folder') {
+    if (node.type === "folder") {
       ids.push(node.id);
       ids.push(...collectAllFolderIds(node.children));
     }
@@ -107,8 +106,12 @@ export function collectAllFolderIds(nodes: ExplorerNode[]): string[] {
  * - Multiple top-level folders (e.g. module folders): All folders and their descendants are collapsible.
  * - No folders (flat notes): Empty classification.
  */
-export function classifyExplorerFolders(nodes: ExplorerNode[]): ExplorerFolderClassification {
-  const topLevelFolders = nodes.filter((n): n is FolderItem => n.type === 'folder');
+export function classifyExplorerFolders(
+  nodes: ExplorerNode[],
+): ExplorerFolderClassification {
+  const topLevelFolders = nodes.filter(
+    (n): n is FolderItem => n.type === "folder",
+  );
 
   if (topLevelFolders.length === 0) {
     return { mainFolderIds: [], collapsibleFolderIds: [] };
@@ -137,23 +140,6 @@ export function classifyExplorerFolders(nodes: ExplorerNode[]): ExplorerFolderCl
   };
 }
 
-export function collectMainFolderIds(nodes: ExplorerNode[]): string[] {
-  return classifyExplorerFolders(nodes).mainFolderIds;
-}
-
-export function collectNestedSubfolderIds(nodes: ExplorerNode[], currentDepth = 0): string[] {
-  const ids: string[] = [];
-  for (const node of nodes) {
-    if (node.type === 'folder') {
-      if (currentDepth >= 1) {
-        ids.push(node.id);
-      }
-      ids.push(...collectNestedSubfolderIds(node.children, currentDepth + 1));
-    }
-  }
-  return ids;
-}
-
 /**
  * Collects all folder IDs that should be toggled by the collapse/expand action.
  * Adapts dynamically to single-root wrapper tabs and multi-folder tabs.
@@ -163,25 +149,21 @@ export function collectAllSubfolderIds(nodes: ExplorerNode[]): string[] {
 }
 
 export function isObsidianMode(mode?: EditorViewMode): boolean {
-  return mode === 'obsidian' || mode === 'write' || !mode;
+  return mode === "obsidian" || mode === "write" || !mode;
 }
 
 export {
   findAncestorFolderIds,
-  findDefaultNoteId,
   findFolderNode,
-  findNodeById,
   findNoteAndPath,
   findNoteByTitle,
-  findNoteNode,
-  naturalCompare,
   resolveActiveNoteData,
   sortExplorerNodes,
 };
 
 export const DEFAULT_SIDEBAR_WIDTH = 280;
 export const DEFAULT_RIGHT_SIDEBAR_WIDTH = 270;
-export const DEFAULT_SPLIT_RATIO = 50;
+const DEFAULT_SPLIT_RATIO = 50;
 
 const MIN_SIDEBAR_WIDTH = 180;
 const MAX_SIDEBAR_WIDTH = 600;
@@ -199,15 +181,17 @@ function clamp(value: number, min: number, max: number): number {
 function mapFolderById(
   folders: TopLevelFolder[],
   folderId: string | null,
-  updater: (folder: TopLevelFolder) => TopLevelFolder
+  updater: (folder: TopLevelFolder) => TopLevelFolder,
 ): TopLevelFolder[] {
   if (!folderId) return folders;
-  return folders.map((folder) => (folder.id === folderId ? updater(folder) : folder));
+  return folders.map((folder) =>
+    folder.id === folderId ? updater(folder) : folder,
+  );
 }
 
 function resolveParentDiskPath(
   folder: TopLevelFolder,
-  parentFolderId: string | null
+  parentFolderId: string | null,
 ): string | null {
   if (!folder.localPath) return null;
   if (!parentFolderId) return folder.localPath;
@@ -219,7 +203,7 @@ function resolveParentDiskPath(
 const contentSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const titleRenameTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-export function hasPendingDiskOperations(): boolean {
+function hasPendingDiskOperations(): boolean {
   return contentSaveTimers.size > 0 || titleRenameTimers.size > 0;
 }
 
@@ -230,7 +214,7 @@ function areNodeTreesEqual(a: ExplorerNode[], b: ExplorerNode[]): boolean {
     const nodeA = a[i];
     const nodeB = b[i];
     if (nodeA.id !== nodeB.id || nodeA.type !== nodeB.type) return false;
-    if (nodeA.type === 'note' && nodeB.type === 'note') {
+    if (nodeA.type === "note" && nodeB.type === "note") {
       if (
         nodeA.title !== nodeB.title ||
         nodeA.content !== nodeB.content ||
@@ -240,7 +224,7 @@ function areNodeTreesEqual(a: ExplorerNode[], b: ExplorerNode[]): boolean {
       ) {
         return false;
       }
-    } else if (nodeA.type === 'folder' && nodeB.type === 'folder') {
+    } else if (nodeA.type === "folder" && nodeB.type === "folder") {
       if (
         nodeA.name !== nodeB.name ||
         nodeA.folderPath !== nodeB.folderPath ||
@@ -254,15 +238,18 @@ function areNodeTreesEqual(a: ExplorerNode[], b: ExplorerNode[]): boolean {
 }
 
 const TAB_GROUP_COLORS: TabGroupColorId[] = [
-  'cyan',
-  'emerald',
-  'amber',
-  'purple',
-  'rose',
-  'blue',
+  "cyan",
+  "emerald",
+  "amber",
+  "purple",
+  "rose",
+  "blue",
 ];
 
-function cleanupEmptyTabGroups(folders: TopLevelFolder[], tabGroups: TabGroup[]): TabGroup[] {
+function cleanupEmptyTabGroups(
+  folders: TopLevelFolder[],
+  tabGroups: TabGroup[],
+): TabGroup[] {
   const firstIndexByGroup = new Map<string, number>();
   folders.forEach((f, idx) => {
     if (f.groupId && !firstIndexByGroup.has(f.groupId)) {
@@ -271,7 +258,10 @@ function cleanupEmptyTabGroups(folders: TopLevelFolder[], tabGroups: TabGroup[])
   });
   return tabGroups
     .filter((g) => firstIndexByGroup.has(g.id))
-    .sort((a, b) => (firstIndexByGroup.get(a.id) ?? 0) - (firstIndexByGroup.get(b.id) ?? 0));
+    .sort(
+      (a, b) =>
+        (firstIndexByGroup.get(a.id) ?? 0) - (firstIndexByGroup.get(b.id) ?? 0),
+    );
 }
 
 export interface NotesState {
@@ -302,7 +292,7 @@ export interface NotesState {
   secondaryFolderId: string | null;
   secondaryNoteId: string | null;
   secondaryViewMode: EditorViewMode;
-  activePane: 'primary' | 'secondary';
+  activePane: "primary" | "secondary";
 
   // RFC-042 Pillar 1: Decoupled working document content
   activeNoteContents: Record<string, string>;
@@ -311,9 +301,8 @@ export interface NotesState {
   // Transient UI state
   isHydrated: boolean;
   isSettingsModalOpen: boolean;
-  settingsActiveTab: 'theme' | 'fonts' | 'layout';
+  settingsActiveTab: "theme" | "fonts" | "layout";
   fontSettings: FontSettings;
-  isThemeModalOpen: boolean;
   isLinkModalOpen: boolean;
   linkModalTargetMode: LinkModalTargetMode;
   isSessionModalOpen: boolean;
@@ -334,16 +323,20 @@ export interface NotesState {
   reorderTopFolders: (
     draggedFolderId: string,
     targetFolderId: string,
-    position: 'before' | 'after',
-    targetGroupId?: string | null
+    position: "before" | "after",
+    targetGroupId?: string | null,
   ) => void;
   reorderTabGroup: (
     draggedGroupId: string,
     targetId: string,
-    targetKind: 'folder' | 'group',
-    position: 'before' | 'after'
+    targetKind: "folder" | "group",
+    position: "before" | "after",
   ) => void;
-  createTabGroupFromFolder: (folderId: string, name?: string, color?: TabGroupColorId) => string;
+  createTabGroupFromFolder: (
+    folderId: string,
+    name?: string,
+    color?: TabGroupColorId,
+  ) => string;
   assignFolderToTabGroup: (folderId: string, groupId: string | null) => void;
   renameTabGroup: (groupId: string, newName: string) => void;
   setTabGroupColor: (groupId: string, color: TabGroupColorId) => void;
@@ -357,13 +350,16 @@ export interface NotesState {
   loadSubfolderChildren: (
     folderId: string,
     subfolderId: string,
-    subfolderPath: string
+    subfolderPath: string,
   ) => Promise<void>;
   closeNoteTab: (noteId: string, folderId?: string) => void;
   navigateToNote: (topFolderId: string, noteId: string) => void;
   toggleNoteLink: (activeNoteId: string, targetNoteId: string) => void;
   createNote: (parentFolderId: string | null) => Promise<string | null>;
-  duplicateNote: (noteId: string, parentFolderId: string | null) => Promise<string | null>;
+  duplicateNote: (
+    noteId: string,
+    parentFolderId: string | null,
+  ) => Promise<string | null>;
   createSubfolder: (parentFolderId: string | null) => Promise<string | null>;
   renameSubfolder: (subfolderId: string, newName: string) => void;
   deleteNode: (nodeId: string) => void;
@@ -374,19 +370,27 @@ export interface NotesState {
     direction: SplitDirection,
     targetFolderId?: string,
     targetNoteId?: string,
-    fromPaneId?: string
+    fromPaneId?: string,
   ) => void;
   toggleSplitDirection: (branchId?: string) => void;
-  closePane: (pane?: string | 'primary' | 'secondary') => void;
+  closePane: (pane?: string | "primary" | "secondary") => void;
   closeOtherPanes: (keepPaneId?: string) => void;
   toggleSplitView: () => void;
-  openInSplitView: (folderId: string, noteId: string, direction?: SplitDirection) => void;
+  openInSplitView: (
+    folderId: string,
+    noteId: string,
+    direction?: SplitDirection,
+  ) => void;
   closeSplitView: () => void;
   setActivePaneId: (paneId: string) => void;
-  setActivePane: (pane: 'primary' | 'secondary') => void;
+  setActivePane: (pane: "primary" | "secondary") => void;
   setPaneNote: (paneId: string, folderId: string, noteId: string) => void;
   setPaneViewMode: (paneId: string, mode: EditorViewMode) => void;
-  resizePaneBranch: (branchId: string, dividerIndex: number, deltaRatio: number) => void;
+  resizePaneBranch: (
+    branchId: string,
+    dividerIndex: number,
+    deltaRatio: number,
+  ) => void;
   resetPaneSizes: (branchId?: string) => void;
   setSecondaryNote: (folderId: string, noteId: string) => void;
   setSecondaryViewMode: (mode: EditorViewMode) => void;
@@ -401,14 +405,17 @@ export interface NotesState {
     rootName: string,
     items: ExplorerNode[],
     placement: boolean | LinkModalTargetMode,
-    localPath?: string
+    localPath?: string,
   ) => void;
 
   // Local folder direct two-way sync actions
   syncFolderFromDisk: (folderId: string) => Promise<boolean>;
   linkFolderToDisk: (folderId: string, localPath: string) => Promise<boolean>;
   unlinkFolderFromDisk: (folderId: string) => void;
-  openLocalFolderAsTab: (localPath: string, customName?: string) => Promise<boolean>;
+  openLocalFolderAsTab: (
+    localPath: string,
+    customName?: string,
+  ) => Promise<boolean>;
 
   toggleSubfolderCollapse: (subfolderId: string) => void;
   expandSubfolder: (subfolderId: string) => void;
@@ -429,11 +436,9 @@ export interface NotesState {
   openSessionModal: () => void;
   closeSessionModal: () => void;
   setSessionName: (name: string) => void;
-  openThemeModal: () => void;
-  closeThemeModal: () => void;
-  openSettingsModal: (tab?: 'theme' | 'fonts' | 'layout') => void;
+  openSettingsModal: (tab?: "theme" | "fonts" | "layout") => void;
   closeSettingsModal: () => void;
-  setSettingsActiveTab: (tab: 'theme' | 'fonts' | 'layout') => void;
+  setSettingsActiveTab: (tab: "theme" | "fonts" | "layout") => void;
   updateFontSettings: (updates: Partial<FontSettings>) => void;
   resetFontSettings: () => void;
   clearPendingRenameFolder: () => void;
@@ -455,36 +460,35 @@ export const useNotesStore = create<NotesState>()(
       selectedNoteByFolder: {},
       openNotesByFolder: {},
       collapsedSubfolderIds: [],
-      viewMode: 'obsidian',
+      viewMode: "obsidian",
       isSidebarCollapsed: false,
       isNavbarCollapsed: false,
       isRightSidebarCollapsed: false,
       sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       rightSidebarWidth: DEFAULT_RIGHT_SIDEBAR_WIDTH,
-      rightSidebarTab: 'outline',
+      rightSidebarTab: "outline",
       editorSplitRatio: DEFAULT_SPLIT_RATIO,
-      sortOrder: 'name-asc',
+      sortOrder: "name-asc",
       theme: initialTheme(),
       lastSyncTimeByFolder: {},
 
       paneLayout: null,
       activePaneId: null,
       isSplitViewActive: false,
-      splitDirection: 'horizontal',
+      splitDirection: "horizontal",
       secondaryFolderId: null,
       secondaryNoteId: null,
-      secondaryViewMode: 'preview',
-      activePane: 'primary',
+      secondaryViewMode: "preview",
+      activePane: "primary",
       activeNoteContents: {},
       loadingNoteIds: {},
 
       isHydrated: false,
       isSettingsModalOpen: false,
-      settingsActiveTab: 'theme',
+      settingsActiveTab: "theme",
       fontSettings: initialFontSettings(),
-      isThemeModalOpen: false,
       isLinkModalOpen: false,
-      linkModalTargetMode: 'new-tab',
+      linkModalTargetMode: "new-tab",
       isSessionModalOpen: false,
       currentSessionId: getTabSessionId(),
       currentSessionName: getTabSessionName(),
@@ -506,8 +510,8 @@ export const useNotesStore = create<NotesState>()(
 
       createTopFolder: () => {
         const newFolder: TopLevelFolder = {
-          id: createId('top'),
-          name: 'Untitled Folder',
+          id: createId("top"),
+          name: "Untitled Folder",
           items: [],
         };
         set((state) => ({
@@ -519,28 +523,45 @@ export const useNotesStore = create<NotesState>()(
 
       renameTopFolder: (folderId, newName) =>
         set((state) => ({
-          folders: mapFolderById(state.folders, folderId, (f) => ({ ...f, name: newName })),
+          folders: mapFolderById(state.folders, folderId, (f) => ({
+            ...f,
+            name: newName,
+          })),
         })),
 
-      reorderTopFolders: (draggedFolderId, targetFolderId, position, targetGroupId) =>
+      reorderTopFolders: (
+        draggedFolderId,
+        targetFolderId,
+        position,
+        targetGroupId,
+      ) =>
         set((state) => {
           if (draggedFolderId === targetFolderId) return state;
-          const fromIndex = state.folders.findIndex((f) => f.id === draggedFolderId);
-          const targetIndex = state.folders.findIndex((f) => f.id === targetFolderId);
+          const fromIndex = state.folders.findIndex(
+            (f) => f.id === draggedFolderId,
+          );
+          const targetIndex = state.folders.findIndex(
+            (f) => f.id === targetFolderId,
+          );
           if (fromIndex === -1 || targetIndex === -1) return state;
 
           const nextFolders = [...state.folders];
           const [draggedFolder] = nextFolders.splice(fromIndex, 1);
           const targetFolder = state.folders[targetIndex];
           const resolvedGroupId =
-            targetGroupId !== undefined ? (targetGroupId ?? undefined) : targetFolder.groupId;
+            targetGroupId !== undefined
+              ? (targetGroupId ?? undefined)
+              : targetFolder.groupId;
           const updatedDraggedFolder: TopLevelFolder = {
             ...draggedFolder,
             groupId: resolvedGroupId,
           };
 
-          const nextTargetIndex = nextFolders.findIndex((f) => f.id === targetFolderId);
-          const insertIndex = position === 'before' ? nextTargetIndex : nextTargetIndex + 1;
+          const nextTargetIndex = nextFolders.findIndex(
+            (f) => f.id === targetFolderId,
+          );
+          const insertIndex =
+            position === "before" ? nextTargetIndex : nextTargetIndex + 1;
           nextFolders.splice(insertIndex, 0, updatedDraggedFolder);
 
           return {
@@ -551,15 +572,20 @@ export const useNotesStore = create<NotesState>()(
 
       reorderTabGroup: (draggedGroupId, targetId, targetKind, position) =>
         set((state) => {
-          if (targetKind === 'group' && draggedGroupId === targetId) return state;
+          if (targetKind === "group" && draggedGroupId === targetId)
+            return state;
 
-          const groupFolders = state.folders.filter((f) => f.groupId === draggedGroupId);
+          const groupFolders = state.folders.filter(
+            (f) => f.groupId === draggedGroupId,
+          );
           if (groupFolders.length === 0) return state;
 
-          const remainingFolders = state.folders.filter((f) => f.groupId !== draggedGroupId);
+          const remainingFolders = state.folders.filter(
+            (f) => f.groupId !== draggedGroupId,
+          );
           let insertIndex = -1;
 
-          if (targetKind === 'group') {
+          if (targetKind === "group") {
             let firstTargetIdx = -1;
             let lastTargetIdx = -1;
             for (let i = 0; i < remainingFolders.length; i++) {
@@ -569,9 +595,12 @@ export const useNotesStore = create<NotesState>()(
               }
             }
             if (firstTargetIdx === -1) return state;
-            insertIndex = position === 'before' ? firstTargetIdx : lastTargetIdx + 1;
+            insertIndex =
+              position === "before" ? firstTargetIdx : lastTargetIdx + 1;
           } else {
-            const targetFolderIdx = remainingFolders.findIndex((f) => f.id === targetId);
+            const targetFolderIdx = remainingFolders.findIndex(
+              (f) => f.id === targetId,
+            );
             if (targetFolderIdx === -1) return state;
             const otherGroupId = remainingFolders[targetFolderIdx].groupId;
             if (otherGroupId) {
@@ -583,9 +612,11 @@ export const useNotesStore = create<NotesState>()(
                   lastOtherIdx = i;
                 }
               }
-              insertIndex = position === 'before' ? firstOtherIdx : lastOtherIdx + 1;
+              insertIndex =
+                position === "before" ? firstOtherIdx : lastOtherIdx + 1;
             } else {
-              insertIndex = position === 'before' ? targetFolderIdx : targetFolderIdx + 1;
+              insertIndex =
+                position === "before" ? targetFolderIdx : targetFolderIdx + 1;
             }
           }
 
@@ -601,9 +632,10 @@ export const useNotesStore = create<NotesState>()(
       createTabGroupFromFolder: (folderId, name, color) => {
         const state = get();
         const nextColor =
-          color ?? TAB_GROUP_COLORS[state.tabGroups.length % TAB_GROUP_COLORS.length];
+          color ??
+          TAB_GROUP_COLORS[state.tabGroups.length % TAB_GROUP_COLORS.length];
         const newGroup: TabGroup = {
-          id: createId('grp'),
+          id: createId("grp"),
           name: name?.trim() || `Group ${state.tabGroups.length + 1}`,
           color: nextColor,
           collapsed: false,
@@ -615,7 +647,10 @@ export const useNotesStore = create<NotesState>()(
           }));
           return {
             folders: nextFolders,
-            tabGroups: cleanupEmptyTabGroups(nextFolders, [...s.tabGroups, newGroup]),
+            tabGroups: cleanupEmptyTabGroups(nextFolders, [
+              ...s.tabGroups,
+              newGroup,
+            ]),
             pendingRenameGroupId: newGroup.id,
           };
         });
@@ -641,13 +676,16 @@ export const useNotesStore = create<NotesState>()(
                 lastMemberIndex = i;
               }
             }
-            const insertAt = lastMemberIndex !== -1 ? lastMemberIndex + 1 : folderIndex;
+            const insertAt =
+              lastMemberIndex !== -1 ? lastMemberIndex + 1 : folderIndex;
             nextFolders.splice(insertAt, 0, updatedFolder);
             return {
               folders: nextFolders,
               tabGroups: cleanupEmptyTabGroups(
                 nextFolders,
-                state.tabGroups.map((g) => (g.id === groupId ? { ...g, collapsed: false } : g))
+                state.tabGroups.map((g) =>
+                  g.id === groupId ? { ...g, collapsed: false } : g,
+                ),
               ),
             };
           } else {
@@ -671,26 +709,28 @@ export const useNotesStore = create<NotesState>()(
       renameTabGroup: (groupId, newName) =>
         set((state) => ({
           tabGroups: state.tabGroups.map((g) =>
-            g.id === groupId ? { ...g, name: newName.trim() || g.name } : g
+            g.id === groupId ? { ...g, name: newName.trim() || g.name } : g,
           ),
         })),
 
       setTabGroupColor: (groupId, color) =>
         set((state) => ({
-          tabGroups: state.tabGroups.map((g) => (g.id === groupId ? { ...g, color } : g)),
+          tabGroups: state.tabGroups.map((g) =>
+            g.id === groupId ? { ...g, color } : g,
+          ),
         })),
 
       toggleTabGroupCollapse: (groupId) =>
         set((state) => ({
           tabGroups: state.tabGroups.map((g) =>
-            g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
+            g.id === groupId ? { ...g, collapsed: !g.collapsed } : g,
           ),
         })),
 
       ungroupTabGroup: (groupId) =>
         set((state) => ({
           folders: state.folders.map((f) =>
-            f.groupId === groupId ? { ...f, groupId: undefined } : f
+            f.groupId === groupId ? { ...f, groupId: undefined } : f,
           ),
           tabGroups: state.tabGroups.filter((g) => g.id !== groupId),
         })),
@@ -698,15 +738,18 @@ export const useNotesStore = create<NotesState>()(
       deleteTabGroupAndFolders: (groupId) =>
         set((state) => {
           const removedFolderIds = new Set(
-            state.folders.filter((f) => f.groupId === groupId).map((f) => f.id)
+            state.folders.filter((f) => f.groupId === groupId).map((f) => f.id),
           );
-          const nextFolders = state.folders.filter((f) => f.groupId !== groupId);
+          const nextFolders = state.folders.filter(
+            (f) => f.groupId !== groupId,
+          );
           const nextNoteMap = { ...state.selectedNoteByFolder };
           for (const id of removedFolderIds) {
             delete nextNoteMap[id];
           }
           const nextSelectedId =
-            state.selectedFolderId && removedFolderIds.has(state.selectedFolderId)
+            state.selectedFolderId &&
+            removedFolderIds.has(state.selectedFolderId)
               ? (nextFolders[0]?.id ?? null)
               : state.selectedFolderId;
           return {
@@ -725,7 +768,8 @@ export const useNotesStore = create<NotesState>()(
           const nextFolders = state.folders.filter((f) => f.id !== folderId);
           let nextSelectedId = state.selectedFolderId;
           if (state.selectedFolderId === folderId) {
-            const neighbor = nextFolders[index] ?? nextFolders[index - 1] ?? null;
+            const neighbor =
+              nextFolders[index] ?? nextFolders[index - 1] ?? null;
             nextSelectedId = neighbor ? neighbor.id : null;
           }
           const nextNoteMap = { ...state.selectedNoteByFolder };
@@ -736,16 +780,25 @@ export const useNotesStore = create<NotesState>()(
             tabGroups: cleanupEmptyTabGroups(nextFolders, state.tabGroups),
             selectedFolderId: nextSelectedId,
             selectedNoteByFolder: nextNoteMap,
-            ...(isSecondaryFolderDeleted ? { secondaryFolderId: null, secondaryNoteId: null } : {}),
+            ...(isSecondaryFolderDeleted
+              ? { secondaryFolderId: null, secondaryNoteId: null }
+              : {}),
           };
         }),
 
       selectNote: (noteId) => {
         const state = get();
         if (!state.selectedFolderId) return;
-        const targetFolder = state.folders.find((f) => f.id === state.selectedFolderId);
-        const targetNote = targetFolder ? findNoteNode(targetFolder.items, noteId) : null;
-        if (targetNote?.filePath && state.activeNoteContents[noteId] === undefined) {
+        const targetFolder = state.folders.find(
+          (f) => f.id === state.selectedFolderId,
+        );
+        const targetNote = targetFolder
+          ? findNoteNode(targetFolder.items, noteId)
+          : null;
+        if (
+          targetNote?.filePath &&
+          state.activeNoteContents[noteId] === undefined
+        ) {
           void get().loadNoteContent(noteId, targetNote.filePath);
         }
 
@@ -753,22 +806,28 @@ export const useNotesStore = create<NotesState>()(
           if (!s.selectedFolderId) return s;
           const folderId = s.selectedFolderId;
           const currentOpen = s.openNotesByFolder[folderId] ?? [];
-          const nextOpen = currentOpen.includes(noteId) ? currentOpen : [...currentOpen, noteId];
+          const nextOpen = currentOpen.includes(noteId)
+            ? currentOpen
+            : [...currentOpen, noteId];
 
           const leaves = getAllLeaves(s.paneLayout);
           if (s.isSplitViewActive && s.activePaneId && leaves.length > 1) {
-            const updatedLayout = updateLeafInTree(s.paneLayout!, s.activePaneId, (l) => ({
-              ...l,
-              folderId: s.selectedFolderId,
-              noteId,
-            }));
+            const updatedLayout = updateLeafInTree(
+              s.paneLayout!,
+              s.activePaneId,
+              (l) => ({
+                ...l,
+                folderId: s.selectedFolderId,
+                noteId,
+              }),
+            );
             const updatedLeaves = getAllLeaves(updatedLayout);
             const secLeaf = updatedLeaves[1] ?? null;
             return {
               paneLayout: updatedLayout,
               secondaryFolderId: secLeaf?.folderId ?? null,
               secondaryNoteId: secLeaf?.noteId ?? null,
-              secondaryViewMode: secLeaf?.viewMode ?? 'preview',
+              secondaryViewMode: secLeaf?.viewMode ?? "preview",
               openNotesByFolder: {
                 ...s.openNotesByFolder,
                 [folderId]: nextOpen,
@@ -798,14 +857,14 @@ export const useNotesStore = create<NotesState>()(
           return state.activeNoteContents[noteId];
         }
         if (state.loadingNoteIds[noteId]) {
-          return '';
+          return "";
         }
         set((s) => ({
           loadingNoteIds: { ...s.loadingNoteIds, [noteId]: true },
         }));
 
         try {
-          let content = '';
+          let content = "";
           if (filePath) {
             content = await fsApi.readFile(filePath);
           } else {
@@ -821,7 +880,10 @@ export const useNotesStore = create<NotesState>()(
             const nextLoading = { ...s.loadingNoteIds };
             delete nextLoading[noteId];
             return {
-              activeNoteContents: { ...s.activeNoteContents, [noteId]: content },
+              activeNoteContents: {
+                ...s.activeNoteContents,
+                [noteId]: content,
+              },
               loadingNoteIds: nextLoading,
             };
           });
@@ -833,7 +895,7 @@ export const useNotesStore = create<NotesState>()(
             delete nextLoading[noteId];
             return { loadingNoteIds: nextLoading };
           });
-          return '';
+          return "";
         }
       },
 
@@ -843,16 +905,18 @@ export const useNotesStore = create<NotesState>()(
           set((s) => ({
             folders: mapFolderById(s.folders, folderId, (folder) => ({
               ...folder,
-              items: updateFolderInTree(folder.items, subfolderId, (sub) => ({
-                ...sub,
+              items: updateFolderInTree(folder.items, subfolderId, {
                 children,
                 hasChildren: children.length > 0,
                 isLoaded: true,
-              })),
+              }),
             })),
           }));
         } catch (err) {
-          console.error(`Failed to load subfolder children for ${subfolderId}:`, err);
+          console.error(
+            `Failed to load subfolder children for ${subfolderId}:`,
+            err,
+          );
         }
       },
 
@@ -896,21 +960,33 @@ export const useNotesStore = create<NotesState>()(
       navigateToNote: (topFolderId, noteId) =>
         set((state) => {
           const currentOpen = state.openNotesByFolder[topFolderId] ?? [];
-          const nextOpen = currentOpen.includes(noteId) ? currentOpen : [...currentOpen, noteId];
+          const nextOpen = currentOpen.includes(noteId)
+            ? currentOpen
+            : [...currentOpen, noteId];
 
-          const targetTopFolder = state.folders.find((f) => f.id === topFolderId);
+          const targetTopFolder = state.folders.find(
+            (f) => f.id === topFolderId,
+          );
           const ancestors = targetTopFolder
             ? (findAncestorFolderIds(targetTopFolder.items, noteId) ?? [])
             : [];
           const ancestorSet = new Set(ancestors);
           const leaves = getAllLeaves(state.paneLayout);
 
-          if (state.isSplitViewActive && state.activePaneId && leaves.length > 1) {
-            const updatedLayout = updateLeafInTree(state.paneLayout!, state.activePaneId, (l) => ({
-              ...l,
-              folderId: topFolderId,
-              noteId,
-            }));
+          if (
+            state.isSplitViewActive &&
+            state.activePaneId &&
+            leaves.length > 1
+          ) {
+            const updatedLayout = updateLeafInTree(
+              state.paneLayout!,
+              state.activePaneId,
+              (l) => ({
+                ...l,
+                folderId: topFolderId,
+                noteId,
+              }),
+            );
             const updatedLeaves = getAllLeaves(updatedLayout);
             const secLeaf = updatedLeaves[1] ?? null;
             return {
@@ -918,8 +994,10 @@ export const useNotesStore = create<NotesState>()(
               paneLayout: updatedLayout,
               secondaryFolderId: secLeaf?.folderId ?? null,
               secondaryNoteId: secLeaf?.noteId ?? null,
-              secondaryViewMode: secLeaf?.viewMode ?? 'preview',
-              collapsedSubfolderIds: state.collapsedSubfolderIds.filter((id) => !ancestorSet.has(id)),
+              secondaryViewMode: secLeaf?.viewMode ?? "preview",
+              collapsedSubfolderIds: state.collapsedSubfolderIds.filter(
+                (id) => !ancestorSet.has(id),
+              ),
               openNotesByFolder: {
                 ...state.openNotesByFolder,
                 [topFolderId]: nextOpen,
@@ -941,12 +1019,15 @@ export const useNotesStore = create<NotesState>()(
               ...state.selectedNoteByFolder,
               [topFolderId]: noteId,
             },
-            collapsedSubfolderIds: state.collapsedSubfolderIds.filter((id) => !ancestorSet.has(id)),
+            collapsedSubfolderIds: state.collapsedSubfolderIds.filter(
+              (id) => !ancestorSet.has(id),
+            ),
           };
         }),
 
       toggleNoteLink: (activeNoteId, targetNoteId) => {
-        if (!activeNoteId || !targetNoteId || activeNoteId === targetNoteId) return;
+        if (!activeNoteId || !targetNoteId || activeNoteId === targetNoteId)
+          return;
         const state = get();
 
         let activeNote: NoteItem | null = null;
@@ -957,48 +1038,79 @@ export const useNotesStore = create<NotesState>()(
         }
         if (!activeNote || !targetNote) return;
 
-        const connections = resolveWorkspaceConnections(state.folders, activeNoteId);
+        const connections = resolveWorkspaceConnections(
+          state.folders,
+          activeNoteId,
+        );
         const isCurrentlyLinked = connections.linkedNoteIds.has(targetNoteId);
 
         if (isCurrentlyLinked) {
-          const nextActiveContent = removeWikiLinkFromContent(activeNote.content, targetNote.title);
-          const nextTargetContent = removeWikiLinkFromContent(targetNote.content, activeNote.title);
+          const nextActiveContent = removeWikiLinkFromContent(
+            activeNote.content,
+            targetNote.title,
+          );
+          const nextTargetContent = removeWikiLinkFromContent(
+            targetNote.content,
+            activeNote.title,
+          );
 
           set((s) => ({
             folders: s.folders.map((folder) => ({
               ...folder,
               items: updateNoteInTree(
-                updateNoteInTree(folder.items, activeNoteId, { content: nextActiveContent }),
+                updateNoteInTree(folder.items, activeNoteId, {
+                  content: nextActiveContent,
+                }),
                 targetNoteId,
-                { content: nextTargetContent }
+                { content: nextTargetContent },
               ),
             })),
           }));
 
           if (activeNote.filePath && nextActiveContent !== activeNote.content) {
-            void fsApi.writeFile(activeNote.filePath, nextActiveContent).catch((err) => {
-              console.error('Failed to write unlinked active note to disk:', err);
-            });
+            void fsApi
+              .writeFile(activeNote.filePath, nextActiveContent)
+              .catch((err) => {
+                console.error(
+                  "Failed to write unlinked active note to disk:",
+                  err,
+                );
+              });
           }
           if (targetNote.filePath && nextTargetContent !== targetNote.content) {
-            void fsApi.writeFile(targetNote.filePath, nextTargetContent).catch((err) => {
-              console.error('Failed to write unlinked target note to disk:', err);
-            });
+            void fsApi
+              .writeFile(targetNote.filePath, nextTargetContent)
+              .catch((err) => {
+                console.error(
+                  "Failed to write unlinked target note to disk:",
+                  err,
+                );
+              });
           }
         } else {
-          const nextActiveContent = appendWikiLinkToContent(activeNote.content, targetNote.title);
+          const nextActiveContent = appendWikiLinkToContent(
+            activeNote.content,
+            targetNote.title,
+          );
 
           set((s) => ({
             folders: s.folders.map((folder) => ({
               ...folder,
-              items: updateNoteInTree(folder.items, activeNoteId, { content: nextActiveContent }),
+              items: updateNoteInTree(folder.items, activeNoteId, {
+                content: nextActiveContent,
+              }),
             })),
           }));
 
           if (activeNote.filePath) {
-            void fsApi.writeFile(activeNote.filePath, nextActiveContent).catch((err) => {
-              console.error('Failed to write linked active note to disk:', err);
-            });
+            void fsApi
+              .writeFile(activeNote.filePath, nextActiveContent)
+              .catch((err) => {
+                console.error(
+                  "Failed to write linked active note to disk:",
+                  err,
+                );
+              });
           }
         }
       },
@@ -1009,10 +1121,10 @@ export const useNotesStore = create<NotesState>()(
         if (!currentFolder) return null;
 
         const newNote: NoteItem = {
-          id: createId('note'),
-          type: 'note',
-          title: 'Untitled Note',
-          content: '',
+          id: createId("note"),
+          type: "note",
+          title: "Untitled Note",
+          content: "",
           updatedAt: todayDateString(),
         };
 
@@ -1037,25 +1149,33 @@ export const useNotesStore = create<NotesState>()(
             ],
           },
           collapsedSubfolderIds: nextCollapsed,
-          viewMode: s.viewMode === 'preview' ? 'write' : s.viewMode,
+          viewMode: s.viewMode === "preview" ? "write" : s.viewMode,
           shouldFocusNoteTitle: true,
         }));
 
         const parentPath = resolveParentDiskPath(currentFolder, parentFolderId);
         if (parentPath) {
           try {
-            const diskNote = await fsApi.createFile(parentPath, 'Untitled Note.md', '');
+            const diskNote = await fsApi.createFile(
+              parentPath,
+              "Untitled Note.md",
+              "",
+            );
             set((s) => ({
-              folders: mapFolderById(s.folders, s.selectedFolderId, (folder) => ({
-                ...folder,
-                items: updateNoteInTree(folder.items, newNote.id, {
-                  title: diskNote.title,
-                  filePath: diskNote.filePath,
+              folders: mapFolderById(
+                s.folders,
+                s.selectedFolderId,
+                (folder) => ({
+                  ...folder,
+                  items: updateNoteInTree(folder.items, newNote.id, {
+                    title: diskNote.title,
+                    filePath: diskNote.filePath,
+                  }),
                 }),
-              })),
+              ),
             }));
           } catch (err) {
-            console.error('Failed to create file on disk:', err);
+            console.error("Failed to create file on disk:", err);
           }
         }
 
@@ -1070,10 +1190,10 @@ export const useNotesStore = create<NotesState>()(
         const sourceNote = findNoteNode(currentFolder.items, noteId);
         if (!sourceNote) return null;
 
-        const copyTitle = `${(sourceNote.title || 'Untitled').trim()} (Copy)`;
+        const copyTitle = `${(sourceNote.title || "Untitled").trim()} (Copy)`;
         const duplicated: NoteItem = {
-          id: createId('note'),
-          type: 'note',
+          id: createId("note"),
+          type: "note",
           title: copyTitle,
           content: sourceNote.content,
           fileType: sourceNote.fileType,
@@ -1100,21 +1220,29 @@ export const useNotesStore = create<NotesState>()(
         }));
 
         const parentPath = resolveParentDiskPath(currentFolder, parentFolderId);
-        if (parentPath && sourceNote.fileType !== 'pdf') {
+        if (parentPath && sourceNote.fileType !== "pdf") {
           try {
             const filename = `${sanitizeFilename(copyTitle)}.md`;
-            const diskNote = await fsApi.createFile(parentPath, filename, sourceNote.content);
+            const diskNote = await fsApi.createFile(
+              parentPath,
+              filename,
+              sourceNote.content,
+            );
             set((s) => ({
-              folders: mapFolderById(s.folders, s.selectedFolderId, (folder) => ({
-                ...folder,
-                items: updateNoteInTree(folder.items, duplicated.id, {
-                  title: diskNote.title,
-                  filePath: diskNote.filePath,
+              folders: mapFolderById(
+                s.folders,
+                s.selectedFolderId,
+                (folder) => ({
+                  ...folder,
+                  items: updateNoteInTree(folder.items, duplicated.id, {
+                    title: diskNote.title,
+                    filePath: diskNote.filePath,
+                  }),
                 }),
-              })),
+              ),
             }));
           } catch (err) {
-            console.error('Failed to duplicate file on disk:', err);
+            console.error("Failed to duplicate file on disk:", err);
           }
         }
 
@@ -1127,9 +1255,9 @@ export const useNotesStore = create<NotesState>()(
         if (!currentFolder) return null;
 
         const newSubfolder: FolderItem = {
-          id: createId('sub'),
-          type: 'folder',
-          name: 'New Folder',
+          id: createId("sub"),
+          type: "folder",
+          name: "New Folder",
           children: [],
         };
 
@@ -1149,18 +1277,25 @@ export const useNotesStore = create<NotesState>()(
         const parentPath = resolveParentDiskPath(currentFolder, parentFolderId);
         if (parentPath) {
           try {
-            const diskFolder = await fsApi.createFolder(parentPath, newSubfolder.name);
+            const diskFolder = await fsApi.createFolder(
+              parentPath,
+              newSubfolder.name,
+            );
             set((s) => ({
-              folders: mapFolderById(s.folders, s.selectedFolderId, (folder) => ({
-                ...folder,
-                items: updateFolderInTree(folder.items, newSubfolder.id, {
-                  name: diskFolder.name,
-                  folderPath: diskFolder.folderPath,
+              folders: mapFolderById(
+                s.folders,
+                s.selectedFolderId,
+                (folder) => ({
+                  ...folder,
+                  items: updateFolderInTree(folder.items, newSubfolder.id, {
+                    name: diskFolder.name,
+                    folderPath: diskFolder.folderPath,
+                  }),
                 }),
-              })),
+              ),
             }));
           } catch (err) {
-            console.error('Failed to create folder on disk:', err);
+            console.error("Failed to create folder on disk:", err);
           }
         }
 
@@ -1172,13 +1307,18 @@ export const useNotesStore = create<NotesState>()(
         const currentFolder = getSelectedTopFolder(state);
         if (!currentFolder) return;
 
-        const targetSubfolder = findFolderNode(currentFolder.items, subfolderId);
+        const targetSubfolder = findFolderNode(
+          currentFolder.items,
+          subfolderId,
+        );
         const oldFolderPath = targetSubfolder?.folderPath;
 
         set((s) => ({
           folders: mapFolderById(s.folders, s.selectedFolderId, (folder) => ({
             ...folder,
-            items: updateFolderInTree(folder.items, subfolderId, { name: newName }),
+            items: updateFolderInTree(folder.items, subfolderId, {
+              name: newName,
+            }),
           })),
         }));
 
@@ -1193,7 +1333,7 @@ export const useNotesStore = create<NotesState>()(
                 void get().syncFolderFromDisk(currentFolder.id);
               })
               .catch((err) => {
-                console.error('Failed to rename folder on disk:', err);
+                console.error("Failed to rename folder on disk:", err);
               });
           }
         }
@@ -1206,7 +1346,9 @@ export const useNotesStore = create<NotesState>()(
 
         const nodeToDelete = findNodeById(currentFolder.items, nodeId);
         const diskPath =
-          nodeToDelete?.type === 'note' ? nodeToDelete.filePath : nodeToDelete?.folderPath;
+          nodeToDelete?.type === "note"
+            ? nodeToDelete.filePath
+            : nodeToDelete?.folderPath;
         const isSecondaryDeleted = state.secondaryNoteId === nodeId;
 
         set((s) => ({
@@ -1218,15 +1360,17 @@ export const useNotesStore = create<NotesState>()(
             Object.entries(s.openNotesByFolder).map(([fId, ids]) => [
               fId,
               ids.filter((id) => id !== nodeId),
-            ])
+            ]),
           ),
-          collapsedSubfolderIds: s.collapsedSubfolderIds.filter((id) => id !== nodeId),
+          collapsedSubfolderIds: s.collapsedSubfolderIds.filter(
+            (id) => id !== nodeId,
+          ),
           ...(isSecondaryDeleted ? { secondaryNoteId: null } : {}),
         }));
 
         if (diskPath) {
           fsApi.deletePath(diskPath).catch((err) => {
-            console.error('Failed to delete path on disk:', err);
+            console.error("Failed to delete path on disk:", err);
           });
         }
       },
@@ -1257,7 +1401,7 @@ export const useNotesStore = create<NotesState>()(
             ...folder,
             items: updateNoteInTree(folder.items, noteId, {
               ...updates,
-              content: '', // RFC-042: tree node does not hold raw file body
+              content: "", // RFC-042: tree node does not hold raw file body
             }),
           })),
         }));
@@ -1275,7 +1419,7 @@ export const useNotesStore = create<NotesState>()(
             try {
               await fsApi.writeFile(currentFilePath, updates.content!);
             } catch (err) {
-              console.error('Failed to write file to disk:', err);
+              console.error("Failed to write file to disk:", err);
             }
           }, CONTENT_SAVE_DEBOUNCE_MS);
           contentSaveTimers.set(currentFilePath, timer);
@@ -1296,18 +1440,25 @@ export const useNotesStore = create<NotesState>()(
               const cleanName = sanitizeFilename(updates.title!.trim());
               const newPath = joinPath(dir, `${cleanName}.md`);
               if (newPath !== currentFilePath) {
-                const actualPath = await fsApi.renamePath(currentFilePath, newPath);
+                const actualPath = await fsApi.renamePath(
+                  currentFilePath,
+                  newPath,
+                );
                 set((s) => ({
-                  folders: mapFolderById(s.folders, targetFolderId, (folder) => ({
-                    ...folder,
-                    items: updateNoteInTree(folder.items, noteId, {
-                      filePath: actualPath,
+                  folders: mapFolderById(
+                    s.folders,
+                    targetFolderId,
+                    (folder) => ({
+                      ...folder,
+                      items: updateNoteInTree(folder.items, noteId, {
+                        filePath: actualPath,
+                      }),
                     }),
-                  })),
+                  ),
                 }));
               }
             } catch (err) {
-              console.error('Failed to rename note file on disk:', err);
+              console.error("Failed to rename note file on disk:", err);
             }
           }, TITLE_RENAME_DEBOUNCE_MS);
           titleRenameTimers.set(noteId, timer);
@@ -1321,8 +1472,8 @@ export const useNotesStore = create<NotesState>()(
 
           if (!state.selectedFolderId) {
             const newTopFolder: TopLevelFolder = {
-              id: createId('top'),
-              name: 'Imported',
+              id: createId("top"),
+              name: "Imported",
               items: importedNotes,
             };
             return {
@@ -1336,10 +1487,14 @@ export const useNotesStore = create<NotesState>()(
           }
 
           return {
-            folders: mapFolderById(state.folders, state.selectedFolderId, (folder) => ({
-              ...folder,
-              items: [...folder.items, ...importedNotes],
-            })),
+            folders: mapFolderById(
+              state.folders,
+              state.selectedFolderId,
+              (folder) => ({
+                ...folder,
+                items: [...folder.items, ...importedNotes],
+              }),
+            ),
             selectedNoteByFolder: {
               ...state.selectedNoteByFolder,
               [state.selectedFolderId]: firstNoteId,
@@ -1356,16 +1511,21 @@ export const useNotesStore = create<NotesState>()(
       importFolder: (rootName, items, placement, localPath) =>
         set((state) => {
           const isTopLevel =
-            placement === true || placement === 'new-tab' || !state.selectedFolderId;
+            placement === true ||
+            placement === "new-tab" ||
+            !state.selectedFolderId;
 
           if (isTopLevel) {
             const newTopFolder: TopLevelFolder = {
-              id: createId('top'),
+              id: createId("top"),
               name: rootName,
               items,
               localPath,
             };
-            const firstNoteId = findDefaultNoteId(newTopFolder.items, state.sortOrder);
+            const firstNoteId = findDefaultNoteId(
+              newTopFolder.items,
+              state.sortOrder,
+            );
             return {
               folders: [...state.folders, newTopFolder],
               selectedFolderId: newTopFolder.id,
@@ -1382,16 +1542,21 @@ export const useNotesStore = create<NotesState>()(
             };
           }
 
-          if (placement === 'current-tab' && state.selectedFolderId) {
+          if (placement === "current-tab" && state.selectedFolderId) {
             const activeFolderId = state.selectedFolderId;
             const firstNoteId = findDefaultNoteId(items, state.sortOrder);
             return {
-              folders: mapFolderById(state.folders, activeFolderId, (folder) => ({
-                ...folder,
-                name: folder.name === 'Untitled Folder' ? rootName : folder.name,
-                items: [...folder.items, ...items],
-                localPath: localPath ?? folder.localPath,
-              })),
+              folders: mapFolderById(
+                state.folders,
+                activeFolderId,
+                (folder) => ({
+                  ...folder,
+                  name:
+                    folder.name === "Untitled Folder" ? rootName : folder.name,
+                  items: [...folder.items, ...items],
+                  localPath: localPath ?? folder.localPath,
+                }),
+              ),
               selectedNoteByFolder:
                 !state.selectedNoteByFolder[activeFolderId] && firstNoteId
                   ? {
@@ -1403,18 +1568,25 @@ export const useNotesStore = create<NotesState>()(
           }
 
           const newSubfolder: FolderItem = {
-            id: createId('sub'),
-            type: 'folder',
+            id: createId("sub"),
+            type: "folder",
             name: rootName,
             children: items,
             folderPath: localPath,
           };
-          const firstNoteId = findDefaultNoteId(newSubfolder.children, state.sortOrder);
+          const firstNoteId = findDefaultNoteId(
+            newSubfolder.children,
+            state.sortOrder,
+          );
           return {
-            folders: mapFolderById(state.folders, state.selectedFolderId!, (folder) => ({
-              ...folder,
-              items: [...folder.items, newSubfolder],
-            })),
+            folders: mapFolderById(
+              state.folders,
+              state.selectedFolderId!,
+              (folder) => ({
+                ...folder,
+                items: [...folder.items, newSubfolder],
+              }),
+            ),
             selectedNoteByFolder: firstNoteId
               ? {
                   ...state.selectedNoteByFolder,
@@ -1442,9 +1614,14 @@ export const useNotesStore = create<NotesState>()(
           const latestFolder = get().folders.find((f) => f.id === folderId);
           if (!latestFolder || !latestFolder.localPath) return false;
 
-          const mergedItems = matchAndPreserveIds(result.items, latestFolder.items);
+          const mergedItems = matchAndPreserveIds(
+            result.items,
+            latestFolder.items,
+          );
           const nextName =
-            latestFolder.name === 'Untitled Folder' ? result.rootName : latestFolder.name;
+            latestFolder.name === "Untitled Folder"
+              ? result.rootName
+              : latestFolder.name;
 
           if (
             areNodeTreesEqual(latestFolder.items, mergedItems) &&
@@ -1480,19 +1657,25 @@ export const useNotesStore = create<NotesState>()(
           });
           return true;
         } catch (err) {
-          console.error('Failed to sync folder from disk:', err);
+          console.error("Failed to sync folder from disk:", err);
           return false;
         } finally {
           set({ isSyncingFolderId: null });
         }
       },
 
-      linkFolderToDisk: async (folderId: string, localPath: string): Promise<boolean> => {
+      linkFolderToDisk: async (
+        folderId: string,
+        localPath: string,
+      ): Promise<boolean> => {
         const folder = get().folders.find((f) => f.id === folderId);
         if (!folder) return false;
 
         set((state) => ({
-          folders: mapFolderById(state.folders, folderId, (f) => ({ ...f, localPath })),
+          folders: mapFolderById(state.folders, folderId, (f) => ({
+            ...f,
+            localPath,
+          })),
         }));
 
         return await get().syncFolderFromDisk(folderId);
@@ -1507,16 +1690,22 @@ export const useNotesStore = create<NotesState>()(
         }));
       },
 
-      openLocalFolderAsTab: async (localPath: string, customName?: string): Promise<boolean> => {
+      openLocalFolderAsTab: async (
+        localPath: string,
+        customName?: string,
+      ): Promise<boolean> => {
         try {
           const result = await fsApi.scanFolder(localPath);
           const newTopFolder: TopLevelFolder = {
-            id: createId('top'),
-            name: customName?.trim() || result.rootName || 'Local Notes',
+            id: createId("top"),
+            name: customName?.trim() || result.rootName || "Local Notes",
             items: result.items,
             localPath: result.rootPath,
           };
-          const firstNoteId = findDefaultNoteId(newTopFolder.items, get().sortOrder);
+          const firstNoteId = findDefaultNoteId(
+            newTopFolder.items,
+            get().sortOrder,
+          );
 
           set((state) => ({
             folders: [...state.folders, newTopFolder],
@@ -1536,7 +1725,7 @@ export const useNotesStore = create<NotesState>()(
           }));
           return true;
         } catch (err) {
-          console.error('Failed to open local folder as tab:', err);
+          console.error("Failed to open local folder as tab:", err);
           throw err;
         }
       },
@@ -1545,11 +1734,20 @@ export const useNotesStore = create<NotesState>()(
         const state = get();
         const exists = state.collapsedSubfolderIds.includes(subfolderId);
         if (exists && state.selectedFolderId) {
-          const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+          const currentFolder = state.folders.find(
+            (f) => f.id === state.selectedFolderId,
+          );
           if (currentFolder) {
             const node = findFolderNode(currentFolder.items, subfolderId);
-            if (node?.folderPath && (!node.children || node.children.length === 0)) {
-              void get().loadSubfolderChildren(currentFolder.id, subfolderId, node.folderPath);
+            if (
+              node?.folderPath &&
+              (!node.children || node.children.length === 0)
+            ) {
+              void get().loadSubfolderChildren(
+                currentFolder.id,
+                subfolderId,
+                node.folderPath,
+              );
             }
           }
         }
@@ -1564,55 +1762,86 @@ export const useNotesStore = create<NotesState>()(
         const state = get();
         if (!state.collapsedSubfolderIds.includes(subfolderId)) return;
         if (state.selectedFolderId) {
-          const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+          const currentFolder = state.folders.find(
+            (f) => f.id === state.selectedFolderId,
+          );
           if (currentFolder) {
             const node = findFolderNode(currentFolder.items, subfolderId);
-            if (node?.folderPath && (!node.children || node.children.length === 0)) {
-              void get().loadSubfolderChildren(currentFolder.id, subfolderId, node.folderPath);
+            if (
+              node?.folderPath &&
+              (!node.children || node.children.length === 0)
+            ) {
+              void get().loadSubfolderChildren(
+                currentFolder.id,
+                subfolderId,
+                node.folderPath,
+              );
             }
           }
         }
         set({
-          collapsedSubfolderIds: state.collapsedSubfolderIds.filter((id) => id !== subfolderId),
+          collapsedSubfolderIds: state.collapsedSubfolderIds.filter(
+            (id) => id !== subfolderId,
+          ),
         });
       },
 
       collapseAllSubfolders: () => {
         const state = get();
-        const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+        const currentFolder = state.folders.find(
+          (f) => f.id === state.selectedFolderId,
+        );
         if (!currentFolder) return;
-        const { mainFolderIds, collapsibleFolderIds } = classifyExplorerFolders(currentFolder.items);
+        const { mainFolderIds, collapsibleFolderIds } = classifyExplorerFolders(
+          currentFolder.items,
+        );
         if (collapsibleFolderIds.length === 0) return;
         // Keep main/parent container folders open, and collapse all target collapsible folders
         const mainSet = new Set(mainFolderIds);
-        const nextCollapsed = state.collapsedSubfolderIds.filter((id) => !mainSet.has(id));
+        const nextCollapsed = state.collapsedSubfolderIds.filter(
+          (id) => !mainSet.has(id),
+        );
         set({
-          collapsedSubfolderIds: Array.from(new Set([...nextCollapsed, ...collapsibleFolderIds])),
+          collapsedSubfolderIds: Array.from(
+            new Set([...nextCollapsed, ...collapsibleFolderIds]),
+          ),
         });
       },
 
       expandAllSubfolders: () => {
         const state = get();
-        const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+        const currentFolder = state.folders.find(
+          (f) => f.id === state.selectedFolderId,
+        );
         if (!currentFolder) {
           set({ collapsedSubfolderIds: [] });
           return;
         }
-        const { mainFolderIds, collapsibleFolderIds } = classifyExplorerFolders(currentFolder.items);
+        const { mainFolderIds, collapsibleFolderIds } = classifyExplorerFolders(
+          currentFolder.items,
+        );
         const toExpand = new Set([...mainFolderIds, ...collapsibleFolderIds]);
         set({
-          collapsedSubfolderIds: state.collapsedSubfolderIds.filter((id) => !toExpand.has(id)),
+          collapsedSubfolderIds: state.collapsedSubfolderIds.filter(
+            (id) => !toExpand.has(id),
+          ),
         });
       },
 
       toggleCollapseAllSubfolders: () => {
         const state = get();
-        const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+        const currentFolder = state.folders.find(
+          (f) => f.id === state.selectedFolderId,
+        );
         if (!currentFolder) return;
-        const { collapsibleFolderIds } = classifyExplorerFolders(currentFolder.items);
+        const { collapsibleFolderIds } = classifyExplorerFolders(
+          currentFolder.items,
+        );
         if (collapsibleFolderIds.length === 0) return;
         const collapsedSet = new Set(state.collapsedSubfolderIds);
-        const allAreCollapsed = collapsibleFolderIds.every((id) => collapsedSet.has(id));
+        const allAreCollapsed = collapsibleFolderIds.every((id) =>
+          collapsedSet.has(id),
+        );
         if (allAreCollapsed) {
           get().expandAllSubfolders();
         } else {
@@ -1645,7 +1874,11 @@ export const useNotesStore = create<NotesState>()(
           }
         }
 
-        const newLeaf = createLeafNode(fId ?? state.selectedFolderId, nId, 'write');
+        const newLeaf = createLeafNode(
+          fId ?? state.selectedFolderId,
+          nId,
+          "write",
+        );
 
         let nextLayout: PaneLayoutNode;
         if (!state.paneLayout || getAllLeaves(state.paneLayout).length <= 1) {
@@ -1658,11 +1891,11 @@ export const useNotesStore = create<NotesState>()(
             primaryFolderId,
             primaryNoteId,
             state.viewMode,
-            'pane-primary'
+            "pane-primary",
           );
           nextLayout = {
             id: createBranchId(),
-            type: 'branch',
+            type: "branch",
             direction,
             children: [primaryLeaf, newLeaf],
             sizes: [0.5, 0.5],
@@ -1670,8 +1903,15 @@ export const useNotesStore = create<NotesState>()(
         } else {
           // Split from specific origin pane
           const originId =
-            fromPaneId ?? state.activePaneId ?? getAllLeaves(state.paneLayout)[0].id;
-          nextLayout = splitLeafInTree(state.paneLayout, originId, direction, newLeaf);
+            fromPaneId ??
+            state.activePaneId ??
+            getAllLeaves(state.paneLayout)[0].id;
+          nextLayout = splitLeafInTree(
+            state.paneLayout,
+            originId,
+            direction,
+            newLeaf,
+          );
         }
 
         const leaves = getAllLeaves(nextLayout);
@@ -1681,11 +1921,12 @@ export const useNotesStore = create<NotesState>()(
           paneLayout: nextLayout,
           activePaneId: newLeaf.id,
           isSplitViewActive: leaves.length > 1,
-          splitDirection: nextLayout.type === 'branch' ? nextLayout.direction : direction,
+          splitDirection:
+            nextLayout.type === "branch" ? nextLayout.direction : direction,
           secondaryFolderId: secLeaf?.folderId ?? null,
           secondaryNoteId: secLeaf?.noteId ?? null,
-          secondaryViewMode: secLeaf?.viewMode ?? 'preview',
-          activePane: newLeaf.id === leaves[0]?.id ? 'primary' : 'secondary',
+          secondaryViewMode: secLeaf?.viewMode ?? "preview",
+          activePane: newLeaf.id === leaves[0]?.id ? "primary" : "secondary",
         });
       },
 
@@ -1693,12 +1934,16 @@ export const useNotesStore = create<NotesState>()(
         const state = get();
         if (!state.paneLayout) {
           set((s) => ({
-            splitDirection: s.splitDirection === 'horizontal' ? 'vertical' : 'horizontal',
+            splitDirection:
+              s.splitDirection === "horizontal" ? "vertical" : "horizontal",
           }));
           return;
         }
         const updatedLayout = toggleBranchDirection(state.paneLayout, branchId);
-        const dir = updatedLayout.type === 'branch' ? updatedLayout.direction : 'horizontal';
+        const dir =
+          updatedLayout.type === "branch"
+            ? updatedLayout.direction
+            : "horizontal";
         set({
           paneLayout: updatedLayout,
           splitDirection: dir,
@@ -1712,21 +1957,27 @@ export const useNotesStore = create<NotesState>()(
         const leaves = getAllLeaves(state.paneLayout);
         let paneIdToClose: string | null = null;
 
-        if (typeof targetPane === 'string' && targetPane !== 'primary' && targetPane !== 'secondary') {
+        if (
+          typeof targetPane === "string" &&
+          targetPane !== "primary" &&
+          targetPane !== "secondary"
+        ) {
           paneIdToClose = targetPane;
-        } else if (targetPane === 'primary') {
+        } else if (targetPane === "primary") {
           paneIdToClose = leaves[0]?.id ?? null;
-        } else if (targetPane === 'secondary') {
+        } else if (targetPane === "secondary") {
           paneIdToClose = leaves[1]?.id ?? null;
         } else {
-          paneIdToClose = state.activePaneId ?? leaves[leaves.length - 1]?.id ?? null;
+          paneIdToClose =
+            state.activePaneId ?? leaves[leaves.length - 1]?.id ?? null;
         }
 
         if (!paneIdToClose) return;
 
         const nextLayout = removeLeafFromTree(state.paneLayout, paneIdToClose);
-        if (!nextLayout || nextLayout.type === 'leaf') {
-          const remainingLeaf = nextLayout ?? (leaves.find((l) => l.id !== paneIdToClose) ?? null);
+        if (!nextLayout || nextLayout.type === "leaf") {
+          const remainingLeaf =
+            nextLayout ?? leaves.find((l) => l.id !== paneIdToClose) ?? null;
           if (remainingLeaf && remainingLeaf.folderId && remainingLeaf.noteId) {
             const fId = remainingLeaf.folderId;
             const nId = remainingLeaf.noteId;
@@ -1740,7 +1991,7 @@ export const useNotesStore = create<NotesState>()(
                 [fId]: nId,
               },
               viewMode: remainingLeaf.viewMode,
-              activePane: 'primary',
+              activePane: "primary",
               secondaryFolderId: null,
               secondaryNoteId: null,
             }));
@@ -1749,7 +2000,7 @@ export const useNotesStore = create<NotesState>()(
               paneLayout: null,
               activePaneId: null,
               isSplitViewActive: false,
-              activePane: 'primary',
+              activePane: "primary",
               secondaryFolderId: null,
               secondaryNoteId: null,
             });
@@ -1770,8 +2021,9 @@ export const useNotesStore = create<NotesState>()(
           isSplitViewActive: remainingLeaves.length > 1,
           secondaryFolderId: secLeaf?.folderId ?? null,
           secondaryNoteId: secLeaf?.noteId ?? null,
-          secondaryViewMode: secLeaf?.viewMode ?? 'preview',
-          activePane: nextActiveId === remainingLeaves[0]?.id ? 'primary' : 'secondary',
+          secondaryViewMode: secLeaf?.viewMode ?? "preview",
+          activePane:
+            nextActiveId === remainingLeaves[0]?.id ? "primary" : "secondary",
         });
       },
 
@@ -1779,7 +2031,9 @@ export const useNotesStore = create<NotesState>()(
         const state = get();
         if (!state.paneLayout) return;
         const targetId = keepPaneId ?? state.activePaneId;
-        const targetLeaf = targetId ? findLeaf(state.paneLayout, targetId) : null;
+        const targetLeaf = targetId
+          ? findLeaf(state.paneLayout, targetId)
+          : null;
         if (!targetLeaf) {
           get().closeSplitView();
           return;
@@ -1797,7 +2051,7 @@ export const useNotesStore = create<NotesState>()(
               [fId]: nId,
             },
             viewMode: targetLeaf.viewMode,
-            activePane: 'primary',
+            activePane: "primary",
             secondaryFolderId: null,
             secondaryNoteId: null,
           }));
@@ -1809,13 +2063,13 @@ export const useNotesStore = create<NotesState>()(
       toggleSplitView: () => {
         const state = get();
         if (state.isSplitViewActive) {
-          get().closePane('secondary');
+          get().closePane("secondary");
         } else {
-          get().splitPane('horizontal');
+          get().splitPane("horizontal");
         }
       },
 
-      openInSplitView: (folderId, noteId, direction = 'horizontal') => {
+      openInSplitView: (folderId, noteId, direction = "horizontal") => {
         get().splitPane(direction, folderId, noteId);
       },
 
@@ -1829,17 +2083,17 @@ export const useNotesStore = create<NotesState>()(
         const isPrimary = leaves[0]?.id === paneId;
         set({
           activePaneId: paneId,
-          activePane: isPrimary ? 'primary' : 'secondary',
+          activePane: isPrimary ? "primary" : "secondary",
         });
       },
 
       setActivePane: (pane) => {
         const state = get();
         const leaves = getAllLeaves(state.paneLayout);
-        if (pane === 'primary' && leaves[0]) {
-          set({ activePaneId: leaves[0].id, activePane: 'primary' });
-        } else if (pane === 'secondary' && leaves[1]) {
-          set({ activePaneId: leaves[1].id, activePane: 'secondary' });
+        if (pane === "primary" && leaves[0]) {
+          set({ activePaneId: leaves[0].id, activePane: "primary" });
+        } else if (pane === "secondary" && leaves[1]) {
+          set({ activePaneId: leaves[1].id, activePane: "secondary" });
         } else {
           set({ activePane: pane });
         }
@@ -1848,11 +2102,15 @@ export const useNotesStore = create<NotesState>()(
       setPaneNote: (paneId, folderId, noteId) => {
         const state = get();
         if (!state.paneLayout) return;
-        const updatedLayout = updateLeafInTree(state.paneLayout, paneId, (l) => ({
-          ...l,
-          folderId,
-          noteId,
-        }));
+        const updatedLayout = updateLeafInTree(
+          state.paneLayout,
+          paneId,
+          (l) => ({
+            ...l,
+            folderId,
+            noteId,
+          }),
+        );
         const leaves = getAllLeaves(updatedLayout);
         const secLeaf = leaves[1] ?? null;
         set({
@@ -1866,17 +2124,26 @@ export const useNotesStore = create<NotesState>()(
       setPaneViewMode: (paneId, mode) => {
         const state = get();
         if (!state.paneLayout) return;
-        const updatedLayout = updateLeafInTree(state.paneLayout, paneId, (l) => ({
-          ...l,
-          viewMode: mode,
-        }));
+        const updatedLayout = updateLeafInTree(
+          state.paneLayout,
+          paneId,
+          (l) => ({
+            ...l,
+            viewMode: mode,
+          }),
+        );
         set({ paneLayout: updatedLayout });
       },
 
       resizePaneBranch: (branchId, index, deltaRatio) => {
         const state = get();
         if (!state.paneLayout) return;
-        const updatedLayout = resizeBranchInTree(state.paneLayout, branchId, index, deltaRatio);
+        const updatedLayout = resizeBranchInTree(
+          state.paneLayout,
+          branchId,
+          index,
+          deltaRatio,
+        );
         set({ paneLayout: updatedLayout });
       },
 
@@ -1896,7 +2163,7 @@ export const useNotesStore = create<NotesState>()(
           set({
             secondaryFolderId: folderId,
             secondaryNoteId: noteId,
-            activePane: 'secondary',
+            activePane: "secondary",
           });
         }
       },
@@ -1910,17 +2177,31 @@ export const useNotesStore = create<NotesState>()(
         set({ secondaryViewMode: mode });
       },
 
-      toggleSidebar: () => set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
-      toggleNavbar: () => set((state) => ({ isNavbarCollapsed: !state.isNavbarCollapsed })),
+      toggleSidebar: () =>
+        set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
+      toggleNavbar: () =>
+        set((state) => ({ isNavbarCollapsed: !state.isNavbarCollapsed })),
       toggleRightSidebar: () =>
-        set((state) => ({ isRightSidebarCollapsed: !state.isRightSidebarCollapsed })),
+        set((state) => ({
+          isRightSidebarCollapsed: !state.isRightSidebarCollapsed,
+        })),
       setSidebarWidth: (width) =>
-        set({ sidebarWidth: clamp(width, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH) }),
+        set({
+          sidebarWidth: clamp(width, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH),
+        }),
       setRightSidebarWidth: (width) =>
-        set({ rightSidebarWidth: clamp(width, MIN_SIDEBAR_WIDTH, MAX_RIGHT_SIDEBAR_WIDTH) }),
+        set({
+          rightSidebarWidth: clamp(
+            width,
+            MIN_SIDEBAR_WIDTH,
+            MAX_RIGHT_SIDEBAR_WIDTH,
+          ),
+        }),
       setRightSidebarTab: (tab) => set({ rightSidebarTab: tab }),
       setEditorSplitRatio: (ratio) =>
-        set({ editorSplitRatio: clamp(ratio, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO) }),
+        set({
+          editorSplitRatio: clamp(ratio, MIN_SPLIT_RATIO, MAX_SPLIT_RATIO),
+        }),
       setSortOrder: (order) => set({ sortOrder: order }),
 
       chooseTheme: (nextTheme) => {
@@ -1929,7 +2210,7 @@ export const useNotesStore = create<NotesState>()(
         set({ theme: nextTheme });
       },
 
-      openLinkModal: (mode = 'new-tab') =>
+      openLinkModal: (mode = "new-tab") =>
         set({ isLinkModalOpen: true, linkModalTargetMode: mode }),
       closeLinkModal: () => set({ isLinkModalOpen: false }),
       openSessionModal: () => set({ isSessionModalOpen: true }),
@@ -1939,12 +2220,9 @@ export const useNotesStore = create<NotesState>()(
         set({ currentSessionName: name });
         void sessionApi.renameSession(get().currentSessionId, name);
       },
-      openThemeModal: () =>
-        set({ isSettingsModalOpen: true, isThemeModalOpen: true, settingsActiveTab: 'theme' }),
-      closeThemeModal: () => set({ isSettingsModalOpen: false, isThemeModalOpen: false }),
-      openSettingsModal: (tab = 'theme') =>
-        set({ isSettingsModalOpen: true, isThemeModalOpen: true, settingsActiveTab: tab }),
-      closeSettingsModal: () => set({ isSettingsModalOpen: false, isThemeModalOpen: false }),
+      openSettingsModal: (tab = "theme") =>
+        set({ isSettingsModalOpen: true, settingsActiveTab: tab }),
+      closeSettingsModal: () => set({ isSettingsModalOpen: false }),
       setSettingsActiveTab: (tab) => set({ settingsActiveTab: tab }),
 
       updateFontSettings: (updates) => {
@@ -1965,7 +2243,7 @@ export const useNotesStore = create<NotesState>()(
       clearFocusNoteTitle: () => set({ shouldFocusNoteTitle: false }),
     }),
     {
-      name: 'pentnotes-workspace-v1',
+      name: "pentnotes-workspace-v1",
       storage: createJSONStorage(() => workspaceStorage),
       partialize: (state) => ({
         folders: state.folders,
@@ -2006,11 +2284,11 @@ export const useNotesStore = create<NotesState>()(
           } else {
             applyFontSettings(initialFontSettings());
           }
-          if ((state.viewMode as string) === 'split') {
-            state.setViewMode('write');
+          if ((state.viewMode as string) === "split") {
+            state.setViewMode("write");
           }
-          if ((state.secondaryViewMode as string) === 'split') {
-            state.setSecondaryViewMode('preview');
+          if ((state.secondaryViewMode as string) === "split") {
+            state.setSecondaryViewMode("preview");
           }
           if (state.paneLayout && getAllLeaves(state.paneLayout).length > 1) {
             state.isSplitViewActive = true;
@@ -2027,6 +2305,6 @@ export const useNotesStore = create<NotesState>()(
           .catch(() => {});
         state?.setHydrated(true);
       },
-    }
-  )
+    },
+  ),
 );

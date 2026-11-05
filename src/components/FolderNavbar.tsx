@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -10,7 +16,6 @@ import {
   Layers,
   Link2,
   Notebook,
-  Palette,
   PanelTopClose,
   PanelTopOpen,
   Pencil,
@@ -20,52 +25,55 @@ import {
   Settings,
   Trash2,
   Unlink,
-} from 'lucide-react';
-import { useClickOutside } from '../hooks/useDomInteractions';
-import { resolveWorkspaceConnections } from '../lib/catalogUtils';
-import { NOTE_FILE_ACCEPT } from '../lib/fileUtils';
-import { sessionApi } from '../lib/sessionManager';
-import { resolveActiveNoteData, useNotesStore } from '../store/useNotesStore';
-import { themes } from '../themes';
-import { TabGroup, TabGroupColorId, TopLevelFolder } from '../types';
+} from "lucide-react";
+import { useClickOutside } from "../hooks/useDomInteractions";
+import { resolveWorkspaceConnections } from "../lib/catalogUtils";
+import { NOTE_FILE_ACCEPT } from "../lib/fileUtils";
+import { sessionApi } from "../lib/sessionManager";
+import { resolveActiveNoteData, useNotesStore } from "../store/useNotesStore";
+import { TabGroup, TabGroupColorId, TopLevelFolder } from "../types";
 
 interface FolderNavbarProps {
   onOpenSearch: () => void;
 }
 
-const GROUP_COLOR_SWATCHES: Array<{ id: TabGroupColorId; label: string; hex: string }> = [
-  { id: 'cyan', label: 'Cyan', hex: '#00e5ff' },
-  { id: 'emerald', label: 'Emerald', hex: '#10b981' },
-  { id: 'amber', label: 'Amber', hex: '#f59e0b' },
-  { id: 'purple', label: 'Purple', hex: '#c084fc' },
-  { id: 'rose', label: 'Rose', hex: '#f43f5e' },
-  { id: 'blue', label: 'Blue', hex: '#3b82f6' },
+const GROUP_COLOR_SWATCHES: Array<{
+  id: TabGroupColorId;
+  label: string;
+  hex: string;
+}> = [
+  { id: "cyan", label: "Cyan", hex: "#00e5ff" },
+  { id: "emerald", label: "Emerald", hex: "#10b981" },
+  { id: "amber", label: "Amber", hex: "#f59e0b" },
+  { id: "purple", label: "Purple", hex: "#c084fc" },
+  { id: "rose", label: "Rose", hex: "#f43f5e" },
+  { id: "blue", label: "Blue", hex: "#3b82f6" },
 ];
 
 type NavbarContextMenuState =
   | {
-      kind: 'tab';
+      kind: "tab";
       folder: TopLevelFolder;
       x: number;
       y: number;
     }
   | {
-      kind: 'group';
+      kind: "group";
       group: TabGroup;
       x: number;
       y: number;
     };
 
 type TabSegment =
-  | { kind: 'single'; folder: TopLevelFolder }
-  | { kind: 'group'; group: TabGroup; folders: TopLevelFolder[] };
+  | { kind: "single"; folder: TopLevelFolder }
+  | { kind: "group"; group: TabGroup; folders: TopLevelFolder[] };
 
 export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const folders = useNotesStore((s) => s.folders);
   const tabGroups = useNotesStore((s) => s.tabGroups ?? []);
   const selectedFolderId = useNotesStore((s) => s.selectedFolderId);
   const selectedNoteByFolder = useNotesStore((s) => s.selectedNoteByFolder);
-  const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
+  const sortOrder = useNotesStore((s) => s.sortOrder ?? "name-asc");
   const pendingRenameFolderId = useNotesStore((s) => s.pendingRenameFolderId);
   const pendingRenameGroupId = useNotesStore((s) => s.pendingRenameGroupId);
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
@@ -77,42 +85,48 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const deleteTopFolder = useNotesStore((s) => s.deleteTopFolder);
   const reorderTopFolders = useNotesStore((s) => s.reorderTopFolders);
   const reorderTabGroup = useNotesStore((s) => s.reorderTabGroup);
-  const createTabGroupFromFolder = useNotesStore((s) => s.createTabGroupFromFolder);
+  const createTabGroupFromFolder = useNotesStore(
+    (s) => s.createTabGroupFromFolder,
+  );
   const assignFolderToTabGroup = useNotesStore((s) => s.assignFolderToTabGroup);
   const renameTabGroup = useNotesStore((s) => s.renameTabGroup);
   const setTabGroupColor = useNotesStore((s) => s.setTabGroupColor);
   const toggleTabGroupCollapse = useNotesStore((s) => s.toggleTabGroupCollapse);
   const ungroupTabGroup = useNotesStore((s) => s.ungroupTabGroup);
-  const deleteTabGroupAndFolders = useNotesStore((s) => s.deleteTabGroupAndFolders);
-  const clearPendingRenameFolder = useNotesStore((s) => s.clearPendingRenameFolder);
-  const clearPendingRenameGroup = useNotesStore((s) => s.clearPendingRenameGroup);
+  const deleteTabGroupAndFolders = useNotesStore(
+    (s) => s.deleteTabGroupAndFolders,
+  );
+  const clearPendingRenameFolder = useNotesStore(
+    (s) => s.clearPendingRenameFolder,
+  );
+  const clearPendingRenameGroup = useNotesStore(
+    (s) => s.clearPendingRenameGroup,
+  );
   const importNotesFiles = useNotesStore((s) => s.importNotesFiles);
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
   const openSessionModal = useNotesStore((s) => s.openSessionModal);
   const currentSessionName = useNotesStore((s) => s.currentSessionName);
-  const theme = useNotesStore((s) => s.theme);
   const openSettingsModal = useNotesStore((s) => s.openSettingsModal);
-  const openThemeModal = useNotesStore((s) => s.openThemeModal);
-
-  const activeThemeObj = themes.find((t) => t.id === theme);
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftName, setDraftName] = useState('');
+  const [draftName, setDraftName] = useState("");
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
-  const [draftGroupName, setDraftGroupName] = useState('');
+  const [draftGroupName, setDraftGroupName] = useState("");
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
   const [draggedFolderId, setDraggedFolderId] = useState<string | null>(null);
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
   const [dragOverInfo, setDragOverInfo] = useState<{
     folderId: string;
-    position: 'before' | 'after';
+    position: "before" | "after";
   } | null>(null);
   const [dragOverGroupOrder, setDragOverGroupOrder] = useState<{
     groupId: string;
-    position: 'before' | 'after';
+    position: "before" | "after";
   } | null>(null);
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<NavbarContextMenuState | null>(null);
+  const [contextMenu, setContextMenu] = useState<NavbarContextMenuState | null>(
+    null,
+  );
 
   const inputRef = useRef<HTMLInputElement>(null);
   const groupInputRef = useRef<HTMLInputElement>(null);
@@ -130,10 +144,10 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   useEffect(() => {
     if (!contextMenu) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setContextMenu(null);
+      if (e.key === "Escape") setContextMenu(null);
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [contextMenu]);
 
   useEffect(() => {
@@ -230,7 +244,10 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     setDragOverGroupId(null);
   };
 
-  const handleTabDragStart = (e: React.DragEvent<HTMLDivElement>, folderId: string) => {
+  const handleTabDragStart = (
+    e: React.DragEvent<HTMLDivElement>,
+    folderId: string,
+  ) => {
     if (editingId === folderId) {
       e.preventDefault();
       return;
@@ -238,11 +255,14 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     e.stopPropagation();
     setDraggedFolderId(folderId);
     setDraggedGroupId(null);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', `folder:${folderId}`);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", `folder:${folderId}`);
   };
 
-  const handleGroupDragStart = (e: React.DragEvent<HTMLDivElement>, groupId: string) => {
+  const handleGroupDragStart = (
+    e: React.DragEvent<HTMLDivElement>,
+    groupId: string,
+  ) => {
     if (editingGroupId === groupId) {
       e.preventDefault();
       return;
@@ -250,23 +270,29 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     e.stopPropagation();
     setDraggedGroupId(groupId);
     setDraggedFolderId(null);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', `group:${groupId}`);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", `group:${groupId}`);
   };
 
-  const handleTabDragOver = (e: React.DragEvent<HTMLDivElement>, targetFolder: TopLevelFolder) => {
+  const handleTabDragOver = (
+    e: React.DragEvent<HTMLDivElement>,
+    targetFolder: TopLevelFolder,
+  ) => {
     if (draggedGroupId) {
       if (targetFolder.groupId === draggedGroupId) return;
       e.preventDefault();
       e.stopPropagation();
-      e.dataTransfer.dropEffect = 'move';
+      e.dataTransfer.dropEffect = "move";
       setDragOverGroupId(null);
 
       if (targetFolder.groupId) {
-        const groupContainer = e.currentTarget.closest('.tab-group-container');
-        const rect = (groupContainer ?? e.currentTarget).getBoundingClientRect();
+        const groupContainer = e.currentTarget.closest(".tab-group-container");
+        const rect = (
+          groupContainer ?? e.currentTarget
+        ).getBoundingClientRect();
         const midpoint = rect.left + rect.width / 2;
-        const position: 'before' | 'after' = e.clientX < midpoint ? 'before' : 'after';
+        const position: "before" | "after" =
+          e.clientX < midpoint ? "before" : "after";
         setDragOverInfo(null);
         if (
           dragOverGroupOrder?.groupId !== targetFolder.groupId ||
@@ -277,9 +303,13 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
       } else {
         const rect = e.currentTarget.getBoundingClientRect();
         const midpoint = rect.left + rect.width / 2;
-        const position: 'before' | 'after' = e.clientX < midpoint ? 'before' : 'after';
+        const position: "before" | "after" =
+          e.clientX < midpoint ? "before" : "after";
         setDragOverGroupOrder(null);
-        if (dragOverInfo?.folderId !== targetFolder.id || dragOverInfo.position !== position) {
+        if (
+          dragOverInfo?.folderId !== targetFolder.id ||
+          dragOverInfo.position !== position
+        ) {
           setDragOverInfo({ folderId: targetFolder.id, position });
         }
       }
@@ -289,22 +319,26 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     if (!draggedFolderId || draggedFolderId === targetFolder.id) return;
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = "move";
     setDragOverGroupId(null);
     setDragOverGroupOrder(null);
 
     const rect = e.currentTarget.getBoundingClientRect();
     const midpoint = rect.left + rect.width / 2;
-    const position: 'before' | 'after' = e.clientX < midpoint ? 'before' : 'after';
+    const position: "before" | "after" =
+      e.clientX < midpoint ? "before" : "after";
 
-    if (dragOverInfo?.folderId !== targetFolder.id || dragOverInfo.position !== position) {
+    if (
+      dragOverInfo?.folderId !== targetFolder.id ||
+      dragOverInfo.position !== position
+    ) {
       setDragOverInfo({ folderId: targetFolder.id, position });
     }
   };
 
   const handleTabDrop = (
     e: React.DragEvent<HTMLDivElement>,
-    targetFolder: TopLevelFolder
+    targetFolder: TopLevelFolder,
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -312,47 +346,57 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     if (draggedGroupId) {
       if (targetFolder.groupId !== draggedGroupId) {
         if (targetFolder.groupId) {
-          const groupContainer = e.currentTarget.closest('.tab-group-container');
-          const rect = (groupContainer ?? e.currentTarget).getBoundingClientRect();
-          const position: 'before' | 'after' =
+          const groupContainer = e.currentTarget.closest(
+            ".tab-group-container",
+          );
+          const rect = (
+            groupContainer ?? e.currentTarget
+          ).getBoundingClientRect();
+          const position: "before" | "after" =
             dragOverGroupOrder?.groupId === targetFolder.groupId
               ? dragOverGroupOrder.position
               : e.clientX < rect.left + rect.width / 2
-                ? 'before'
-                : 'after';
-          reorderTabGroup(draggedGroupId, targetFolder.groupId, 'group', position);
+                ? "before"
+                : "after";
+          reorderTabGroup(
+            draggedGroupId,
+            targetFolder.groupId,
+            "group",
+            position,
+          );
         } else {
           const rect = e.currentTarget.getBoundingClientRect();
-          const position: 'before' | 'after' =
+          const position: "before" | "after" =
             dragOverInfo?.folderId === targetFolder.id
               ? dragOverInfo.position
               : e.clientX < rect.left + rect.width / 2
-                ? 'before'
-                : 'after';
-          reorderTabGroup(draggedGroupId, targetFolder.id, 'folder', position);
+                ? "before"
+                : "after";
+          reorderTabGroup(draggedGroupId, targetFolder.id, "folder", position);
         }
       }
       resetDragState();
       return;
     }
 
-    const rawData = e.dataTransfer.getData('text/plain');
+    const rawData = e.dataTransfer.getData("text/plain");
     const sourceId =
-      draggedFolderId || (rawData.startsWith('folder:') ? rawData.slice(7) : rawData);
+      draggedFolderId ||
+      (rawData.startsWith("folder:") ? rawData.slice(7) : rawData);
     if (sourceId && sourceId !== targetFolder.id) {
       const rect = e.currentTarget.getBoundingClientRect();
       const midpoint = rect.left + rect.width / 2;
-      const position: 'before' | 'after' =
+      const position: "before" | "after" =
         dragOverInfo?.folderId === targetFolder.id
           ? dragOverInfo.position
           : e.clientX < midpoint
-            ? 'before'
-            : 'after';
+            ? "before"
+            : "after";
       reorderTopFolders(
         sourceId,
         targetFolder.id,
         position,
-        targetFolder.groupId ?? null
+        targetFolder.groupId ?? null,
       );
     }
     resetDragState();
@@ -360,20 +404,20 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
 
   const handleGroupChipDragOver = (
     e: React.DragEvent<HTMLDivElement>,
-    group: TabGroup
+    group: TabGroup,
   ) => {
     if (draggedGroupId) {
       if (draggedGroupId === group.id) return;
       e.preventDefault();
       e.stopPropagation();
-      e.dataTransfer.dropEffect = 'move';
+      e.dataTransfer.dropEffect = "move";
       setDragOverInfo(null);
       setDragOverGroupId(null);
 
-      const groupContainer = e.currentTarget.closest('.tab-group-container');
+      const groupContainer = e.currentTarget.closest(".tab-group-container");
       const rect = (groupContainer ?? e.currentTarget).getBoundingClientRect();
-      const position: 'before' | 'after' =
-        e.clientX < rect.left + rect.width / 2 ? 'before' : 'after';
+      const position: "before" | "after" =
+        e.clientX < rect.left + rect.width / 2 ? "before" : "after";
       if (
         dragOverGroupOrder?.groupId !== group.id ||
         dragOverGroupOrder.position !== position
@@ -386,7 +430,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     if (!draggedFolderId) return;
     e.preventDefault();
     e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = "move";
     setDragOverInfo(null);
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -394,13 +438,19 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
 
     if (relX < 0.22) {
       setDragOverGroupId(null);
-      if (dragOverGroupOrder?.groupId !== group.id || dragOverGroupOrder.position !== 'before') {
-        setDragOverGroupOrder({ groupId: group.id, position: 'before' });
+      if (
+        dragOverGroupOrder?.groupId !== group.id ||
+        dragOverGroupOrder.position !== "before"
+      ) {
+        setDragOverGroupOrder({ groupId: group.id, position: "before" });
       }
     } else if (group.collapsed && relX > 0.78) {
       setDragOverGroupId(null);
-      if (dragOverGroupOrder?.groupId !== group.id || dragOverGroupOrder.position !== 'after') {
-        setDragOverGroupOrder({ groupId: group.id, position: 'after' });
+      if (
+        dragOverGroupOrder?.groupId !== group.id ||
+        dragOverGroupOrder.position !== "after"
+      ) {
+        setDragOverGroupOrder({ groupId: group.id, position: "after" });
       }
     } else {
       setDragOverGroupOrder(null);
@@ -413,38 +463,46 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const handleGroupChipDrop = (
     e: React.DragEvent<HTMLDivElement>,
     group: TabGroup,
-    groupFolders: TopLevelFolder[]
+    groupFolders: TopLevelFolder[],
   ) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (draggedGroupId) {
       if (draggedGroupId !== group.id) {
-        const groupContainer = e.currentTarget.closest('.tab-group-container');
-        const rect = (groupContainer ?? e.currentTarget).getBoundingClientRect();
-        const position: 'before' | 'after' =
+        const groupContainer = e.currentTarget.closest(".tab-group-container");
+        const rect = (
+          groupContainer ?? e.currentTarget
+        ).getBoundingClientRect();
+        const position: "before" | "after" =
           dragOverGroupOrder?.groupId === group.id
             ? dragOverGroupOrder.position
             : e.clientX < rect.left + rect.width / 2
-              ? 'before'
-              : 'after';
-        reorderTabGroup(draggedGroupId, group.id, 'group', position);
+              ? "before"
+              : "after";
+        reorderTabGroup(draggedGroupId, group.id, "group", position);
       }
       resetDragState();
       return;
     }
 
-    const rawData = e.dataTransfer.getData('text/plain');
+    const rawData = e.dataTransfer.getData("text/plain");
     const sourceId =
-      draggedFolderId || (rawData.startsWith('folder:') ? rawData.slice(7) : rawData);
+      draggedFolderId ||
+      (rawData.startsWith("folder:") ? rawData.slice(7) : rawData);
     if (sourceId) {
       if (dragOverGroupOrder?.groupId === group.id) {
         const boundaryFolder =
-          dragOverGroupOrder.position === 'before'
+          dragOverGroupOrder.position === "before"
             ? groupFolders[0]
             : groupFolders[groupFolders.length - 1];
         if (boundaryFolder && sourceId !== boundaryFolder.id) {
-          reorderTopFolders(sourceId, boundaryFolder.id, dragOverGroupOrder.position, null);
+          reorderTopFolders(
+            sourceId,
+            boundaryFolder.id,
+            dragOverGroupOrder.position,
+            null,
+          );
         }
       } else {
         assignFolderToTabGroup(sourceId, group.id);
@@ -460,7 +518,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     const menuHeight = 290;
     const x = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
     const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
-    setContextMenu({ kind: 'tab', folder, x, y });
+    setContextMenu({ kind: "tab", folder, x, y });
   };
 
   const openGroupContextMenu = (e: React.MouseEvent, group: TabGroup) => {
@@ -470,19 +528,21 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     const menuHeight = 260;
     const x = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
     const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
-    setContextMenu({ kind: 'group', group, x, y });
+    setContextMenu({ kind: "group", group, x, y });
   };
 
   const activeFolder = folders.find((f) => f.id === selectedFolderId) ?? null;
 
   const activeNoteId = useMemo(
-    () => resolveActiveNoteData(activeFolder, selectedNoteByFolder, sortOrder)?.note.id ?? null,
-    [activeFolder, selectedNoteByFolder, sortOrder]
+    () =>
+      resolveActiveNoteData(activeFolder, selectedNoteByFolder, sortOrder)?.note
+        .id ?? null,
+    [activeFolder, selectedNoteByFolder, sortOrder],
   );
 
   const connections = useMemo(
     () => resolveWorkspaceConnections(folders, activeNoteId),
-    [folders, activeNoteId]
+    [folders, activeNoteId],
   );
 
   const tabSegments = useMemo<TabSegment[]>(() => {
@@ -492,13 +552,13 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     for (const folder of folders) {
       const group = folder.groupId ? groupById.get(folder.groupId) : undefined;
       if (!group) {
-        segments.push({ kind: 'single', folder });
+        segments.push({ kind: "single", folder });
       } else {
         const prev = segments[segments.length - 1];
-        if (prev && prev.kind === 'group' && prev.group.id === group.id) {
+        if (prev && prev.kind === "group" && prev.group.id === group.id) {
           prev.folders.push(folder);
         } else {
-          segments.push({ kind: 'group', group, folders: [folder] });
+          segments.push({ kind: "group", group, folders: [folder] });
         }
       }
     }
@@ -514,23 +574,27 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
       : 0;
     const isLinkedFolder = linkedNoteCount > 0;
     const isDraggingThis = draggedFolderId === folder.id;
-    const isContextOpen = contextMenu?.kind === 'tab' && contextMenu.folder.id === folder.id;
+    const isContextOpen =
+      contextMenu?.kind === "tab" && contextMenu.folder.id === folder.id;
     const dropIndicatorClass =
       dragOverInfo?.folderId === folder.id && draggedFolderId !== folder.id
         ? `is-drop-${dragOverInfo.position}`
-        : '';
+        : "";
 
     const handleSelectFolderTab = () => {
       if (isLinkedFolder) {
         const currentNoteInTarget = resolveActiveNoteData(
           folder,
           selectedNoteByFolder,
-          sortOrder
+          sortOrder,
         )?.note.id;
-        const firstLinkedId = connections.firstLinkedNoteByTopFolder.get(folder.id);
+        const firstLinkedId = connections.firstLinkedNoteByTopFolder.get(
+          folder.id,
+        );
         if (
           firstLinkedId &&
-          (!currentNoteInTarget || !connections.linkedNoteIds.has(currentNoteInTarget))
+          (!currentNoteInTarget ||
+            !connections.linkedNoteIds.has(currentNoteInTarget))
         ) {
           navigateToNote(folder.id, firstLinkedId);
           return;
@@ -546,10 +610,10 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
         tabIndex={0}
         aria-pressed={isSelected}
         draggable={!isEditing}
-        className={`folder-tab ${isSelected ? 'is-selected' : ''} ${
-          isLinkedFolder ? 'is-linked-folder' : ''
-        } ${isNavbarCollapsed ? 'is-slim' : ''} ${isDraggingThis ? 'is-dragging' : ''} ${
-          isContextOpen ? 'is-context-open' : ''
+        className={`folder-tab ${isSelected ? "is-selected" : ""} ${
+          isLinkedFolder ? "is-linked-folder" : ""
+        } ${isNavbarCollapsed ? "is-slim" : ""} ${isDraggingThis ? "is-dragging" : ""} ${
+          isContextOpen ? "is-context-open" : ""
         } ${dropIndicatorClass}`}
         onClick={handleSelectFolderTab}
         onDoubleClick={(e) => startRename(folder, e)}
@@ -560,7 +624,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
         onDragEnd={resetDragState}
         onKeyDown={(e) => {
           if (isEditing) return;
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             handleSelectFolderTab();
           }
@@ -572,8 +636,8 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
             <Folder
               size={isNavbarCollapsed ? 14 : 16}
               strokeWidth={1.8}
-              className={`folder-tab-icon ${isSelected ? 'is-selected-icon' : ''} ${
-                isLinkedFolder ? 'is-linked-icon' : ''
+              className={`folder-tab-icon ${isSelected ? "is-selected-icon" : ""} ${
+                isLinkedFolder ? "is-linked-icon" : ""
               }`}
             />
             {folder.localPath && (
@@ -588,7 +652,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
               <span
                 className="tab-link-indicator"
                 title={`${linkedNoteCount} ${
-                  linkedNoteCount === 1 ? 'note' : 'notes'
+                  linkedNoteCount === 1 ? "note" : "notes"
                 } in "${folder.name}" connected to current note`}
               >
                 <Link2 size={10} strokeWidth={2.2} />
@@ -634,9 +698,9 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
             onBlur={() => commitRename(folder.id)}
             onKeyDown={(e) => {
               e.stopPropagation();
-              if (e.key === 'Enter') {
+              if (e.key === "Enter") {
                 commitRename(folder.id);
-              } else if (e.key === 'Escape') {
+              } else if (e.key === "Escape") {
                 cancelRename();
               }
             }}
@@ -649,7 +713,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   };
 
   return (
-    <header className={`navbar ${isNavbarCollapsed ? 'is-collapsed' : ''}`}>
+    <header className={`navbar ${isNavbarCollapsed ? "is-collapsed" : ""}`}>
       {/* Hidden file picker for importing separate note files */}
       <input
         ref={noteFileInputRef}
@@ -659,7 +723,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
         hidden
         onChange={(e) => {
           const selected = e.target.files ? Array.from(e.target.files) : [];
-          e.target.value = '';
+          e.target.value = "";
           if (selected.length > 0) {
             void importNotesFiles(selected);
           }
@@ -703,7 +767,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
             <div className="plus-menu-container" ref={plusMenuRef}>
               <button
                 type="button"
-                className={`navbar-icon-btn ${isPlusMenuOpen ? 'is-active' : ''}`}
+                className={`navbar-icon-btn ${isPlusMenuOpen ? "is-active" : ""}`}
                 onClick={() => setIsPlusMenuOpen((v) => !v)}
                 title="Create or sync local folder"
                 aria-label="Create or import"
@@ -721,7 +785,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                       sessionApi.openSessionInNewTab();
                     }}
                   >
-                    <Layers size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <Layers
+                      size={15}
+                      strokeWidth={1.8}
+                      className="plus-menu-icon"
+                    />
                     <span>New session (new tab)...</span>
                   </button>
 
@@ -730,10 +798,14 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     className="plus-menu-item"
                     onClick={() => {
                       closePlusMenu();
-                      openLinkModal('new-tab');
+                      openLinkModal("new-tab");
                     }}
                   >
-                    <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <FolderUp
+                      size={15}
+                      strokeWidth={1.8}
+                      className="plus-menu-icon"
+                    />
                     <span>Add folder...</span>
                   </button>
 
@@ -745,7 +817,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                       createTopFolder();
                     }}
                   >
-                    <FolderPlus size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <FolderPlus
+                      size={15}
+                      strokeWidth={1.8}
+                      className="plus-menu-icon"
+                    />
                     <span>New empty folder</span>
                   </button>
 
@@ -759,7 +835,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                       noteFileInputRef.current?.click();
                     }}
                   >
-                    <FileUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <FileUp
+                      size={15}
+                      strokeWidth={1.8}
+                      className="plus-menu-icon"
+                    />
                     <span>Import notes & PDFs (.md, .txt, .pdf)</span>
                   </button>
 
@@ -773,7 +853,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                       openSettingsModal();
                     }}
                   >
-                    <Settings size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <Settings
+                      size={15}
+                      strokeWidth={1.8}
+                      className="plus-menu-icon"
+                    />
                     <span>Settings</span>
                   </button>
                 </div>
@@ -807,7 +891,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
 
       {/* Tabs Row: Compact card tabs (or single-line slim tabs when collapsed) */}
       <nav
-        className={`navbar-tabs ${isNavbarCollapsed ? 'is-slim' : ''}`}
+        className={`navbar-tabs ${isNavbarCollapsed ? "is-slim" : ""}`}
         aria-label="Top-level folders"
       >
         <div className="navbar-tabs-scroll" onScroll={closeContextMenu}>
@@ -816,11 +900,15 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
               <button
                 type="button"
                 className="folder-tab is-placeholder"
-                onClick={() => openLinkModal('new-tab')}
+                onClick={() => openLinkModal("new-tab")}
                 title="Add or sync a folder from your computer"
               >
                 <div className="folder-tab-top">
-                  <FolderUp size={16} strokeWidth={1.8} className="folder-tab-icon" />
+                  <FolderUp
+                    size={16}
+                    strokeWidth={1.8}
+                    className="folder-tab-icon"
+                  />
                 </div>
                 <span className="folder-tab-name">Add folder</span>
               </button>
@@ -831,21 +919,27 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                 onClick={createTopFolder}
               >
                 <div className="folder-tab-top">
-                  <Plus size={16} strokeWidth={1.8} className="folder-tab-icon" />
+                  <Plus
+                    size={16}
+                    strokeWidth={1.8}
+                    className="folder-tab-icon"
+                  />
                 </div>
                 <span className="folder-tab-name">New folder</span>
               </button>
             </>
           ) : (
             tabSegments.map((segment) => {
-              if (segment.kind === 'single') {
+              if (segment.kind === "single") {
                 return renderFolderTab(segment.folder);
               }
 
               const { group, folders: groupFolders } = segment;
               const isGroupEditing = editingGroupId === group.id;
               const isGroupCollapsed = Boolean(group.collapsed);
-              const hasActiveTabInside = groupFolders.some((f) => f.id === selectedFolderId);
+              const hasActiveTabInside = groupFolders.some(
+                (f) => f.id === selectedFolderId,
+              );
               const groupLinkedNotesCount = groupFolders.reduce((sum, f) => {
                 if (f.id === selectedFolderId) return sum;
                 return sum + (connections.linkedTopFolderCounts.get(f.id) ?? 0);
@@ -853,32 +947,34 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
               const isDropTargetGroup = dragOverGroupId === group.id;
               const isDraggingGroup = draggedGroupId === group.id;
               const isGroupContextOpen =
-                contextMenu?.kind === 'group' && contextMenu.group.id === group.id;
+                contextMenu?.kind === "group" &&
+                contextMenu.group.id === group.id;
               const groupDropOrderClass =
-                dragOverGroupOrder?.groupId === group.id && draggedGroupId !== group.id
+                dragOverGroupOrder?.groupId === group.id &&
+                draggedGroupId !== group.id
                   ? `is-drop-${dragOverGroupOrder.position}`
-                  : '';
+                  : "";
 
               return (
                 <div
                   key={`group-${group.id}-${groupFolders[0]?.id}`}
                   className={`tab-group-container is-color-${group.color} ${
-                    isGroupCollapsed ? 'is-collapsed' : ''
-                  } ${hasActiveTabInside ? 'has-active-tab' : ''} ${
-                    groupLinkedNotesCount > 0 ? 'has-linked-tab' : ''
-                  } ${isNavbarCollapsed ? 'is-slim' : ''} ${
-                    isDropTargetGroup ? 'is-drop-target' : ''
-                  } ${isDraggingGroup ? 'is-dragging' : ''} ${groupDropOrderClass}`}
+                    isGroupCollapsed ? "is-collapsed" : ""
+                  } ${hasActiveTabInside ? "has-active-tab" : ""} ${
+                    groupLinkedNotesCount > 0 ? "has-linked-tab" : ""
+                  } ${isNavbarCollapsed ? "is-slim" : ""} ${
+                    isDropTargetGroup ? "is-drop-target" : ""
+                  } ${isDraggingGroup ? "is-dragging" : ""} ${groupDropOrderClass}`}
                 >
                   <div
                     role="button"
                     tabIndex={0}
                     draggable={!isGroupEditing}
-                    className={`tab-group-chip ${isGroupContextOpen ? 'is-context-open' : ''}`}
+                    className={`tab-group-chip ${isGroupContextOpen ? "is-context-open" : ""}`}
                     title={`${group.name} (${groupFolders.length} ${
-                      groupFolders.length === 1 ? 'tab' : 'tabs'
+                      groupFolders.length === 1 ? "tab" : "tabs"
                     }) — Drag to rearrange group, click to ${
-                      isGroupCollapsed ? 'expand' : 'collapse'
+                      isGroupCollapsed ? "expand" : "collapse"
                     }, double-click to rename, right-click for group options`}
                     onClick={() => {
                       if (!isGroupEditing) {
@@ -893,7 +989,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     onDragEnd={resetDragState}
                     onKeyDown={(e) => {
                       if (isGroupEditing) return;
-                      if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         toggleTabGroupCollapse(group.id);
                       }
@@ -911,9 +1007,9 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                         onBlur={() => commitGroupRename(group.id)}
                         onKeyDown={(e) => {
                           e.stopPropagation();
-                          if (e.key === 'Enter') {
+                          if (e.key === "Enter") {
                             commitGroupRename(group.id);
-                          } else if (e.key === 'Escape') {
+                          } else if (e.key === "Escape") {
                             cancelGroupRename();
                           }
                         }}
@@ -921,12 +1017,14 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     ) : (
                       <span className="tab-group-name">{group.name}</span>
                     )}
-                    <span className="tab-group-count">{groupFolders.length}</span>
+                    <span className="tab-group-count">
+                      {groupFolders.length}
+                    </span>
                     {isGroupCollapsed && groupLinkedNotesCount > 0 && (
                       <span
                         className="tab-link-indicator"
                         title={`${groupLinkedNotesCount} connected ${
-                          groupLinkedNotesCount === 1 ? 'note' : 'notes'
+                          groupLinkedNotesCount === 1 ? "note" : "notes"
                         } inside collapsed group "${group.name}"`}
                       >
                         <Link2 size={10} strokeWidth={2.2} />
@@ -980,7 +1078,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
             <div className="plus-menu-container" ref={plusMenuRef}>
               <button
                 type="button"
-                className={`navbar-icon-btn is-compact ${isPlusMenuOpen ? 'is-active' : ''}`}
+                className={`navbar-icon-btn is-compact ${isPlusMenuOpen ? "is-active" : ""}`}
                 onClick={() => setIsPlusMenuOpen((v) => !v)}
                 title="Create or sync local folder"
                 aria-label="Create or import"
@@ -998,7 +1096,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                       sessionApi.openSessionInNewTab();
                     }}
                   >
-                    <Layers size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <Layers
+                      size={15}
+                      strokeWidth={1.8}
+                      className="plus-menu-icon"
+                    />
                     <span>New session (new tab)...</span>
                   </button>
 
@@ -1007,10 +1109,14 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     className="plus-menu-item"
                     onClick={() => {
                       closePlusMenu();
-                      openLinkModal('new-tab');
+                      openLinkModal("new-tab");
                     }}
                   >
-                    <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <FolderUp
+                      size={15}
+                      strokeWidth={1.8}
+                      className="plus-menu-icon"
+                    />
                     <span>Add folder...</span>
                   </button>
 
@@ -1022,7 +1128,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                       createTopFolder();
                     }}
                   >
-                    <FolderPlus size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <FolderPlus
+                      size={15}
+                      strokeWidth={1.8}
+                      className="plus-menu-icon"
+                    />
                     <span>New empty folder</span>
                   </button>
 
@@ -1036,7 +1146,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                       noteFileInputRef.current?.click();
                     }}
                   >
-                    <FileUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <FileUp
+                      size={15}
+                      strokeWidth={1.8}
+                      className="plus-menu-icon"
+                    />
                     <span>Import notes & PDFs (.md, .txt, .pdf)</span>
                   </button>
 
@@ -1050,7 +1164,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                       openSettingsModal();
                     }}
                   >
-                    <Settings size={15} strokeWidth={1.8} className="plus-menu-icon" />
+                    <Settings
+                      size={15}
+                      strokeWidth={1.8}
+                      className="plus-menu-icon"
+                    />
                     <span>Settings</span>
                   </button>
                 </div>
@@ -1089,7 +1207,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
           role="menu"
           aria-label="Tab group actions"
         >
-          {contextMenu.kind === 'tab' && (
+          {contextMenu.kind === "tab" && (
             <>
               <div className="context-menu-header">
                 <Folder size={12} className="context-menu-header-icon" />
@@ -1115,12 +1233,13 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                   <div className="dropdown-menu-divider" />
                   <div className="dropdown-section-title">MOVE TO GROUP</div>
                   {tabGroups.map((grp) => {
-                    const isCurrentGroup = contextMenu.folder.groupId === grp.id;
+                    const isCurrentGroup =
+                      contextMenu.folder.groupId === grp.id;
                     return (
                       <button
                         key={grp.id}
                         type="button"
-                        className={`dropdown-menu-item ${isCurrentGroup ? 'is-selected-sort' : ''}`}
+                        className={`dropdown-menu-item ${isCurrentGroup ? "is-selected-sort" : ""}`}
                         role="menuitem"
                         onClick={() => {
                           const targetFolderId = contextMenu.folder.id;
@@ -1128,7 +1247,9 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                           assignFolderToTabGroup(targetFolderId, grp.id);
                         }}
                       >
-                        <span className={`context-group-dot is-color-${grp.color}`} />
+                        <span
+                          className={`context-group-dot is-color-${grp.color}`}
+                        />
                         <span style={{ flex: 1 }}>{grp.name}</span>
                       </button>
                     );
@@ -1187,10 +1308,12 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
             </>
           )}
 
-          {contextMenu.kind === 'group' && (
+          {contextMenu.kind === "group" && (
             <>
               <div className="context-menu-header">
-                <span className={`context-group-dot is-color-${contextMenu.group.color}`} />
+                <span
+                  className={`context-group-dot is-color-${contextMenu.group.color}`}
+                />
                 <span>{contextMenu.group.name}</span>
               </div>
 
@@ -1201,7 +1324,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     key={swatch.id}
                     type="button"
                     className={`group-color-swatch ${
-                      contextMenu.group.color === swatch.id ? 'is-active' : ''
+                      contextMenu.group.color === swatch.id ? "is-active" : ""
                     }`}
                     style={{ backgroundColor: swatch.hex }}
                     title={swatch.label}
@@ -1244,7 +1367,11 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                 ) : (
                   <ChevronRight size={14} strokeWidth={1.8} />
                 )}
-                <span>{contextMenu.group.collapsed ? 'Expand group' : 'Collapse group'}</span>
+                <span>
+                  {contextMenu.group.collapsed
+                    ? "Expand group"
+                    : "Collapse group"}
+                </span>
               </button>
 
               <button

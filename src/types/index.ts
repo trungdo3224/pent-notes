@@ -1,17 +1,17 @@
 export interface NoteItem {
   id: string;
-  type: 'note';
+  type: "note";
   title: string;
   content: string;
   updatedAt: string;
   filePath?: string;
-  fileType?: 'markdown' | 'pdf';
+  fileType?: "markdown" | "pdf";
   pdfData?: string;
 }
 
 export interface FolderItem {
   id: string;
-  type: 'folder';
+  type: "folder";
   name: string;
   children: ExplorerNode[];
   folderPath?: string;
@@ -22,12 +22,7 @@ export interface FolderItem {
 export type ExplorerNode = FolderItem | NoteItem;
 
 export type TabGroupColorId =
-  | 'cyan'
-  | 'emerald'
-  | 'amber'
-  | 'purple'
-  | 'rose'
-  | 'blue';
+  "cyan" | "emerald" | "amber" | "purple" | "rose" | "blue";
 
 export interface TabGroup {
   id: string;
@@ -44,15 +39,13 @@ export interface TopLevelFolder {
   groupId?: string;
 }
 
-export type EditorViewMode = 'obsidian' | 'notebook' | 'write' | 'preview';
+export type EditorViewMode = "obsidian" | "notebook" | "write" | "preview";
 
-export type PdfViewMode = 'pdf' | 'notes';
-
-export type SplitDirection = 'horizontal' | 'vertical';
+export type SplitDirection = "horizontal" | "vertical";
 
 export interface PaneLeafNode {
   id: string;
-  type: 'leaf';
+  type: "leaf";
   folderId: string | null;
   noteId: string | null;
   viewMode: EditorViewMode;
@@ -60,7 +53,7 @@ export interface PaneLeafNode {
 
 export interface PaneBranchNode {
   id: string;
-  type: 'branch';
+  type: "branch";
   direction: SplitDirection;
   children: PaneLayoutNode[];
   sizes: number[];
@@ -68,11 +61,8 @@ export interface PaneBranchNode {
 
 export type PaneLayoutNode = PaneLeafNode | PaneBranchNode;
 
-export type SortOrder = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc';
+export type SortOrder = "name-asc" | "name-desc" | "date-desc" | "date-asc";
 
-export type LinkModalTargetMode = 'new-tab' | 'subfolder' | 'current-tab';
+export type LinkModalTargetMode = "new-tab" | "subfolder" | "current-tab";
 
-export type CatalogTab = 'outline' | 'tags' | 'info';
-
-
-
+export type CatalogTab = "outline" | "tags" | "info";

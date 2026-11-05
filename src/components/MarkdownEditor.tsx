@@ -1,50 +1,32 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import {
-  closeBrackets,
-  closeBracketsKeymap,
-} from '@codemirror/autocomplete';
-import {
-  defaultKeymap,
-  history,
-  historyKeymap,
-} from '@codemirror/commands';
-import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import {
-  bracketMatching,
-  indentOnInput,
-} from '@codemirror/language';
-import { languages } from '@codemirror/language-data';
-import {
-  Compartment,
-  EditorState,
-  Extension,
-} from '@codemirror/state';
+import React, { useEffect, useMemo, useRef } from "react";
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { bracketMatching, indentOnInput } from "@codemirror/language";
+import { languages } from "@codemirror/language-data";
+import { Compartment, EditorState } from "@codemirror/state";
 import {
   drawSelection,
   dropCursor,
   EditorView,
-  highlightActiveLineGutter,
   keymap,
-  lineNumbers,
-} from '@codemirror/view';
-import { livePreviewPlugin } from '../lib/codemirror/livePreview';
+} from "@codemirror/view";
+import { GFM } from "@lezer/markdown";
+import { livePreviewPlugin } from "../lib/codemirror/livePreview";
 import {
   obsidianEditorTheme,
   obsidianHighlightStyle,
-} from '../lib/codemirror/obsidianTheme';
-import { smartListKeymap } from '../lib/codemirror/smartLists';
+} from "../lib/codemirror/obsidianTheme";
+import { smartListKeymap } from "../lib/codemirror/smartLists";
 import {
   createWikilinkCompletion,
   NoteWikilinkOption,
   wikilinkViewPlugin,
-} from '../lib/codemirror/wikilinks';
-
-export type MarkdownEditorMode = 'live' | 'source';
+} from "../lib/codemirror/wikilinks";
 
 export interface MarkdownEditorProps {
   content: string;
   onChange?: (val: string) => void;
-  mode?: MarkdownEditorMode;
   readonly?: boolean;
   className?: string;
   notes?: NoteWikilinkOption[];
@@ -55,9 +37,8 @@ export interface MarkdownEditorProps {
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   content,
   onChange,
-  mode = 'live',
   readonly = false,
-  className = '',
+  className = "",
   notes = [],
   onOpenWikilink,
   autoFocus = false,
@@ -72,15 +53,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   onOpenWikilinkRef.current = onOpenWikilink;
   notesRef.current = notes;
 
-  const modeCompartment = useMemo(() => new Compartment(), []);
   const readonlyCompartment = useMemo(() => new Compartment(), []);
-
-  const getModeExtensions = (targetMode: MarkdownEditorMode): Extension[] => {
-    if (targetMode === 'source') {
-      return [lineNumbers(), highlightActiveLineGutter(), wikilinkViewPlugin];
-    }
-    return [livePreviewPlugin, wikilinkViewPlugin];
-  };
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -88,13 +61,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     lastContentRef.current = content;
 
     const startState = EditorState.create({
-      doc: content || '',
+      doc: content || "",
       extensions: [
         obsidianEditorTheme,
         obsidianHighlightStyle,
         markdown({
           base: markdownLanguage,
           codeLanguages: languages,
+          extensions: [GFM],
         }),
         EditorView.lineWrapping,
         history(),
@@ -104,6 +78,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         indentOnInput(),
         bracketMatching(),
         closeBrackets(),
+        livePreviewPlugin,
+        wikilinkViewPlugin,
         createWikilinkCompletion(() => notesRef.current),
         keymap.of([
           ...smartListKeymap,
@@ -111,7 +87,6 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           ...defaultKeymap,
           ...historyKeymap,
         ]),
-        modeCompartment.of(getModeExtensions(mode)),
         readonlyCompartment.of(EditorState.readOnly.of(readonly)),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -124,9 +99,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         EditorView.domEventHandlers({
           click(event) {
             const target = event.target as HTMLElement | null;
-            const wikilinkEl = target?.closest('.cm-wikilink');
+            const wikilinkEl = target?.closest(".cm-wikilink");
             if (wikilinkEl) {
-              const noteTarget = wikilinkEl.getAttribute('data-target');
+              const noteTarget = wikilinkEl.getAttribute("data-target");
               if (noteTarget && onOpenWikilinkRef.current) {
                 event.preventDefault();
                 event.stopPropagation();
@@ -170,28 +145,20 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         changes: {
           from: 0,
           to: view.state.doc.length,
-          insert: content || '',
+          insert: content || "",
         },
       });
     }
   }, [content]);
-
-  // Dynamically switch between Live Preview and Source Mode without remounting
-  useEffect(() => {
-    const view = viewRef.current;
-    if (view) {
-      view.dispatch({
-        effects: modeCompartment.reconfigure(getModeExtensions(mode)),
-      });
-    }
-  }, [mode, modeCompartment]);
 
   // Dynamically update readonly mode
   useEffect(() => {
     const view = viewRef.current;
     if (view) {
       view.dispatch({
-        effects: readonlyCompartment.reconfigure(EditorState.readOnly.of(readonly)),
+        effects: readonlyCompartment.reconfigure(
+          EditorState.readOnly.of(readonly),
+        ),
       });
     }
   }, [readonly, readonlyCompartment]);
@@ -199,10 +166,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`obsidian-editor-wrapper ${mode === 'live' ? 'is-live-preview' : 'is-source-mode'} ${className}`}
+      className={`obsidian-editor-wrapper ${className}`.trim()}
     />
   );
 };
-
-export default MarkdownEditor;
-

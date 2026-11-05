@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Check,
   Columns,
@@ -14,15 +14,11 @@ import {
   Sun,
   Type,
   X,
-} from 'lucide-react';
-import { useEscapeKey } from '../hooks/useDomInteractions';
-import {
-  DEFAULT_FONT_SETTINGS,
-  MONO_FONT_OPTIONS,
-  SANS_FONT_OPTIONS,
-} from '../lib/fontSettings';
-import { useNotesStore } from '../store/useNotesStore';
-import { ThemeId, themes } from '../themes';
+} from "lucide-react";
+import { useEscapeKey } from "../hooks/useDomInteractions";
+import { MONO_FONT_OPTIONS, SANS_FONT_OPTIONS } from "../lib/fontSettings";
+import { useNotesStore } from "../store/useNotesStore";
+import { ThemeId, themes } from "../themes";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -51,9 +47,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   };
 
   const activeSans =
-    SANS_FONT_OPTIONS.find((f) => f.id === fontSettings.sansFontId) ?? SANS_FONT_OPTIONS[0];
+    SANS_FONT_OPTIONS.find((f) => f.id === fontSettings.sansFontId) ??
+    SANS_FONT_OPTIONS[0];
   const activeMono =
-    MONO_FONT_OPTIONS.find((f) => f.id === fontSettings.monoFontId) ?? MONO_FONT_OPTIONS[0];
+    MONO_FONT_OPTIONS.find((f) => f.id === fontSettings.monoFontId) ??
+    MONO_FONT_OPTIONS[0];
 
   return (
     <div className="modal-backdrop" onMouseDown={handleBackdropClick}>
@@ -72,9 +70,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             <div>
               <h2>Settings</h2>
               <span className="settings-header-subtitle">
-                {activeTab === 'theme' && 'Themes & Color Accents'}
-                {activeTab === 'fonts' && 'Typography, Sizing & Line Spacing'}
-                {activeTab === 'layout' && 'Workspace Layout & Panes'}
+                {activeTab === "theme" && "Themes & Color Accents"}
+                {activeTab === "fonts" && "Typography, Sizing & Line Spacing"}
+                {activeTab === "layout" && "Workspace Layout & Panes"}
               </span>
             </div>
           </div>
@@ -92,11 +90,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
         {/* Body Container: Left Nav & Right Content */}
         <div className="settings-modal-body">
           {/* Left Navigation */}
-          <aside className="settings-sidebar-nav" aria-label="Settings categories">
+          <aside
+            className="settings-sidebar-nav"
+            aria-label="Settings categories"
+          >
             <button
               type="button"
-              className={`settings-nav-item ${activeTab === 'theme' ? 'is-active' : ''}`}
-              onClick={() => setActiveTab('theme')}
+              className={`settings-nav-item ${activeTab === "theme" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("theme")}
             >
               <Palette size={16} strokeWidth={1.8} />
               <span>Theme</span>
@@ -104,8 +105,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
             <button
               type="button"
-              className={`settings-nav-item ${activeTab === 'fonts' ? 'is-active' : ''}`}
-              onClick={() => setActiveTab('fonts')}
+              className={`settings-nav-item ${activeTab === "fonts" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("fonts")}
             >
               <Type size={16} strokeWidth={1.8} />
               <span>Fonts</span>
@@ -113,8 +114,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
 
             <button
               type="button"
-              className={`settings-nav-item ${activeTab === 'layout' ? 'is-active' : ''}`}
-              onClick={() => setActiveTab('layout')}
+              className={`settings-nav-item ${activeTab === "layout" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("layout")}
             >
               <LayoutTemplate size={16} strokeWidth={1.8} />
               <span>Layout</span>
@@ -125,24 +126,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
           {/* Right Content Panel */}
           <main className="settings-content-panel">
             {/* TAB 1: THEMES */}
-            {activeTab === 'theme' && (
+            {activeTab === "theme" && (
               <div className="settings-tab-pane">
                 <div className="settings-pane-intro">
                   <h3>Color Atmosphere</h3>
                   <p>
-                    Minimalist, high-readability workspaces with vibrant theme color accents.
+                    Minimalist, high-readability workspaces with vibrant theme
+                    color accents.
                   </p>
                 </div>
 
-                {(['dark', 'light'] as const).map((mode) => (
+                {(["dark", "light"] as const).map((mode) => (
                   <section
                     className="theme-group"
                     key={mode}
-                    aria-label={`${mode === 'dark' ? 'Dark' : 'Light'} themes`}
+                    aria-label={`${mode === "dark" ? "Dark" : "Light"} themes`}
                   >
                     <h4>
-                      {mode === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
-                      <span>{mode === 'dark' ? 'Dark Minimal' : 'Light Minimal'}</span>
+                      {mode === "dark" ? <Moon size={14} /> : <Sun size={14} />}
+                      <span>
+                        {mode === "dark" ? "Dark Minimal" : "Light Minimal"}
+                      </span>
                     </h4>
 
                     <div className="theme-options">
@@ -151,7 +155,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         .map((option) => (
                           <button
                             type="button"
-                            className={`theme-option ${theme === option.id ? 'selected' : ''}`}
+                            className={`theme-option ${theme === option.id ? "selected" : ""}`}
                             key={option.id}
                             aria-pressed={theme === option.id}
                             onClick={() => chooseTheme(option.id as ThemeId)}
@@ -197,7 +201,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                               {theme === option.id && <Check size={16} />}
                             </div>
 
-                            <span className="theme-description">{option.description}</span>
+                            <span className="theme-description">
+                              {option.description}
+                            </span>
                           </button>
                         ))}
                     </div>
@@ -207,14 +213,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             )}
 
             {/* TAB 2: FONTS */}
-            {activeTab === 'fonts' && (
+            {activeTab === "fonts" && (
               <div className="settings-tab-pane">
                 <div className="settings-pane-intro">
                   <div className="settings-intro-row">
                     <div>
                       <h3>Typography & Readability</h3>
                       <p>
-                        Configure typography for the Markdown note editor, Milkdown canvas, and code blocks.
+                        Configure typography for the Markdown note editor,
+                        Milkdown canvas, and code blocks.
                       </p>
                     </div>
 
@@ -237,7 +244,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <div>
                         <h4>Editor Font Size</h4>
                         <p className="settings-card-desc">
-                          Controls the base text size across CodeMirror and the Notebook canvas.
+                          Controls the base text size across CodeMirror and the
+                          Notebook canvas.
                         </p>
                       </div>
                       <div className="settings-font-size-val">
@@ -264,7 +272,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         step={1}
                         value={fontSettings.fontSize}
                         onChange={(e) =>
-                          updateFontSettings({ fontSize: parseInt(e.target.value, 10) })
+                          updateFontSettings({
+                            fontSize: parseInt(e.target.value, 10),
+                          })
                         }
                         className="settings-slider"
                         aria-label="Editor font size slider"
@@ -286,7 +296,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                           <button
                             key={sz}
                             type="button"
-                            className={`preset-pill ${fontSettings.fontSize === sz ? 'is-active' : ''}`}
+                            className={`preset-pill ${fontSettings.fontSize === sz ? "is-active" : ""}`}
                             onClick={() => updateFontSettings({ fontSize: sz })}
                           >
                             {sz}
@@ -301,22 +311,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <div>
                         <h4>Line Spacing</h4>
                         <p className="settings-card-desc">
-                          Vertical line height between text lines for comfortable reading.
+                          Vertical line height between text lines for
+                          comfortable reading.
                         </p>
                       </div>
                     </div>
 
                     <div className="settings-line-height-options">
                       {[
-                        { label: 'Compact', value: 1.4, desc: '1.4× height' },
-                        { label: 'Balanced (Default)', value: 1.65, desc: '1.65× height' },
-                        { label: 'Relaxed', value: 1.85, desc: '1.85× height' },
+                        { label: "Compact", value: 1.4, desc: "1.4× height" },
+                        {
+                          label: "Balanced (Default)",
+                          value: 1.65,
+                          desc: "1.65× height",
+                        },
+                        { label: "Relaxed", value: 1.85, desc: "1.85× height" },
                       ].map((item) => (
                         <button
                           key={item.value}
                           type="button"
-                          className={`line-height-btn ${fontSettings.lineHeight === item.value ? 'is-active' : ''}`}
-                          onClick={() => updateFontSettings({ lineHeight: item.value })}
+                          className={`line-height-btn ${fontSettings.lineHeight === item.value ? "is-active" : ""}`}
+                          onClick={() =>
+                            updateFontSettings({ lineHeight: item.value })
+                          }
                         >
                           <span className="line-height-name">{item.label}</span>
                           <span className="line-height-desc">{item.desc}</span>
@@ -340,15 +357,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         <button
                           key={opt.id}
                           type="button"
-                          className={`font-option-card ${isSelected ? 'is-selected' : ''}`}
-                          onClick={() => updateFontSettings({ sansFontId: opt.id })}
+                          className={`font-option-card ${isSelected ? "is-selected" : ""}`}
+                          onClick={() =>
+                            updateFontSettings({ sansFontId: opt.id })
+                          }
                           style={{ fontFamily: opt.family }}
                         >
                           <div className="font-card-top">
                             <span className="font-name">{opt.name}</span>
-                            {isSelected && <Check size={15} className="font-check-icon" />}
+                            {isSelected && (
+                              <Check size={15} className="font-check-icon" />
+                            )}
                           </div>
-                          <span className="font-sample" style={{ fontFamily: opt.family }}>
+                          <span
+                            className="font-sample"
+                            style={{ fontFamily: opt.family }}
+                          >
                             The quick brown fox jumps over 123
                           </span>
                           <span className="font-desc">{opt.preview}</span>
@@ -372,14 +396,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         <button
                           key={opt.id}
                           type="button"
-                          className={`font-option-card ${isSelected ? 'is-selected' : ''}`}
-                          onClick={() => updateFontSettings({ monoFontId: opt.id })}
+                          className={`font-option-card ${isSelected ? "is-selected" : ""}`}
+                          onClick={() =>
+                            updateFontSettings({ monoFontId: opt.id })
+                          }
                         >
                           <div className="font-card-top">
                             <span className="font-name">{opt.name}</span>
-                            {isSelected && <Check size={15} className="font-check-icon" />}
+                            {isSelected && (
+                              <Check size={15} className="font-check-icon" />
+                            )}
                           </div>
-                          <code className="font-sample-code" style={{ fontFamily: opt.family }}>
+                          <code
+                            className="font-sample-code"
+                            style={{ fontFamily: opt.family }}
+                          >
                             {opt.preview}
                           </code>
                         </button>
@@ -403,27 +434,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       lineHeight: fontSettings.lineHeight,
                     }}
                   >
-                    <h3 className="preview-heading"># Vulnerability Assessment & Findings</h3>
+                    <h3 className="preview-heading">
+                      # Vulnerability Assessment & Findings
+                    </h3>
                     <p className="preview-paragraph">
-                      During reconnaissance on the target surface, identified endpoint{' '}
+                      During reconnaissance on the target surface, identified
+                      endpoint{" "}
                       <code
                         className="preview-inline-code"
                         style={{ fontFamily: activeMono.family }}
                       >
                         /api/v1/auth/token
-                      </code>{' '}
-                      exhibiting potential blind SQL injection in parameter handling. Notes and evidence
-                      are synchronized locally.
+                      </code>{" "}
+                      exhibiting potential blind SQL injection in parameter
+                      handling. Notes and evidence are synchronized locally.
                     </p>
 
                     <div
                       className="preview-code-block"
                       style={{ fontFamily: activeMono.family }}
                     >
-                      <span className="code-kw">import</span> requests{'\n'}
+                      <span className="code-kw">import</span> requests{"\n"}
                       <span className="code-var">resp</span> = requests.get(
-                      <span className="code-str">"https://target/api"</span>, headers=&#123;
-                      <span className="code-str">"X-Audit"</span>: <span className="code-str">"true"</span>
+                      <span className="code-str">"https://target/api"</span>,
+                      headers=&#123;
+                      <span className="code-str">"X-Audit"</span>:{" "}
+                      <span className="code-str">"true"</span>
                       &#125;)
                     </div>
                   </div>
@@ -432,7 +468,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             )}
 
             {/* TAB 3: LAYOUT (PLACEHOLDER) */}
-            {activeTab === 'layout' && (
+            {activeTab === "layout" && (
               <div className="settings-tab-pane">
                 <div className="settings-layout-placeholder">
                   <div className="layout-placeholder-badge">
@@ -440,10 +476,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <span>Under Construction</span>
                   </div>
 
-                  <h3 className="layout-placeholder-title">Workspace & Layout Settings</h3>
+                  <h3 className="layout-placeholder-title">
+                    Workspace & Layout Settings
+                  </h3>
                   <p className="layout-placeholder-desc">
-                    Custom layout management is currently in development. You will soon be able to configure
-                    docking positions, tab strip styles, split presets, and distraction-free writing margins.
+                    Custom layout management is currently in development. You
+                    will soon be able to configure docking positions, tab strip
+                    styles, split presets, and distraction-free writing margins.
                   </p>
 
                   <div className="layout-preview-mockup">
@@ -452,7 +491,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                         <Columns size={16} strokeWidth={1.8} />
                         <div>
                           <span className="mock-title">Tab Strip Bar</span>
-                          <span className="mock-subtitle">Show open file navigation tabs above editor</span>
+                          <span className="mock-subtitle">
+                            Show open file navigation tabs above editor
+                          </span>
                         </div>
                       </div>
                       <span className="mock-pill is-active">Enabled</span>
@@ -462,8 +503,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <div className="mock-item-left">
                         <LayoutTemplate size={16} strokeWidth={1.8} />
                         <div>
-                          <span className="mock-title">Split View Orientation Preset</span>
-                          <span className="mock-subtitle">Default multi-file splitting direction</span>
+                          <span className="mock-title">
+                            Split View Orientation Preset
+                          </span>
+                          <span className="mock-subtitle">
+                            Default multi-file splitting direction
+                          </span>
                         </div>
                       </div>
                       <span className="mock-pill">Horizontal</span>
@@ -473,8 +518,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <div className="mock-item-left">
                         <Compass size={16} strokeWidth={1.8} />
                         <div>
-                          <span className="mock-title">Distraction-Free Zen Mode</span>
-                          <span className="mock-subtitle">Centered content with wide readable margins</span>
+                          <span className="mock-title">
+                            Distraction-Free Zen Mode
+                          </span>
+                          <span className="mock-subtitle">
+                            Centered content with wide readable margins
+                          </span>
                         </div>
                       </div>
                       <span className="mock-pill">Coming Soon</span>
@@ -489,4 +538,3 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
     </div>
   );
 };
-

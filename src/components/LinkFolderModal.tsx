@@ -1,16 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  FolderOpen,
-  FolderPlus,
-  HardDrive,
-  LoaderCircle,
-  X,
-} from 'lucide-react';
-import { useEscapeKey } from '../hooks/useDomInteractions';
-import { buildExplorerTreeFromFiles } from '../lib/fileUtils';
-import { fsApi } from '../lib/fsApi';
-import { useNotesStore } from '../store/useNotesStore';
-import { LinkModalTargetMode } from '../types';
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { FolderOpen, FolderPlus, LoaderCircle, X } from "lucide-react";
+import { useEscapeKey } from "../hooks/useDomInteractions";
+import { buildExplorerTreeFromFiles } from "../lib/fileUtils";
+import { fsApi } from "../lib/fsApi";
+import { useNotesStore } from "../store/useNotesStore";
+import { LinkModalTargetMode } from "../types";
 
 export const LinkFolderModal: React.FC = () => {
   const isOpen = useNotesStore((s) => s.isLinkModalOpen);
@@ -24,28 +18,28 @@ export const LinkFolderModal: React.FC = () => {
 
   const activeFolder = folders.find((f) => f.id === selectedFolderId) ?? null;
 
-  const [folderPath, setFolderPath] = useState<string>('');
-  const [targetMode, setTargetMode] = useState<LinkModalTargetMode>('new-tab');
-  const [customName, setCustomName] = useState('');
+  const [folderPath, setFolderPath] = useState<string>("");
+  const [targetMode, setTargetMode] = useState<LinkModalTargetMode>("new-tab");
+  const [customName, setCustomName] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const folderInputRef = useRef<HTMLInputElement | null>(null);
 
   const setFolderInputElement = useCallback((el: HTMLInputElement | null) => {
     folderInputRef.current = el;
     if (el) {
-      el.setAttribute('webkitdirectory', '');
-      el.setAttribute('directory', '');
-      el.setAttribute('mozdirectory', '');
+      el.setAttribute("webkitdirectory", "");
+      el.setAttribute("directory", "");
+      el.setAttribute("mozdirectory", "");
     }
   }, []);
 
   useEffect(() => {
     if (isOpen) {
-      setTargetMode(activeFolder ? initialTargetMode : 'new-tab');
+      setTargetMode(activeFolder ? initialTargetMode : "new-tab");
     } else {
-      setError('');
+      setError("");
       setBusy(false);
     }
   }, [isOpen, initialTargetMode, activeFolder]);
@@ -55,34 +49,48 @@ export const LinkFolderModal: React.FC = () => {
   if (!isOpen) return null;
 
   const handleBrowseFolderClick = async () => {
-    if (typeof window !== 'undefined' && window.electronAPI?.dialog?.selectFolder) {
+    if (
+      typeof window !== "undefined" &&
+      window.electronAPI?.dialog?.selectFolder
+    ) {
       try {
         const selected = await window.electronAPI.dialog.selectFolder();
         if (selected) {
           setFolderPath(selected);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to open folder picker.');
+        setError(
+          err instanceof Error ? err.message : "Failed to open folder picker.",
+        );
       }
       return;
     }
     folderInputRef.current?.click();
   };
 
-  const handleFolderFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFolderFilesSelected = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
-    e.target.value = '';
+    e.target.value = "";
     if (selectedFiles.length === 0) return;
 
     setBusy(true);
-    setError('');
+    setError("");
     try {
-      const { rootName, items } = await buildExplorerTreeFromFiles(selectedFiles, customName);
-      const placement: LinkModalTargetMode = activeFolder ? targetMode : 'new-tab';
+      const { rootName, items } = await buildExplorerTreeFromFiles(
+        selectedFiles,
+        customName,
+      );
+      const placement: LinkModalTargetMode = activeFolder
+        ? targetMode
+        : "new-tab";
       importFolder(rootName, items, placement);
       closeLinkModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to read selected folder.');
+      setError(
+        err instanceof Error ? err.message : "Failed to read selected folder.",
+      );
     } finally {
       setBusy(false);
     }
@@ -90,30 +98,32 @@ export const LinkFolderModal: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleaned = folderPath.replace(/^["']+|["']+$/g, '').trim();
+    const cleaned = folderPath.replace(/^["']+|["']+$/g, "").trim();
     if (!cleaned) {
-      setError('Please provide a folder path or use Browse.');
+      setError("Please provide a folder path or use Browse.");
       return;
     }
 
     setBusy(true);
-    setError('');
+    setError("");
     try {
-      if (targetMode === 'current-tab' && activeFolder) {
+      if (targetMode === "current-tab" && activeFolder) {
         const ok = await linkFolderToDisk(activeFolder.id, cleaned);
         if (!ok) {
-          throw new Error('Failed to link and sync local folder.');
+          throw new Error("Failed to link and sync local folder.");
         }
-      } else if (targetMode === 'subfolder' && activeFolder) {
+      } else if (targetMode === "subfolder" && activeFolder) {
         const result = await fsApi.scanFolder(cleaned);
-        const folderName = customName.trim() || result.rootName || 'New Folder';
-        importFolder(folderName, result.items, 'subfolder', result.rootPath);
+        const folderName = customName.trim() || result.rootName || "New Folder";
+        importFolder(folderName, result.items, "subfolder", result.rootPath);
       } else {
         await openLocalFolderAsTab(cleaned, customName);
       }
       closeLinkModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add local folder.');
+      setError(
+        err instanceof Error ? err.message : "Failed to add local folder.",
+      );
     } finally {
       setBusy(false);
     }
@@ -141,7 +151,7 @@ export const LinkFolderModal: React.FC = () => {
         />
 
         <div className="modal-heading">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <FolderPlus size={20} className="primary-accent-icon" />
             <h2>Add Folder</h2>
           </div>
@@ -156,7 +166,10 @@ export const LinkFolderModal: React.FC = () => {
           </button>
         </div>
 
-        <form onSubmit={(e) => void handleSubmit(e)} className="add-folder-form">
+        <form
+          onSubmit={(e) => void handleSubmit(e)}
+          className="add-folder-form"
+        >
           <label className="field-label" htmlFor="local-folder-path-input">
             Local folder path
           </label>
@@ -183,7 +196,7 @@ export const LinkFolderModal: React.FC = () => {
             </button>
           </div>
 
-          {targetMode !== 'current-tab' && (
+          {targetMode !== "current-tab" && (
             <>
               <label className="field-label" htmlFor="local-tab-custom-name">
                 Folder display name<span>Optional</span>
@@ -211,8 +224,8 @@ export const LinkFolderModal: React.FC = () => {
                   <input
                     type="radio"
                     name="link-target"
-                    checked={targetMode === 'new-tab'}
-                    onChange={() => setTargetMode('new-tab')}
+                    checked={targetMode === "new-tab"}
+                    onChange={() => setTargetMode("new-tab")}
                     disabled={busy}
                   />
                   <span>Open as a new tab</span>
@@ -221,21 +234,25 @@ export const LinkFolderModal: React.FC = () => {
                   <input
                     type="radio"
                     name="link-target"
-                    checked={targetMode === 'subfolder'}
-                    onChange={() => setTargetMode('subfolder')}
+                    checked={targetMode === "subfolder"}
+                    onChange={() => setTargetMode("subfolder")}
                     disabled={busy}
                   />
-                  <span>Open as a subfolder inside &ldquo;{activeFolder.name}&rdquo;</span>
+                  <span>
+                    Open as a subfolder inside &ldquo;{activeFolder.name}&rdquo;
+                  </span>
                 </label>
                 <label className="radio-option">
                   <input
                     type="radio"
                     name="link-target"
-                    checked={targetMode === 'current-tab'}
-                    onChange={() => setTargetMode('current-tab')}
+                    checked={targetMode === "current-tab"}
+                    onChange={() => setTargetMode("current-tab")}
                     disabled={busy}
                   />
-                  <span>Link to active tab &ldquo;{activeFolder.name}&rdquo;</span>
+                  <span>
+                    Link to active tab &ldquo;{activeFolder.name}&rdquo;
+                  </span>
                 </label>
               </div>
             </div>
@@ -261,8 +278,12 @@ export const LinkFolderModal: React.FC = () => {
               className="primary-subtle-btn"
               disabled={busy || !folderPath.trim()}
             >
-              {busy ? <LoaderCircle size={15} className="spin" /> : <FolderPlus size={15} />}
-              <span>{busy ? 'Adding Folder...' : 'Add Folder'}</span>
+              {busy ? (
+                <LoaderCircle size={15} className="spin" />
+              ) : (
+                <FolderPlus size={15} />
+              )}
+              <span>{busy ? "Adding Folder..." : "Add Folder"}</span>
             </button>
           </div>
         </form>

@@ -2,83 +2,85 @@ export interface FontOption {
   id: string;
   name: string;
   family: string;
-  category: 'sans' | 'serif' | 'mono';
+  category: "sans" | "serif" | "mono";
   preview: string;
 }
 
 export const SANS_FONT_OPTIONS: FontOption[] = [
   {
-    id: 'system',
-    name: 'System Default',
+    id: "system",
+    name: "System Default",
     family:
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif",
-    category: 'sans',
-    preview: 'Clean modern system UI font',
+    category: "sans",
+    preview: "Clean modern system UI font",
   },
   {
-    id: 'inter',
-    name: 'Inter',
-    family: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-    category: 'sans',
-    preview: 'Crafted for screen readability & technical UI',
+    id: "inter",
+    name: "Inter",
+    family:
+      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    category: "sans",
+    preview: "Crafted for screen readability & technical UI",
   },
   {
-    id: 'roboto',
-    name: 'Roboto',
+    id: "roboto",
+    name: "Roboto",
     family: "'Roboto', 'Segoe UI', Arial, sans-serif",
-    category: 'sans',
-    preview: 'Geometric yet friendly modern curves',
+    category: "sans",
+    preview: "Geometric yet friendly modern curves",
   },
   {
-    id: 'segoe',
-    name: 'Segoe UI',
+    id: "segoe",
+    name: "Segoe UI",
     family: "'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif",
-    category: 'sans',
-    preview: 'Fluent typography for desktop applications',
+    category: "sans",
+    preview: "Fluent typography for desktop applications",
   },
   {
-    id: 'merriweather',
-    name: 'Merriweather / Serif',
+    id: "merriweather",
+    name: "Merriweather / Serif",
     family: "'Merriweather', Georgia, 'Times New Roman', serif",
-    category: 'serif',
-    preview: 'Elegant editorial serif for distraction-free reading',
+    category: "serif",
+    preview: "Elegant editorial serif for distraction-free reading",
   },
   {
-    id: 'jetbrains-all',
-    name: 'JetBrains Mono (Full Monospace)',
+    id: "jetbrains-all",
+    name: "JetBrains Mono (Full Monospace)",
     family: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace",
-    category: 'mono',
-    preview: 'Code-first monospaced layout for all text',
+    category: "mono",
+    preview: "Code-first monospaced layout for all text",
   },
 ];
 
 export const MONO_FONT_OPTIONS: FontOption[] = [
   {
-    id: 'jetbrains',
-    name: 'JetBrains Mono',
-    family: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace",
-    category: 'mono',
-    preview: 'const audit = (target: string) => true;',
+    id: "jetbrains",
+    name: "JetBrains Mono",
+    family:
+      "'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    category: "mono",
+    preview: "const audit = (target: string) => true;",
   },
   {
-    id: 'fira-code',
-    name: 'Fira Code',
+    id: "fira-code",
+    name: "Fira Code",
     family: "'Fira Code', 'JetBrains Mono', Consolas, monospace",
-    category: 'mono',
-    preview: 'fn connect() -> Result<(), Error> { ok() }',
+    category: "mono",
+    preview: "fn connect() -> Result<(), Error> { ok() }",
   },
   {
-    id: 'cascadia',
-    name: 'Cascadia Code',
+    id: "cascadia",
+    name: "Cascadia Code",
     family: "'Cascadia Code', Consolas, 'JetBrains Mono', monospace",
-    category: 'mono',
-    preview: 'SELECT * FROM pent_logs WHERE status = 200;',
+    category: "mono",
+    preview: "SELECT * FROM pent_logs WHERE status = 200;",
   },
   {
-    id: 'consolas',
-    name: 'Consolas',
+    id: "consolas",
+    name: "Consolas",
     family: "Consolas, 'Courier New', monospace",
-    category: 'mono',
+    category: "mono",
     preview: 'printf("payload: %s\\n", buffer);',
   },
 ];
@@ -91,13 +93,13 @@ export interface FontSettings {
 }
 
 export const DEFAULT_FONT_SETTINGS: FontSettings = {
-  sansFontId: 'system',
-  monoFontId: 'jetbrains',
+  sansFontId: "system",
+  monoFontId: "jetbrains",
   fontSize: 16,
   lineHeight: 1.65,
 };
 
-export const FONT_SETTINGS_STORAGE_KEY = 'pentnotes.fonts.v1';
+const FONT_SETTINGS_STORAGE_KEY = "pentnotes.fonts.v1";
 
 export function initialFontSettings(): FontSettings {
   try {
@@ -124,16 +126,23 @@ export function saveFontSettings(settings: FontSettings): void {
 }
 
 export function applyFontSettings(settings: FontSettings): void {
-  if (typeof document === 'undefined') return;
+  if (typeof document === "undefined") return;
 
   const sans =
-    SANS_FONT_OPTIONS.find((f) => f.id === settings.sansFontId) ?? SANS_FONT_OPTIONS[0];
+    SANS_FONT_OPTIONS.find((f) => f.id === settings.sansFontId) ??
+    SANS_FONT_OPTIONS[0];
   const mono =
-    MONO_FONT_OPTIONS.find((f) => f.id === settings.monoFontId) ?? MONO_FONT_OPTIONS[0];
+    MONO_FONT_OPTIONS.find((f) => f.id === settings.monoFontId) ??
+    MONO_FONT_OPTIONS[0];
 
-  document.documentElement.style.setProperty('--font-sans', sans.family);
-  document.documentElement.style.setProperty('--font-mono', mono.family);
-  document.documentElement.style.setProperty('--editor-font-size', `${settings.fontSize}px`);
-  document.documentElement.style.setProperty('--editor-line-height', String(settings.lineHeight));
+  document.documentElement.style.setProperty("--font-sans", sans.family);
+  document.documentElement.style.setProperty("--font-mono", mono.family);
+  document.documentElement.style.setProperty(
+    "--editor-font-size",
+    `${settings.fontSize}px`,
+  );
+  document.documentElement.style.setProperty(
+    "--editor-line-height",
+    String(settings.lineHeight),
+  );
 }
-

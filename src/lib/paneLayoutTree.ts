@@ -1,22 +1,28 @@
-import { EditorViewMode, PaneBranchNode, PaneLayoutNode, PaneLeafNode, SplitDirection } from '../types';
+import {
+  EditorViewMode,
+  PaneBranchNode,
+  PaneLayoutNode,
+  PaneLeafNode,
+  SplitDirection,
+} from "../types";
 
 export function createPaneId(): string {
-  return 'pane-' + Math.random().toString(36).slice(2, 9);
+  return "pane-" + Math.random().toString(36).slice(2, 9);
 }
 
 export function createBranchId(): string {
-  return 'branch-' + Math.random().toString(36).slice(2, 9);
+  return "branch-" + Math.random().toString(36).slice(2, 9);
 }
 
 export function createLeafNode(
   folderId: string | null,
   noteId: string | null,
-  viewMode: EditorViewMode = 'obsidian',
-  id?: string
+  viewMode: EditorViewMode = "obsidian",
+  id?: string,
 ): PaneLeafNode {
   return {
     id: id || createPaneId(),
-    type: 'leaf',
+    type: "leaf",
     folderId,
     noteId,
     viewMode,
@@ -25,19 +31,16 @@ export function createLeafNode(
 
 export function getAllLeaves(node: PaneLayoutNode | null): PaneLeafNode[] {
   if (!node) return [];
-  if (node.type === 'leaf') return [node];
+  if (node.type === "leaf") return [node];
   return node.children.flatMap(getAllLeaves);
 }
 
-export function countLeaves(node: PaneLayoutNode | null): number {
-  if (!node) return 0;
-  if (node.type === 'leaf') return 1;
-  return node.children.reduce((acc, c) => acc + countLeaves(c), 0);
-}
-
-export function findLeaf(node: PaneLayoutNode | null, leafId: string): PaneLeafNode | null {
+export function findLeaf(
+  node: PaneLayoutNode | null,
+  leafId: string,
+): PaneLeafNode | null {
   if (!node) return null;
-  if (node.type === 'leaf') {
+  if (node.type === "leaf") {
     return node.id === leafId ? node : null;
   }
   for (const child of node.children) {
@@ -51,13 +54,13 @@ export function splitLeafInTree(
   root: PaneLayoutNode,
   targetLeafId: string,
   direction: SplitDirection,
-  newLeaf: PaneLeafNode
+  newLeaf: PaneLeafNode,
 ): PaneLayoutNode {
-  if (root.type === 'leaf') {
+  if (root.type === "leaf") {
     if (root.id === targetLeafId) {
       return {
         id: createBranchId(),
-        type: 'branch',
+        type: "branch",
         direction,
         children: [root, newLeaf],
         sizes: [0.5, 0.5],
@@ -89,7 +92,7 @@ export function splitLeafInTree(
       // Perpendicular direction: nest into a sub-branch at targetIdx
       const subBranch: PaneBranchNode = {
         id: createBranchId(),
-        type: 'branch',
+        type: "branch",
         direction,
         children: [targetChild, newLeaf],
         sizes: [0.5, 0.5],
@@ -106,7 +109,9 @@ export function splitLeafInTree(
   // Target leaf is nested deeper
   return {
     ...root,
-    children: root.children.map((c) => splitLeafInTree(c, targetLeafId, direction, newLeaf)),
+    children: root.children.map((c) =>
+      splitLeafInTree(c, targetLeafId, direction, newLeaf),
+    ),
   };
 }
 
@@ -118,9 +123,9 @@ function normalizeSizes(sizes: number[]): number[] {
 
 export function removeLeafFromTree(
   root: PaneLayoutNode,
-  targetLeafId: string
+  targetLeafId: string,
 ): PaneLayoutNode | null {
-  if (root.type === 'leaf') {
+  if (root.type === "leaf") {
     return root.id === targetLeafId ? null : root;
   }
 
@@ -168,9 +173,9 @@ export function removeLeafFromTree(
 export function updateLeafInTree(
   root: PaneLayoutNode,
   leafId: string,
-  updater: (leaf: PaneLeafNode) => PaneLeafNode
+  updater: (leaf: PaneLeafNode) => PaneLeafNode,
 ): PaneLayoutNode {
-  if (root.type === 'leaf') {
+  if (root.type === "leaf") {
     return root.id === leafId ? updater(root) : root;
   }
   return {
@@ -184,9 +189,9 @@ export function resizeBranchInTree(
   branchId: string,
   dividerIndex: number,
   deltaRatio: number,
-  minSize = 0.08
+  minSize = 0.08,
 ): PaneLayoutNode {
-  if (root.type === 'leaf') return root;
+  if (root.type === "leaf") return root;
 
   if (root.id === branchId) {
     const i = dividerIndex;
@@ -213,12 +218,17 @@ export function resizeBranchInTree(
 
   return {
     ...root,
-    children: root.children.map((c) => resizeBranchInTree(c, branchId, dividerIndex, deltaRatio, minSize)),
+    children: root.children.map((c) =>
+      resizeBranchInTree(c, branchId, dividerIndex, deltaRatio, minSize),
+    ),
   };
 }
 
-export function resetBranchSizes(root: PaneLayoutNode, branchId?: string): PaneLayoutNode {
-  if (root.type === 'leaf') return root;
+export function resetBranchSizes(
+  root: PaneLayoutNode,
+  branchId?: string,
+): PaneLayoutNode {
+  if (root.type === "leaf") return root;
 
   if (!branchId || root.id === branchId) {
     const evenSizes = root.children.map(() => 1 / root.children.length);
@@ -235,11 +245,15 @@ export function resetBranchSizes(root: PaneLayoutNode, branchId?: string): PaneL
   };
 }
 
-export function toggleBranchDirection(root: PaneLayoutNode, branchId?: string): PaneLayoutNode {
-  if (root.type === 'leaf') return root;
+export function toggleBranchDirection(
+  root: PaneLayoutNode,
+  branchId?: string,
+): PaneLayoutNode {
+  if (root.type === "leaf") return root;
 
   if (!branchId || root.id === branchId) {
-    const nextDir: SplitDirection = root.direction === 'horizontal' ? 'vertical' : 'horizontal';
+    const nextDir: SplitDirection =
+      root.direction === "horizontal" ? "vertical" : "horizontal";
     return {
       ...root,
       direction: nextDir,
@@ -251,4 +265,3 @@ export function toggleBranchDirection(root: PaneLayoutNode, branchId?: string): 
     children: root.children.map((c) => toggleBranchDirection(c, branchId)),
   };
 }
-

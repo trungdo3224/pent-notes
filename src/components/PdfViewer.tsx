@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Download, ExternalLink, FileText } from 'lucide-react';
+import React, { useEffect, useMemo, useRef } from "react";
+import { Download, ExternalLink, FileText } from "lucide-react";
 
 interface PdfViewerProps {
   title: string;
@@ -9,12 +9,12 @@ interface PdfViewerProps {
 }
 
 function formatPdfFilename(title: string): string {
-  return title.endsWith('.pdf') ? title : `${title}.pdf`;
+  return title.endsWith(".pdf") ? title : `${title}.pdf`;
 }
 
 function convertDataUrlToBlobUrl(dataUrl: string): string {
-  const parts = dataUrl.split(',');
-  const mime = parts[0].match(/:(.*?);/)?.[1] || 'application/pdf';
+  const parts = dataUrl.split(",");
+  const mime = parts[0].match(/:(.*?);/)?.[1] || "application/pdf";
   const binaryStr = atob(parts[1]);
   const bytes = new Uint8Array(binaryStr.length);
   for (let i = 0; i < binaryStr.length; i++) {
@@ -28,7 +28,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   title,
   filePath,
   pdfData,
-  className = '',
+  className = "",
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const activeBlobUrlRef = useRef<string | null>(null);
@@ -37,7 +37,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
     return () => {
       // RFC-042 Pillar 3: Bound rendering pipeline and release GPU/Renderer bitmap contexts
       if (iframeRef.current) {
-        iframeRef.current.src = 'about:blank';
+        iframeRef.current.src = "about:blank";
       }
       if (activeBlobUrlRef.current) {
         URL.revokeObjectURL(activeBlobUrlRef.current);
@@ -51,18 +51,22 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
       return pdfData;
     }
     if (filePath) {
-      if (typeof window !== 'undefined' && window.electronAPI?.fs?.getRawUrl) {
+      if (typeof window !== "undefined" && window.electronAPI?.fs?.getRawUrl) {
         return window.electronAPI.fs.getRawUrl(filePath);
       }
       return `/api/fs/raw?path=${encodeURIComponent(filePath)}`;
     }
-    return '';
+    return "";
   }, [filePath, pdfData]);
 
   if (!pdfUrl) {
     return (
       <div className={`pdf-viewer-empty ${className}`}>
-        <FileText size={42} strokeWidth={1.5} className="pdf-viewer-empty-icon" />
+        <FileText
+          size={42}
+          strokeWidth={1.5}
+          className="pdf-viewer-empty-icon"
+        />
         <h3>PDF Source Unavailable</h3>
         <p>No valid file path or data found for this document.</p>
       </div>
@@ -74,18 +78,18 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   const handleOpenExternal = () => {
     if (pdfData) {
       try {
-        window.open(convertDataUrlToBlobUrl(pdfData), '_blank');
+        window.open(convertDataUrlToBlobUrl(pdfData), "_blank");
         return;
       } catch {
-        window.open(pdfUrl, '_blank');
+        window.open(pdfUrl, "_blank");
         return;
       }
     }
-    window.open(pdfUrl, '_blank');
+    window.open(pdfUrl, "_blank");
   };
 
   const handleDownload = () => {
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = pdfUrl;
     link.download = displayFilename;
     document.body.appendChild(link);
@@ -135,5 +139,3 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
     </div>
   );
 };
-
-export default PdfViewer;
