@@ -364,7 +364,11 @@ async function ensureSessionsDir() {
       updatedAt: Date.now(),
       payload: initialPayload
     };
-    await fs.writeFile(defaultPath, JSON.stringify(defaultSession, null, 2), "utf-8");
+    await fs.writeFile(
+      defaultPath,
+      JSON.stringify(defaultSession, null, 2),
+      "utf-8"
+    );
   }
 }
 async function listAllSessions() {
@@ -395,7 +399,10 @@ async function listAllSessions() {
 }
 async function readSessionPayloadIfExists(sessionId) {
   try {
-    const raw = await fs.readFile(path.join(SESSIONS_DIR, `${sessionId}.json`), "utf-8");
+    const raw = await fs.readFile(
+      path.join(SESSIONS_DIR, `${sessionId}.json`),
+      "utf-8"
+    );
     const data = JSON.parse(raw);
     return typeof data.payload === "string" ? data.payload : null;
   } catch {
@@ -459,12 +466,22 @@ async function saveSession(sessionId, name, payload) {
     await fs.mkdir(DATA_DIR, { recursive: true });
     await fs.writeFile(
       STATE_FILE,
-      JSON.stringify({ savedAt: updated.updatedAt, payload: updated.payload }),
+      JSON.stringify({
+        savedAt: updated.updatedAt,
+        payload: updated.payload
+      }),
       "utf-8"
     ).catch(() => {
     });
   }
-  return { ok: true, session: { id: updated.id, name: updated.name, updatedAt: updated.updatedAt } };
+  return {
+    ok: true,
+    session: {
+      id: updated.id,
+      name: updated.name,
+      updatedAt: updated.updatedAt
+    }
+  };
 }
 async function deleteSession(sessionId) {
   const list = await listAllSessions();
