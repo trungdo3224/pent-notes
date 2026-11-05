@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
   ChevronDown,
@@ -16,8 +16,8 @@ import {
   PanelRightClose,
   Search,
   Tag,
-} from 'lucide-react';
-import { useCopyFeedback } from '../hooks/useDomInteractions';
+} from "lucide-react";
+import { useCopyFeedback } from "../hooks/useDomInteractions";
 import {
   buildHeadingTree,
   calculateNoteStats,
@@ -26,14 +26,14 @@ import {
   extractTags,
   HeadingNode,
   scrollToHeading,
-} from '../lib/catalogUtils';
-import { findLeaf } from '../lib/paneLayoutTree';
+} from "../lib/catalogUtils";
+import { findLeaf } from "../lib/paneLayoutTree";
 import {
   DEFAULT_RIGHT_SIDEBAR_WIDTH,
   findNoteAndPath,
   resolveActiveNoteData,
   useNotesStore,
-} from '../store/useNotesStore';
+} from "../store/useNotesStore";
 
 interface NoteCatalogSidebarProps {
   onOpenSearchWithQuery?: (query: string) => void;
@@ -45,10 +45,12 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
   const folders = useNotesStore((s) => s.folders);
   const selectedFolderId = useNotesStore((s) => s.selectedFolderId);
   const selectedNoteByFolder = useNotesStore((s) => s.selectedNoteByFolder);
-  const sortOrder = useNotesStore((s) => s.sortOrder ?? 'name-asc');
+  const sortOrder = useNotesStore((s) => s.sortOrder ?? "name-asc");
   const isCollapsed = useNotesStore((s) => s.isRightSidebarCollapsed);
-  const width = useNotesStore((s) => s.rightSidebarWidth ?? DEFAULT_RIGHT_SIDEBAR_WIDTH);
-  const activeTab = useNotesStore((s) => s.rightSidebarTab ?? 'outline');
+  const width = useNotesStore(
+    (s) => s.rightSidebarWidth ?? DEFAULT_RIGHT_SIDEBAR_WIDTH,
+  );
+  const activeTab = useNotesStore((s) => s.rightSidebarTab ?? "outline");
   const isSplitViewActive = useNotesStore((s) => s.isSplitViewActive);
   const activePane = useNotesStore((s) => s.activePane);
   const secondaryFolderId = useNotesStore((s) => s.secondaryFolderId);
@@ -58,13 +60,15 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
 
   const toggleRightSidebar = useNotesStore((s) => s.toggleRightSidebar);
   const setRightSidebarTab = useNotesStore((s) => s.setRightSidebarTab);
+  const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
+  const loadNoteContent = useNotesStore((s) => s.loadNoteContent);
 
-  const [headingFilter, setHeadingFilter] = useState('');
+  const [headingFilter, setHeadingFilter] = useState("");
   const [copiedPath, copyPath] = useCopyFeedback();
 
   const activeFolder = useMemo(
     () => folders.find((f) => f.id === selectedFolderId) ?? null,
-    [folders, selectedFolderId]
+    [folders, selectedFolderId],
   );
 
   const activeNoteData = useMemo(() => {
@@ -74,7 +78,9 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
         if (activeLeaf.folderId) {
           const secFolder = folders.find((f) => f.id === activeLeaf.folderId);
           if (secFolder) {
-            const found = findNoteAndPath(secFolder.items, activeLeaf.noteId, [secFolder.name]);
+            const found = findNoteAndPath(secFolder.items, activeLeaf.noteId, [
+              secFolder.name,
+            ]);
             if (found) return found;
           }
         }
@@ -84,11 +90,13 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
         }
       }
     }
-    if (isSplitViewActive && activePane === 'secondary' && secondaryNoteId) {
+    if (isSplitViewActive && activePane === "secondary" && secondaryNoteId) {
       if (secondaryFolderId) {
         const secFolder = folders.find((f) => f.id === secondaryFolderId);
         if (secFolder) {
-          const found = findNoteAndPath(secFolder.items, secondaryNoteId, [secFolder.name]);
+          const found = findNoteAndPath(secFolder.items, secondaryNoteId, [
+            secFolder.name,
+          ]);
           if (found) return found;
         }
       }
@@ -113,12 +121,28 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
 
   const note = activeNoteData?.note ?? null;
 
-  const headings = useMemo(() => {
-    if (!note) return [];
-    return extractHeadings(note.content);
-  }, [note?.content]);
+  useEffect(() => {
+    if (
+      note?.id &&
+      note?.filePath &&
+      activeNoteContents[note.id] === undefined
+    ) {
+      void loadNoteContent(note.id, note.filePath);
+    }
+  }, [note?.id, note?.filePath, activeNoteContents, loadNoteContent]);
 
-  const [collapsedHeadingIds, setCollapsedHeadingIds] = useState<Set<string>>(new Set());
+  const noteContent = note?.filePath
+    ? (activeNoteContents[note.id] ?? "")
+    : (note?.content ?? "");
+
+  const headings = useMemo(() => {
+    if (!noteContent) return [];
+    return extractHeadings(noteContent);
+  }, [noteContent]);
+
+  const [collapsedHeadingIds, setCollapsedHeadingIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   useEffect(() => {
     setCollapsedHeadingIds(new Set());
@@ -138,7 +162,9 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
     }
 
     if (tree.length === 1 && tree[0].children.length > 0) {
-      const secondLevelHasChildren = tree[0].children.some((c) => c.children.length > 0);
+      const secondLevelHasChildren = tree[0].children.some(
+        (c) => c.children.length > 0,
+      );
       if (secondLevelHasChildren) {
         // Document title (#) and primary sections (##) remain open;
         // any subheaders under the primary sections collapse into them.
@@ -205,23 +231,25 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
   }, [headingTree, headingFilter]);
 
   const noteTags = useMemo(() => {
-    if (!note) return [];
-    return extractTags(note.content);
-  }, [note?.content]);
+    if (!noteContent) return [];
+    return extractTags(noteContent);
+  }, [noteContent]);
 
   const allWorkspaceTags = useMemo(() => {
     return extractAllWorkspaceTags(folders);
   }, [folders]);
 
   const stats = useMemo(() => {
-    if (!note) return null;
-    return calculateNoteStats(note.content);
-  }, [note?.content]);
+    if (!noteContent) return null;
+    return calculateNoteStats(noteContent);
+  }, [noteContent]);
 
   const renderHeadingNodes = (nodes: HeadingNode[]): React.ReactNode => {
     return nodes.map((node) => {
       const hasChildren = node.children.length > 0;
-      const isCollapsed = headingFilter.trim() ? false : collapsedHeadingIds.has(node.id);
+      const isCollapsed = headingFilter.trim()
+        ? false
+        : collapsedHeadingIds.has(node.id);
       const indentLevel = Math.max(0, node.level - 1);
 
       return (
@@ -229,11 +257,11 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
           <div
             role="button"
             tabIndex={0}
-            className={`outline-item level-${node.level} ${isCollapsed ? 'is-collapsed' : ''}`}
+            className={`outline-item level-${node.level} ${isCollapsed ? "is-collapsed" : ""}`}
             style={{ paddingLeft: `${6 + indentLevel * 12}px` }}
             onClick={() => scrollToHeading(node.text, node.level)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
+              if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 scrollToHeading(node.text, node.level);
               }
@@ -248,10 +276,18 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                   e.stopPropagation();
                   toggleHeadingCollapse(node.id);
                 }}
-                title={isCollapsed ? 'Expand subheaders' : 'Collapse subheaders'}
-                aria-label={isCollapsed ? 'Expand subheaders' : 'Collapse subheaders'}
+                title={
+                  isCollapsed ? "Expand subheaders" : "Collapse subheaders"
+                }
+                aria-label={
+                  isCollapsed ? "Expand subheaders" : "Collapse subheaders"
+                }
               >
-                {isCollapsed ? <ChevronRight size={13} strokeWidth={2} /> : <ChevronDown size={13} strokeWidth={2} />}
+                {isCollapsed ? (
+                  <ChevronRight size={13} strokeWidth={2} />
+                ) : (
+                  <ChevronDown size={13} strokeWidth={2} />
+                )}
               </button>
             ) : (
               <span className="outline-chevron-spacer" />
@@ -278,7 +314,11 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
       {/* Header */}
       <div className="catalog-header">
         <div className="catalog-title-wrapper">
-          <BookOpen size={16} strokeWidth={1.8} className="catalog-header-icon" />
+          <BookOpen
+            size={16}
+            strokeWidth={1.8}
+            className="catalog-header-icon"
+          />
           <span className="catalog-header-title">NOTE CATALOG</span>
         </div>
         <button
@@ -297,35 +337,39 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
         <button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'outline'}
-          className={`catalog-tab-btn ${activeTab === 'outline' ? 'is-active' : ''}`}
-          onClick={() => setRightSidebarTab('outline')}
+          aria-selected={activeTab === "outline"}
+          className={`catalog-tab-btn ${activeTab === "outline" ? "is-active" : ""}`}
+          onClick={() => setRightSidebarTab("outline")}
           title="Headings Outline (Table of Contents)"
         >
           <ListTree size={13} strokeWidth={1.8} />
           <span>Outline</span>
-          {headings.length > 0 && <span className="catalog-tab-badge">{headings.length}</span>}
+          {headings.length > 0 && (
+            <span className="catalog-tab-badge">{headings.length}</span>
+          )}
         </button>
 
         <button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'tags'}
-          className={`catalog-tab-btn ${activeTab === 'tags' ? 'is-active' : ''}`}
-          onClick={() => setRightSidebarTab('tags')}
+          aria-selected={activeTab === "tags"}
+          className={`catalog-tab-btn ${activeTab === "tags" ? "is-active" : ""}`}
+          onClick={() => setRightSidebarTab("tags")}
           title="Tags & Categories"
         >
           <Tag size={13} strokeWidth={1.8} />
           <span>Tags</span>
-          {noteTags.length > 0 && <span className="catalog-tab-badge">{noteTags.length}</span>}
+          {noteTags.length > 0 && (
+            <span className="catalog-tab-badge">{noteTags.length}</span>
+          )}
         </button>
 
         <button
           type="button"
           role="tab"
-          aria-selected={activeTab === 'info'}
-          className={`catalog-tab-btn ${activeTab === 'info' ? 'is-active' : ''}`}
-          onClick={() => setRightSidebarTab('info')}
+          aria-selected={activeTab === "info"}
+          className={`catalog-tab-btn ${activeTab === "info" ? "is-active" : ""}`}
+          onClick={() => setRightSidebarTab("info")}
           title="Note Properties & Metadata"
         >
           <Info size={13} strokeWidth={1.8} />
@@ -337,13 +381,17 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
       <div className="catalog-content">
         {!note ? (
           <div className="catalog-empty">
-            <BookOpen size={24} strokeWidth={1.4} className="catalog-empty-icon" />
+            <BookOpen
+              size={24}
+              strokeWidth={1.4}
+              className="catalog-empty-icon"
+            />
             <p>Select a note to inspect its outline and catalog.</p>
           </div>
         ) : (
           <>
             {/* Outline / Table of Contents Tab */}
-            {activeTab === 'outline' && (
+            {activeTab === "outline" && (
               <div className="catalog-outline-view">
                 {headings.length > 0 && (
                   <div className="catalog-outline-toolbar">
@@ -360,7 +408,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                         <button
                           type="button"
                           className="catalog-search-clear"
-                          onClick={() => setHeadingFilter('')}
+                          onClick={() => setHeadingFilter("")}
                           title="Clear filter"
                         >
                           ×
@@ -373,12 +421,16 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                       className="catalog-toolbar-btn"
                       title={
                         !hasCollapsibleSubheaders
-                          ? 'No subheaders to collapse'
+                          ? "No subheaders to collapse"
                           : isAllSubheadersCollapsed
-                          ? 'Expand all subheaders'
-                          : 'Collapse all subheaders'
+                            ? "Expand all subheaders"
+                            : "Collapse all subheaders"
                       }
-                      aria-label={isAllSubheadersCollapsed ? 'Expand all subheaders' : 'Collapse all subheaders'}
+                      aria-label={
+                        isAllSubheadersCollapsed
+                          ? "Expand all subheaders"
+                          : "Collapse all subheaders"
+                      }
                       disabled={!hasCollapsibleSubheaders}
                       onClick={toggleCollapseAllSubheaders}
                     >
@@ -395,7 +447,8 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                   <div className="catalog-empty">
                     <p>No headings in this note.</p>
                     <span className="catalog-empty-hint">
-                      Use <code># Heading 1</code> or <code>## Heading 2</code> to create sections.
+                      Use <code># Heading 1</code> or <code>## Heading 2</code>{" "}
+                      to create sections.
                     </span>
                   </div>
                 ) : filteredHeadingTree.length === 0 ? (
@@ -403,7 +456,10 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                     <p>No headings match &ldquo;{headingFilter}&rdquo;</p>
                   </div>
                 ) : (
-                  <nav className="catalog-outline-tree" aria-label="Table of Contents">
+                  <nav
+                    className="catalog-outline-tree"
+                    aria-label="Table of Contents"
+                  >
                     {renderHeadingNodes(filteredHeadingTree)}
                   </nav>
                 )}
@@ -411,14 +467,15 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
             )}
 
             {/* Tags Tab */}
-            {activeTab === 'tags' && (
+            {activeTab === "tags" && (
               <div className="catalog-tags-view">
                 <div className="catalog-section">
                   <div className="catalog-section-label">TAGS IN THIS NOTE</div>
                   {noteTags.length === 0 ? (
                     <div className="catalog-subtle-hint">
-                      No tags detected. Add tags in text like <code>#recon</code>,{' '}
-                      <code>#nmap</code>, or frontmatter <code>tags: [sqli]</code>.
+                      No tags detected. Add tags in text like{" "}
+                      <code>#recon</code>, <code>#nmap</code>, or frontmatter{" "}
+                      <code>tags: [sqli]</code>.
                     </div>
                   ) : (
                     <div className="catalog-tags-cloud">
@@ -440,9 +497,13 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                 </div>
 
                 <div className="catalog-section" style={{ marginTop: 20 }}>
-                  <div className="catalog-section-label">WORKSPACE TAG CLOUD</div>
+                  <div className="catalog-section-label">
+                    WORKSPACE TAG CLOUD
+                  </div>
                   {allWorkspaceTags.length === 0 ? (
-                    <div className="catalog-subtle-hint">No tags found across workspace.</div>
+                    <div className="catalog-subtle-hint">
+                      No tags found across workspace.
+                    </div>
                   ) : (
                     <div className="catalog-tags-cloud">
                       {allWorkspaceTags.map((t) => (
@@ -465,7 +526,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
             )}
 
             {/* Info & Properties Tab */}
-            {activeTab === 'info' && stats && (
+            {activeTab === "info" && stats && (
               <div className="catalog-info-view">
                 {/* Statistics Grid */}
                 <div className="catalog-section">
@@ -473,12 +534,16 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                   <div className="catalog-stats-grid">
                     <div className="catalog-stat-box">
                       <FileText size={14} className="stat-icon" />
-                      <span className="stat-value">{stats.words.toLocaleString()}</span>
+                      <span className="stat-value">
+                        {stats.words.toLocaleString()}
+                      </span>
                       <span className="stat-label">Words</span>
                     </div>
                     <div className="catalog-stat-box">
                       <FileCode size={14} className="stat-icon" />
-                      <span className="stat-value">{stats.chars.toLocaleString()}</span>
+                      <span className="stat-value">
+                        {stats.chars.toLocaleString()}
+                      </span>
                       <span className="stat-label">Characters</span>
                     </div>
                     <div className="catalog-stat-box">
@@ -496,7 +561,9 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                     <div className="catalog-disk-card">
                       <div className="catalog-disk-header">
                         <HardDrive size={13} className="primary-accent-icon" />
-                        <span className="catalog-disk-status">Live disk file</span>
+                        <span className="catalog-disk-status">
+                          Live disk file
+                        </span>
                       </div>
                       <code className="catalog-disk-path" title={note.filePath}>
                         {note.filePath}
@@ -508,17 +575,21 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                         onClick={() => copyPath(note.filePath!)}
                       >
                         <Copy size={12} />
-                        <span>{copiedPath ? 'Copied path!' : 'Copy absolute path'}</span>
+                        <span>
+                          {copiedPath ? "Copied path!" : "Copy absolute path"}
+                        </span>
                       </button>
                     </div>
                   ) : (
                     <div className="catalog-disk-card">
                       <div className="catalog-disk-header">
-                        <span className="catalog-disk-status">Stored in session workspace</span>
+                        <span className="catalog-disk-status">
+                          Stored in session workspace
+                        </span>
                       </div>
                       <span className="catalog-subtle-hint">
-                        Not linked to a standalone disk file. Use &ldquo;Open local folder&rdquo; to
-                        sync with local directories.
+                        Not linked to a standalone disk file. Use &ldquo;Open
+                        local folder&rdquo; to sync with local directories.
                       </span>
                     </div>
                   )}

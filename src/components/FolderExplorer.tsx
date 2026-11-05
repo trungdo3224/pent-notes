@@ -84,7 +84,7 @@ export const FolderExplorer: React.FC = () => {
   const folders = useNotesStore((s) => s.folders);
   const selectedFolderId = useNotesStore((s) => s.selectedFolderId);
   const selectedNoteByFolder = useNotesStore((s) => s.selectedNoteByFolder);
-  const collapsedSubfolderIds = useNotesStore((s) => s.collapsedSubfolderIds);
+  const expandedFolderIds = useNotesStore((s) => s.expandedFolderIds ?? []);
   const pendingRenameNodeId = useNotesStore((s) => s.pendingRenameNodeId);
   const isCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
@@ -135,9 +135,9 @@ export const FolderExplorer: React.FC = () => {
     [folder, selectedNoteByFolder, sortOrder],
   );
 
-  const collapsedSet = useMemo(
-    () => new Set(collapsedSubfolderIds),
-    [collapsedSubfolderIds],
+  const expandedSet = useMemo(
+    () => new Set(expandedFolderIds),
+    [expandedFolderIds],
   );
 
   const allSubfolderIds = useMemo(() => {
@@ -147,8 +147,8 @@ export const FolderExplorer: React.FC = () => {
 
   const isAllSubfoldersCollapsed = useMemo(() => {
     if (allSubfolderIds.length === 0) return false;
-    return allSubfolderIds.every((id) => collapsedSet.has(id));
-  }, [allSubfolderIds, collapsedSet]);
+    return allSubfolderIds.every((id) => !expandedSet.has(id));
+  }, [allSubfolderIds, expandedSet]);
 
   const openPaneNoteIds = useMemo(() => {
     if (!isSplitViewActive || !paneLayout) return new Set<string>();
@@ -247,7 +247,7 @@ export const FolderExplorer: React.FC = () => {
         });
         if (
           item.type === "folder" &&
-          !collapsedSet.has(item.id) &&
+          expandedSet.has(item.id) &&
           Array.isArray(item.children) &&
           item.children.length > 0
         ) {
@@ -257,7 +257,7 @@ export const FolderExplorer: React.FC = () => {
     };
     walk(folder.items, 0, null);
     return flat;
-  }, [folder?.items, sortOrder, collapsedSet]);
+  }, [folder?.items, sortOrder, expandedSet]);
 
   const treeContainerRef = useRef<HTMLDivElement>(null);
   const [treeScrollTop, setTreeScrollTop] = useState(0);
@@ -402,7 +402,7 @@ export const FolderExplorer: React.FC = () => {
     const indentPx = BASE_INDENT_PX + depth * DEPTH_INDENT_STEP_PX;
 
     if (node.type === "folder") {
-      const isCollapsedFolder = collapsedSet.has(node.id);
+      const isExpandedFolder = expandedSet.has(node.id);
       const isEditing = editingNodeId === node.id;
       const isParentLevel = depth === 0;
       const isSelectedParent = activeFolderIdSet.has(node.id);
@@ -448,20 +448,20 @@ export const FolderExplorer: React.FC = () => {
             }}
           >
             <span className="explorer-chevron">
-              {isCollapsedFolder ? (
-                <ChevronRight size={14} />
-              ) : (
+              {isExpandedFolder ? (
                 <ChevronDown size={14} />
+              ) : (
+                <ChevronRight size={14} />
               )}
             </span>
-            {isCollapsedFolder ? (
-              <Folder
+            {isExpandedFolder ? (
+              <FolderOpen
                 size={16}
                 strokeWidth={1.8}
                 className="explorer-item-icon is-folder-icon"
               />
             ) : (
-              <FolderOpen
+              <Folder
                 size={16}
                 strokeWidth={1.8}
                 className="explorer-item-icon is-folder-icon"

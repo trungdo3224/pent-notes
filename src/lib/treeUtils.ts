@@ -301,10 +301,18 @@ export function matchAndPreserveIds(
       const existing = node.folderPath
         ? folderByPath.get(node.folderPath)
         : null;
+      const preservedChildren =
+        node.children.length > 0
+          ? mapScanned(node.children)
+          : existing && existing.children.length > 0
+            ? existing.children
+            : [];
       return {
         ...node,
         id: existing ? existing.id : node.id,
-        children: mapScanned(node.children),
+        children: preservedChildren,
+        hasChildren: node.hasChildren || preservedChildren.length > 0,
+        isLoaded: existing?.isLoaded ?? node.isLoaded,
       };
     });
   }

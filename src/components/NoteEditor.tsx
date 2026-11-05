@@ -6,7 +6,6 @@ import React, {
   useState,
 } from "react";
 import {
-  BookOpen,
   Check,
   ChevronDown,
   ChevronRight,
@@ -19,7 +18,6 @@ import {
   PanelLeftOpen,
   PanelRightOpen,
   PanelTopOpen,
-  PenLine,
   Plus,
   Split,
   X,
@@ -36,14 +34,8 @@ import {
   readFileAsDataUrl,
 } from "../lib/fileUtils";
 import { getAllLeaves } from "../lib/paneLayoutTree";
-import {
-  findNoteByTitle,
-  isObsidianMode,
-  resolveActiveNoteData,
-  useNotesStore,
-} from "../store/useNotesStore";
-import { EditorViewMode, NoteItem } from "../types";
-import { MdxEditor } from "./MdxEditor";
+import { resolveActiveNoteData, useNotesStore } from "../store/useNotesStore";
+import { NoteItem } from "../types";
 import { MilkdownViewer } from "./MilkdownViewer";
 import { NoteTabsBar } from "./NoteTabsBar";
 import { PaneSplitTree } from "./PaneSplitTree";
@@ -54,7 +46,6 @@ export const NoteEditor: React.FC = () => {
   const folders = useNotesStore((s) => s.folders);
   const selectedFolderId = useNotesStore((s) => s.selectedFolderId);
   const selectedNoteByFolder = useNotesStore((s) => s.selectedNoteByFolder);
-  const viewMode = useNotesStore((s) => s.viewMode);
   const shouldFocusTitle = useNotesStore((s) => s.shouldFocusNoteTitle);
   const isSidebarCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
@@ -70,7 +61,6 @@ export const NoteEditor: React.FC = () => {
   const toggleSidebar = useNotesStore((s) => s.toggleSidebar);
   const toggleNavbar = useNotesStore((s) => s.toggleNavbar);
   const toggleRightSidebar = useNotesStore((s) => s.toggleRightSidebar);
-  const setViewMode = useNotesStore((s) => s.setViewMode);
   const updateNote = useNotesStore((s) => s.updateNote);
   const toggleNoteLink = useNotesStore((s) => s.toggleNoteLink);
   const createTopFolder = useNotesStore((s) => s.createTopFolder);
@@ -78,8 +68,6 @@ export const NoteEditor: React.FC = () => {
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
   const clearFocusNoteTitle = useNotesStore((s) => s.clearFocusNoteTitle);
   const closeSplitView = useNotesStore((s) => s.closeSplitView);
-  const selectFolder = useNotesStore((s) => s.selectFolder);
-  const selectNote = useNotesStore((s) => s.selectNote);
   const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
   const loadNoteContent = useNotesStore((s) => s.loadNoteContent);
 
@@ -149,28 +137,6 @@ export const NoteEditor: React.FC = () => {
       return title.includes(q) || folderPath.includes(q);
     });
   }, [folders, note?.id, linkFilter]);
-
-  const wikilinkNotes = useMemo(() => {
-    return listConnectableNotes(folders, null).map((item) => ({
-      id: item.note.id,
-      title: item.note.title.trim() || "Untitled",
-      folderPath: [item.topFolderName, ...item.subfolderNames].join(" / "),
-    }));
-  }, [folders]);
-
-  const handleOpenWikilink = useCallback(
-    (targetTitle: string) => {
-      for (const f of folders) {
-        const found = findNoteByTitle(f.items, targetTitle);
-        if (found) {
-          selectFolder(f.id);
-          selectNote(found.id);
-          return;
-        }
-      }
-    },
-    [folders, selectFolder, selectNote],
-  );
 
   useEffect(() => {
     if (shouldFocusTitle && note && titleInputRef.current) {
@@ -333,11 +299,7 @@ export const NoteEditor: React.FC = () => {
     );
   }
 
-  const renderNoteContent = (
-    targetNote: NoteItem,
-    targetViewMode: EditorViewMode,
-    isPrimaryTitle = false,
-  ) => {
+  const renderNoteContent = (targetNote: NoteItem, isPrimaryTitle = false) => {
     const isPdf = isPdfNote(targetNote);
 
     if (isPdf) {
@@ -351,6 +313,10 @@ export const NoteEditor: React.FC = () => {
         </div>
       );
     }
+
+    const isContentLoading = Boolean(
+      targetNote.filePath && activeNoteContents[targetNote.id] === undefined,
+    );
 
     return (
       <div className="editor-scroll-container">
@@ -366,15 +332,8 @@ export const NoteEditor: React.FC = () => {
             }
           />
 
-          {isObsidianMode(targetViewMode) ? (
-            <MdxEditor
-              key={`editor-obsidian-${targetNote.id}`}
-              content={noteContent}
-              onChange={(val) => updateNote(targetNote.id, { content: val })}
-              readonly={false}
-              notes={wikilinkNotes}
-              onOpenWikilink={handleOpenWikilink}
-            />
+          {isContentLoading ? (
+            <div className="editor-loading-placeholder" />
           ) : (
             <MilkdownViewer
               key={`editor-notebook-${targetNote.id}`}
@@ -481,34 +440,6 @@ export const NoteEditor: React.FC = () => {
               <span className="editor-meta">
                 {primaryWords} {primaryWords === 1 ? "word" : "words"}
               </span>
-
-              {/* Markdown Style Mode Toggle: Obsidian vs Notebook */}
-              {!isPrimaryPdf && (
-                <div
-                  className="editor-mode-switch"
-                  role="group"
-                  aria-label="Editor markdown style mode"
-                >
-                  <button
-                    type="button"
-                    className={`mode-btn ${isObsidianMode(viewMode) ? "is-active" : ""}`}
-                    onClick={() => setViewMode("mdx")}
-                    title="MDX Markdown"
-                    aria-label="MDX Markdown"
-                  >
-                    <PenLine size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    className={`mode-btn ${!isObsidianMode(viewMode) ? "is-active" : ""}`}
-                    onClick={() => setViewMode("notebook")}
-                    title="Notebook"
-                    aria-label="Notebook Style"
-                  >
-                    <BookOpen size={13} />
-                  </button>
-                </div>
-              )}
             </>
           )}
 
@@ -666,7 +597,7 @@ export const NoteEditor: React.FC = () => {
       {isSplitViewActive && paneLayout ? (
         <PaneSplitTree root={paneLayout} />
       ) : (
-        note && renderNoteContent(note, viewMode, true)
+        note && renderNoteContent(note, true)
       )}
     </main>
   );

@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  BookOpen,
   Check,
   ChevronDown,
   ChevronRight,
@@ -8,7 +7,6 @@ import {
   Folder,
   HardDrive,
   Link2,
-  PenLine,
   Search,
   X,
 } from "lucide-react";
@@ -19,10 +17,9 @@ import {
   resolveWorkspaceConnections,
 } from "../lib/catalogUtils";
 import { isPdfNote } from "../lib/fileUtils";
-import { findNoteAndPath, findNoteByTitle } from "../lib/treeUtils";
-import { isObsidianMode, useNotesStore } from "../store/useNotesStore";
+import { findNoteAndPath } from "../lib/treeUtils";
+import { useNotesStore } from "../store/useNotesStore";
 import { PaneLeafNode, TopLevelFolder } from "../types";
-import { MdxEditor } from "./MdxEditor";
 import { MilkdownViewer } from "./MilkdownViewer";
 import { PdfViewer } from "./PdfViewer";
 
@@ -44,7 +41,6 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
   onSelect,
 }) => {
   const updateNote = useNotesStore((s) => s.updateNote);
-  const setPaneViewMode = useNotesStore((s) => s.setPaneViewMode);
   const setPaneNote = useNotesStore((s) => s.setPaneNote);
   const closePane = useNotesStore((s) => s.closePane);
   const toggleNoteLink = useNotesStore((s) => s.toggleNoteLink);
@@ -114,27 +110,6 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
     () =>
       note ? resolveWorkspaceConnections(folders, note.id, noteContent) : null,
     [folders, note, noteContent],
-  );
-
-  const wikilinkNotes = useMemo(() => {
-    return listConnectableNotes(folders, null).map((item) => ({
-      id: item.note.id,
-      title: item.note.title.trim() || "Untitled",
-      folderPath: [item.topFolderName, ...item.subfolderNames].join(" / "),
-    }));
-  }, [folders]);
-
-  const handleOpenWikilink = useCallback(
-    (targetTitle: string) => {
-      for (const f of folders) {
-        const found = findNoteByTitle(f.items, targetTitle);
-        if (found) {
-          setPaneNote(leaf.id, f.id, found.id);
-          return;
-        }
-      }
-    },
-    [folders, leaf.id, setPaneNote],
   );
 
   const isPdf = note ? isPdfNote(note) : false;
@@ -284,39 +259,6 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
               ) : null}
 
               <span className="editor-meta">{words}w</span>
-
-              {!isPdf && (
-                <div
-                  className="editor-mode-switch"
-                  role="group"
-                  aria-label="Pane markdown style mode"
-                >
-                  <button
-                    type="button"
-                    className={`mode-btn ${isObsidianMode(leaf.viewMode) ? "is-active" : ""}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPaneViewMode(leaf.id, "mdx");
-                    }}
-                    title="Obsidian Style (Markdown, wikilinks, Live Preview)"
-                    aria-label="Obsidian Style"
-                  >
-                    <PenLine size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    className={`mode-btn ${!isObsidianMode(leaf.viewMode) ? "is-active" : ""}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPaneViewMode(leaf.id, "notebook");
-                    }}
-                    title="Notebook Style (Milkdown Crepe block WYSIWYG, slash menus)"
-                    aria-label="Notebook Style"
-                  >
-                    <BookOpen size={12} />
-                  </button>
-                </div>
-              )}
             </>
           )}
 
@@ -362,15 +304,10 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                 onFocus={onSelect}
               />
 
-              {isObsidianMode(leaf.viewMode) ? (
-                <MdxEditor
-                  key={`editor-obsidian-${leaf.id}-${note.id}`}
-                  content={noteContent}
-                  onChange={(val) => updateNote(note.id, { content: val })}
-                  readonly={false}
-                  notes={wikilinkNotes}
-                  onOpenWikilink={handleOpenWikilink}
-                />
+              {Boolean(
+                note.filePath && activeNoteContents[note.id] === undefined,
+              ) ? (
+                <div className="editor-loading-placeholder" />
               ) : (
                 <MilkdownViewer
                   key={`editor-notebook-${leaf.id}-${note.id}`}

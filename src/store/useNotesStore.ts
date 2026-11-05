@@ -109,47 +109,18 @@ export function collectAllFolderIds(nodes: ExplorerNode[]): string[] {
 export function classifyExplorerFolders(
   nodes: ExplorerNode[],
 ): ExplorerFolderClassification {
-  const topLevelFolders = nodes.filter(
-    (n): n is FolderItem => n.type === "folder",
-  );
-
-  if (topLevelFolders.length === 0) {
-    return { mainFolderIds: [], collapsibleFolderIds: [] };
-  }
-
-  if (topLevelFolders.length === 1) {
-    const singleRoot = topLevelFolders[0];
-    const nestedFolderIds = collectAllFolderIds(singleRoot.children);
-
-    if (nestedFolderIds.length > 0) {
-      return {
-        mainFolderIds: [singleRoot.id],
-        collapsibleFolderIds: nestedFolderIds,
-      };
-    }
-
-    return {
-      mainFolderIds: [],
-      collapsibleFolderIds: [singleRoot.id],
-    };
-  }
-
+  const allFolderIds = collectAllFolderIds(nodes);
   return {
     mainFolderIds: [],
-    collapsibleFolderIds: collectAllFolderIds(nodes),
+    collapsibleFolderIds: allFolderIds,
   };
 }
 
 /**
  * Collects all folder IDs that should be toggled by the collapse/expand action.
- * Adapts dynamically to single-root wrapper tabs and multi-folder tabs.
  */
 export function collectAllSubfolderIds(nodes: ExplorerNode[]): string[] {
-  return classifyExplorerFolders(nodes).collapsibleFolderIds;
-}
-
-export function isObsidianMode(mode?: EditorViewMode): boolean {
-  return mode === "mdx" || mode === "write" || !mode;
+  return collectAllFolderIds(nodes);
 }
 
 export {
@@ -272,6 +243,7 @@ export interface NotesState {
   selectedNoteByFolder: Record<string, string | null>;
   openNotesByFolder: Record<string, string[]>;
   collapsedSubfolderIds: string[];
+  expandedFolderIds: string[];
   viewMode: EditorViewMode;
   isSidebarCollapsed: boolean;
   isNavbarCollapsed: boolean;
@@ -460,7 +432,8 @@ export const useNotesStore = create<NotesState>()(
       selectedNoteByFolder: {},
       openNotesByFolder: {},
       collapsedSubfolderIds: [],
-      viewMode: "mdx",
+      expandedFolderIds: [],
+      viewMode: "notebook",
       isSidebarCollapsed: false,
       isNavbarCollapsed: false,
       isRightSidebarCollapsed: false,
@@ -810,6 +783,18 @@ export const useNotesStore = create<NotesState>()(
             ? currentOpen
             : [...currentOpen, noteId];
 
+          const targetFolder = s.folders.find((f) => f.id === folderId);
+          const ancestorIds = targetFolder
+            ? (findAncestorFolderIds(targetFolder.items, noteId) ?? [])
+            : [];
+          const nextExpanded = Array.from(
+            new Set([...(s.expandedFolderIds ?? []), ...ancestorIds]),
+          );
+          const ancestorSet = new Set(ancestorIds);
+          const nextCollapsed = s.collapsedSubfolderIds.filter(
+            (id) => !ancestorSet.has(id),
+          );
+
           const leaves = getAllLeaves(s.paneLayout);
           if (s.isSplitViewActive && s.activePaneId && leaves.length > 1) {
             const updatedLayout = updateLeafInTree(
@@ -828,6 +813,8 @@ export const useNotesStore = create<NotesState>()(
               secondaryFolderId: secLeaf?.folderId ?? null,
               secondaryNoteId: secLeaf?.noteId ?? null,
               secondaryViewMode: secLeaf?.viewMode ?? "preview",
+              collapsedSubfolderIds: nextCollapsed,
+              expandedFolderIds: nextExpanded,
               openNotesByFolder: {
                 ...s.openNotesByFolder,
                 [folderId]: nextOpen,
@@ -839,6 +826,8 @@ export const useNotesStore = create<NotesState>()(
             };
           }
           return {
+            collapsedSubfolderIds: nextCollapsed,
+            expandedFolderIds: nextExpanded,
             openNotesByFolder: {
               ...s.openNotesByFolder,
               [folderId]: nextOpen,
@@ -989,6 +978,9 @@ export const useNotesStore = create<NotesState>()(
             );
             const updatedLeaves = getAllLeaves(updatedLayout);
             const secLeaf = updatedLeaves[1] ?? null;
+            const nextExpanded = Array.from(
+              new Set([...(state.expandedFolderIds ?? []), ...ancestorSet]),
+            );
             return {
               selectedFolderId: topFolderId,
               paneLayout: updatedLayout,
@@ -998,6 +990,7 @@ export const useNotesStore = create<NotesState>()(
               collapsedSubfolderIds: state.collapsedSubfolderIds.filter(
                 (id) => !ancestorSet.has(id),
               ),
+              expandedFolderIds: nextExpanded,
               openNotesByFolder: {
                 ...state.openNotesByFolder,
                 [topFolderId]: nextOpen,
@@ -1009,8 +1002,12 @@ export const useNotesStore = create<NotesState>()(
             };
           }
 
+          const nextExpanded = Array.from(
+            new Set([...(state.expandedFolderIds ?? []), ...ancestorSet]),
+          );
           return {
             selectedFolderId: topFolderId,
+            expandedFolderIds: nextExpanded,
             openNotesByFolder: {
               ...state.openNotesByFolder,
               [topFolderId]: nextOpen,
@@ -1149,7 +1146,7 @@ export const useNotesStore = create<NotesState>()(
             ],
           },
           collapsedSubfolderIds: nextCollapsed,
-          viewMode: s.viewMode === "preview" ? "write" : s.viewMode,
+          viewMode: s.viewMode === "preview" ? "notebook" : s.viewMode,
           shouldFocusNoteTitle: true,
         }));
 
@@ -1732,8 +1729,10 @@ export const useNotesStore = create<NotesState>()(
 
       toggleSubfolderCollapse: (subfolderId) => {
         const state = get();
-        const exists = state.collapsedSubfolderIds.includes(subfolderId);
-        if (exists && state.selectedFolderId) {
+        const isExpanded = (state.expandedFolderIds ?? []).includes(
+          subfolderId,
+        );
+        if (!isExpanded && state.selectedFolderId) {
           const currentFolder = state.folders.find(
             (f) => f.id === state.selectedFolderId,
           );
@@ -1751,16 +1750,20 @@ export const useNotesStore = create<NotesState>()(
             }
           }
         }
+        const nextExpanded = isExpanded
+          ? (state.expandedFolderIds ?? []).filter((id) => id !== subfolderId)
+          : [...(state.expandedFolderIds ?? []), subfolderId];
         set({
-          collapsedSubfolderIds: exists
-            ? state.collapsedSubfolderIds.filter((id) => id !== subfolderId)
-            : [...state.collapsedSubfolderIds, subfolderId],
+          expandedFolderIds: nextExpanded,
+          collapsedSubfolderIds: isExpanded
+            ? [...state.collapsedSubfolderIds, subfolderId]
+            : state.collapsedSubfolderIds.filter((id) => id !== subfolderId),
         });
       },
 
       expandSubfolder: (subfolderId) => {
         const state = get();
-        if (!state.collapsedSubfolderIds.includes(subfolderId)) return;
+        if ((state.expandedFolderIds ?? []).includes(subfolderId)) return;
         if (state.selectedFolderId) {
           const currentFolder = state.folders.find(
             (f) => f.id === state.selectedFolderId,
@@ -1780,6 +1783,7 @@ export const useNotesStore = create<NotesState>()(
           }
         }
         set({
+          expandedFolderIds: [...(state.expandedFolderIds ?? []), subfolderId],
           collapsedSubfolderIds: state.collapsedSubfolderIds.filter(
             (id) => id !== subfolderId,
           ),
@@ -1791,20 +1795,12 @@ export const useNotesStore = create<NotesState>()(
         const currentFolder = state.folders.find(
           (f) => f.id === state.selectedFolderId,
         );
-        if (!currentFolder) return;
-        const { mainFolderIds, collapsibleFolderIds } = classifyExplorerFolders(
-          currentFolder.items,
-        );
-        if (collapsibleFolderIds.length === 0) return;
-        // Keep main/parent container folders open, and collapse all target collapsible folders
-        const mainSet = new Set(mainFolderIds);
-        const nextCollapsed = state.collapsedSubfolderIds.filter(
-          (id) => !mainSet.has(id),
-        );
+        const allIds = currentFolder
+          ? collectAllFolderIds(currentFolder.items)
+          : [];
         set({
-          collapsedSubfolderIds: Array.from(
-            new Set([...nextCollapsed, ...collapsibleFolderIds]),
-          ),
+          expandedFolderIds: [],
+          collapsedSubfolderIds: allIds,
         });
       },
 
@@ -1814,17 +1810,26 @@ export const useNotesStore = create<NotesState>()(
           (f) => f.id === state.selectedFolderId,
         );
         if (!currentFolder) {
-          set({ collapsedSubfolderIds: [] });
+          set({ expandedFolderIds: [], collapsedSubfolderIds: [] });
           return;
         }
-        const { mainFolderIds, collapsibleFolderIds } = classifyExplorerFolders(
-          currentFolder.items,
-        );
-        const toExpand = new Set([...mainFolderIds, ...collapsibleFolderIds]);
+        const allIds = collectAllFolderIds(currentFolder.items);
+        for (const fId of allIds) {
+          const node = findFolderNode(currentFolder.items, fId);
+          if (
+            node?.folderPath &&
+            (!node.children || node.children.length === 0)
+          ) {
+            void get().loadSubfolderChildren(
+              currentFolder.id,
+              fId,
+              node.folderPath,
+            );
+          }
+        }
         set({
-          collapsedSubfolderIds: state.collapsedSubfolderIds.filter(
-            (id) => !toExpand.has(id),
-          ),
+          expandedFolderIds: allIds,
+          collapsedSubfolderIds: [],
         });
       },
 
@@ -1834,18 +1839,14 @@ export const useNotesStore = create<NotesState>()(
           (f) => f.id === state.selectedFolderId,
         );
         if (!currentFolder) return;
-        const { collapsibleFolderIds } = classifyExplorerFolders(
-          currentFolder.items,
-        );
-        if (collapsibleFolderIds.length === 0) return;
-        const collapsedSet = new Set(state.collapsedSubfolderIds);
-        const allAreCollapsed = collapsibleFolderIds.every((id) =>
-          collapsedSet.has(id),
-        );
-        if (allAreCollapsed) {
-          get().expandAllSubfolders();
-        } else {
+        const allIds = collectAllFolderIds(currentFolder.items);
+        if (allIds.length === 0) return;
+        const expandedSet = new Set(state.expandedFolderIds ?? []);
+        const allAreExpanded = allIds.every((id) => expandedSet.has(id));
+        if (allAreExpanded) {
           get().collapseAllSubfolders();
+        } else {
+          get().expandAllSubfolders();
         }
       },
 
@@ -1877,7 +1878,7 @@ export const useNotesStore = create<NotesState>()(
         const newLeaf = createLeafNode(
           fId ?? state.selectedFolderId,
           nId,
-          "write",
+          "notebook",
         );
 
         let nextLayout: PaneLayoutNode;
@@ -2252,6 +2253,7 @@ export const useNotesStore = create<NotesState>()(
         selectedNoteByFolder: state.selectedNoteByFolder,
         openNotesByFolder: state.openNotesByFolder,
         collapsedSubfolderIds: state.collapsedSubfolderIds,
+        expandedFolderIds: state.expandedFolderIds,
         viewMode: state.viewMode,
         isSidebarCollapsed: state.isSidebarCollapsed,
         isNavbarCollapsed: state.isNavbarCollapsed,
@@ -2285,7 +2287,7 @@ export const useNotesStore = create<NotesState>()(
             applyFontSettings(initialFontSettings());
           }
           if ((state.viewMode as string) === "split") {
-            state.setViewMode("write");
+            state.setViewMode("notebook");
           }
           if ((state.secondaryViewMode as string) === "split") {
             state.setSecondaryViewMode("preview");

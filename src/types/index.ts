@@ -39,7 +39,7 @@ export interface TopLevelFolder {
   groupId?: string;
 }
 
-export type EditorViewMode = "mdx" | "notebook" | "write" | "preview";
+export type EditorViewMode = "notebook" | "preview";
 
 export type SplitDirection = "horizontal" | "vertical";
 

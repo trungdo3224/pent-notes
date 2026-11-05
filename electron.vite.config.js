@@ -20,7 +20,6 @@ export default defineConfig({
         "react-dom",
         "zustand",
         "lucide-react",
-        "@mdxeditor/editor",
         "@milkdown/crepe",
       ],
     },
@@ -33,8 +32,6 @@ export default defineConfig({
                 return "vendor-milkdown";
               }
               if (
-                id.includes("@mdxeditor") ||
-                id.includes("lexical") ||
                 id.includes("react") ||
                 id.includes("zustand") ||
                 id.includes("lucide-react")
