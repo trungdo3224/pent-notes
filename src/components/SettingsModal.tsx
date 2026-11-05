@@ -244,8 +244,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                       <div>
                         <h4>Editor Font Size</h4>
                         <p className="settings-card-desc">
-                          Controls the base text size across CodeMirror and the
-                          Notebook canvas.
+                          Controls the base text size across the Markdown editor
+                          and the Notebook canvas.
                         </p>
                       </div>
                       <div className="settings-font-size-val">

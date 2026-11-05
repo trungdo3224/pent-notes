@@ -43,7 +43,7 @@ import {
   useNotesStore,
 } from "../store/useNotesStore";
 import { EditorViewMode, NoteItem } from "../types";
-import { MarkdownEditor } from "./MarkdownEditor";
+import { MdxEditor } from "./MdxEditor";
 import { MilkdownViewer } from "./MilkdownViewer";
 import { NoteTabsBar } from "./NoteTabsBar";
 import { PaneSplitTree } from "./PaneSplitTree";
@@ -367,7 +367,7 @@ export const NoteEditor: React.FC = () => {
           />
 
           {isObsidianMode(targetViewMode) ? (
-            <MarkdownEditor
+            <MdxEditor
               key={`editor-obsidian-${targetNote.id}`}
               content={noteContent}
               onChange={(val) => updateNote(targetNote.id, { content: val })}
@@ -492,9 +492,9 @@ export const NoteEditor: React.FC = () => {
                   <button
                     type="button"
                     className={`mode-btn ${isObsidianMode(viewMode) ? "is-active" : ""}`}
-                    onClick={() => setViewMode("obsidian")}
-                    title="OFM"
-                    aria-label="Obsidian Flavored Markdown"
+                    onClick={() => setViewMode("mdx")}
+                    title="MDX Markdown"
+                    aria-label="MDX Markdown"
                   >
                     <PenLine size={13} />
                   </button>

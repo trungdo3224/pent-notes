@@ -39,7 +39,7 @@ export interface TopLevelFolder {
   groupId?: string;
 }
 
-export type EditorViewMode = "obsidian" | "notebook" | "write" | "preview";
+export type EditorViewMode = "mdx" | "notebook" | "write" | "preview";
 
 export type SplitDirection = "horizontal" | "vertical";
 
@@ -66,3 +66,9 @@ export type SortOrder = "name-asc" | "name-desc" | "date-desc" | "date-asc";
 export type LinkModalTargetMode = "new-tab" | "subfolder" | "current-tab";
 
 export type CatalogTab = "outline" | "tags" | "info";
+
+export interface NoteWikilinkOption {
+  id: string;
+  title: string;
+  folderPath?: string;
+}

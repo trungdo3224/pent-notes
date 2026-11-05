@@ -22,7 +22,7 @@ import { isPdfNote } from "../lib/fileUtils";
 import { findNoteAndPath, findNoteByTitle } from "../lib/treeUtils";
 import { isObsidianMode, useNotesStore } from "../store/useNotesStore";
 import { PaneLeafNode, TopLevelFolder } from "../types";
-import { MarkdownEditor } from "./MarkdownEditor";
+import { MdxEditor } from "./MdxEditor";
 import { MilkdownViewer } from "./MilkdownViewer";
 import { PdfViewer } from "./PdfViewer";
 
@@ -296,7 +296,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                     className={`mode-btn ${isObsidianMode(leaf.viewMode) ? "is-active" : ""}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setPaneViewMode(leaf.id, "obsidian");
+                      setPaneViewMode(leaf.id, "mdx");
                     }}
                     title="Obsidian Style (Markdown, wikilinks, Live Preview)"
                     aria-label="Obsidian Style"
@@ -363,7 +363,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
               />
 
               {isObsidianMode(leaf.viewMode) ? (
-                <MarkdownEditor
+                <MdxEditor
                   key={`editor-obsidian-${leaf.id}-${note.id}`}
                   content={noteContent}
                   onChange={(val) => updateNote(note.id, { content: val })}

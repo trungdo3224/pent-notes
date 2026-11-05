@@ -149,7 +149,7 @@ export function collectAllSubfolderIds(nodes: ExplorerNode[]): string[] {
 }
 
 export function isObsidianMode(mode?: EditorViewMode): boolean {
-  return mode === "obsidian" || mode === "write" || !mode;
+  return mode === "mdx" || mode === "write" || !mode;
 }
 
 export {
@@ -460,7 +460,7 @@ export const useNotesStore = create<NotesState>()(
       selectedNoteByFolder: {},
       openNotesByFolder: {},
       collapsedSubfolderIds: [],
-      viewMode: "obsidian",
+      viewMode: "mdx",
       isSidebarCollapsed: false,
       isNavbarCollapsed: false,
       isRightSidebarCollapsed: false,

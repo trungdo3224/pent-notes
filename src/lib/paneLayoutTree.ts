@@ -17,7 +17,7 @@ export function createBranchId(): string {
 export function createLeafNode(
   folderId: string | null,
   noteId: string | null,
-  viewMode: EditorViewMode = "obsidian",
+  viewMode: EditorViewMode = "mdx",
   id?: string,
 ): PaneLeafNode {
   return {
