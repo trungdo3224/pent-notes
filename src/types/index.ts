@@ -15,6 +15,8 @@ export interface FolderItem {
   name: string;
   children: ExplorerNode[];
   folderPath?: string;
+  hasChildren?: boolean;
+  isLoaded?: boolean;
 }
 
 export type ExplorerNode = FolderItem | NoteItem;

@@ -44,6 +44,8 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
   const setPaneNote = useNotesStore((s) => s.setPaneNote);
   const closePane = useNotesStore((s) => s.closePane);
   const toggleNoteLink = useNotesStore((s) => s.toggleNoteLink);
+  const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
+  const loadNoteContent = useNotesStore((s) => s.loadNoteContent);
 
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
@@ -87,10 +89,18 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
     });
   }, [folders, filterQuery]);
 
+  const noteContent = note ? (activeNoteContents[note.id] ?? note.content ?? '') : '';
+
+  React.useEffect(() => {
+    if (note?.id && note?.filePath && activeNoteContents[note.id] === undefined) {
+      void loadNoteContent(note.id, note.filePath);
+    }
+  }, [note?.id, note?.filePath, activeNoteContents, loadNoteContent]);
+
   // Connected notes for this note
   const connections = useMemo(
-    () => (note ? resolveWorkspaceConnections(folders, note.id) : null),
-    [folders, note]
+    () => (note ? resolveWorkspaceConnections(folders, note.id, noteContent) : null),
+    [folders, note, noteContent]
   );
 
   const wikilinkNotes = useMemo(() => {
@@ -317,7 +327,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
               {isObsidianMode(leaf.viewMode) ? (
                 <MarkdownEditor
                   key={`editor-obsidian-${leaf.id}-${note.id}`}
-                  content={note.content}
+                  content={noteContent}
                   onChange={(val) => updateNote(note.id, { content: val })}
                   mode="live"
                   readonly={false}
@@ -327,7 +337,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
               ) : (
                 <MilkdownViewer
                   key={`editor-notebook-${leaf.id}-${note.id}`}
-                  content={note.content}
+                  content={noteContent}
                   onChange={(val) => updateNote(note.id, { content: val })}
                   readonly={false}
                 />

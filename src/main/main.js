@@ -4,6 +4,7 @@ import { pathToFileURL } from 'url';
 import * as fsService from './services/fsService.js';
 import * as sessionService from './services/sessionService.js';
 import * as dialogService from './services/dialogService.js';
+import { linkIndexService } from './services/linkIndexService.js';
 
 // Register custom protocol privilege before app is ready
 protocol.registerSchemesAsPrivileged([
@@ -43,6 +44,18 @@ function registerIpcHandlers() {
 
   ipcMain.handle('fs:delete', async (_, targetPath) => {
     return await fsService.deletePath(targetPath);
+  });
+
+  ipcMain.handle('fs:read-file', async (_, filePath) => {
+    return await fsService.readFile(filePath);
+  });
+
+  ipcMain.handle('fs:read-dir', async (_, dirPath) => {
+    return await fsService.readDirectoryShallow(dirPath);
+  });
+
+  ipcMain.handle('links:get-connections', async (_, filePath, noteTitle) => {
+    return await linkIndexService.getConnections(filePath, noteTitle);
   });
 
   // Sessions handlers
@@ -137,6 +150,13 @@ function createWindow() {
     return { action: 'allow' };
   });
 
+  mainWindow.webContents.on('console-message', (_, level, message, line, sourceId) => {
+    console.log(`[Renderer Console] ${message} (${sourceId}:${line})`);
+  });
+  mainWindow.webContents.on('did-fail-load', (_, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Renderer Fail Load] ${errorCode} - ${errorDescription} at ${validatedURL}`);
+  });
+
   // In development, load the Vite dev server URL automatically injected by electron-vite
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
@@ -145,6 +165,12 @@ function createWindow() {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
 }
+
+// RFC-042 Pillar 4: Chromium process optimization
+app.commandLine.appendSwitch('disable-site-isolation-trials');
+app.commandLine.appendSwitch('renderer-process-limit', '2');
+app.commandLine.appendSwitch('disable-breakpad');
+app.commandLine.appendSwitch('disable-component-update');
 
 app.whenReady().then(() => {
   // Register custom protocol for local raw files (PDFs, images)

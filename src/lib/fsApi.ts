@@ -78,4 +78,38 @@ export const fsApi = {
       'Failed to delete on disk.'
     );
   },
+
+  async readFile(filePath: string): Promise<string> {
+    if (typeof window !== 'undefined' && window.electronAPI?.fs) {
+      return await window.electronAPI.fs.readFile(filePath);
+    }
+    const data = await postJson<{ content: string }>(
+      '/api/fs/read-file',
+      { path: filePath },
+      'Failed to read file from disk.'
+    );
+    return data.content;
+  },
+
+  async readDir(dirPath: string): Promise<ExplorerNode[]> {
+    if (typeof window !== 'undefined' && window.electronAPI?.fs) {
+      return await window.electronAPI.fs.readDir(dirPath);
+    }
+    const data = await postJson<{ items: ExplorerNode[] }>(
+      '/api/fs/read-dir',
+      { path: dirPath },
+      'Failed to read directory.'
+    );
+    return data.items;
+  },
+
+  async getConnections(
+    filePath?: string,
+    noteTitle?: string
+  ): Promise<{ outgoing: string[]; incoming: string[] }> {
+    if (typeof window !== 'undefined' && window.electronAPI?.fs?.getConnections) {
+      return await window.electronAPI.fs.getConnections(filePath, noteTitle);
+    }
+    return { outgoing: [], incoming: [] };
+  },
 };

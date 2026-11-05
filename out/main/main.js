@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, protocol, app, net, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, protocol, net, ipcMain, shell } from "electron";
 import { join } from "path";
 import { pathToFileURL } from "url";
 import fs from "node:fs/promises";
@@ -7,9 +7,132 @@ import __shims_module__ from "node:module";
 const __filename = import.meta.filename;
 const __dirname = import.meta.dirname;
 const require2 = __shims_module__.createRequire(import.meta.url);
+const WIKILINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+class LinkIndexService {
+  constructor() {
+    this.indexPath = null;
+    this.index = {
+      // sourcePath -> Array of target titles
+      outgoing: {},
+      // targetTitle (lowercase) -> Array of sourcePaths
+      incoming: {}
+    };
+    this.saveTimer = null;
+    this.isLoaded = false;
+  }
+  getStoragePath() {
+    if (!this.indexPath) {
+      const userData = app?.getPath("userData") || process.cwd();
+      this.indexPath = path.join(userData, "link-index.json");
+    }
+    return this.indexPath;
+  }
+  async loadIndex() {
+    if (this.isLoaded) return;
+    try {
+      const data = await fs.readFile(this.getStoragePath(), "utf-8");
+      const parsed = JSON.parse(data);
+      if (parsed && typeof parsed === "object") {
+        this.index = {
+          outgoing: parsed.outgoing || {},
+          incoming: parsed.incoming || {}
+        };
+      }
+    } catch {
+      this.index = { outgoing: {}, incoming: {} };
+    }
+    this.isLoaded = true;
+  }
+  scheduleSave() {
+    if (this.saveTimer) clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(async () => {
+      try {
+        const dest = this.getStoragePath();
+        await fs.mkdir(path.dirname(dest), { recursive: true });
+        await fs.writeFile(dest, JSON.stringify(this.index), "utf-8");
+      } catch (err) {
+        console.error("Failed to save link index to disk:", err);
+      }
+    }, 500);
+  }
+  async updateFileLinks(filePath, content) {
+    await this.loadIndex();
+    const resolvedPath = path.resolve(filePath);
+    const oldTargets = this.index.outgoing[resolvedPath] || [];
+    for (const oldT of oldTargets) {
+      const key = oldT.toLowerCase();
+      if (this.index.incoming[key]) {
+        this.index.incoming[key] = this.index.incoming[key].filter(
+          (p) => p !== resolvedPath
+        );
+        if (this.index.incoming[key].length === 0) {
+          delete this.index.incoming[key];
+        }
+      }
+    }
+    const newTargets = [];
+    if (content && typeof content === "string") {
+      let match;
+      WIKILINK_REGEX.lastIndex = 0;
+      while ((match = WIKILINK_REGEX.exec(content)) !== null) {
+        const targetTitle = match[1].trim();
+        if (targetTitle && !newTargets.includes(targetTitle)) {
+          newTargets.push(targetTitle);
+        }
+      }
+    }
+    if (newTargets.length > 0) {
+      this.index.outgoing[resolvedPath] = newTargets;
+      for (const target of newTargets) {
+        const key = target.toLowerCase();
+        if (!this.index.incoming[key]) {
+          this.index.incoming[key] = [];
+        }
+        if (!this.index.incoming[key].includes(resolvedPath)) {
+          this.index.incoming[key].push(resolvedPath);
+        }
+      }
+    } else {
+      delete this.index.outgoing[resolvedPath];
+    }
+    this.scheduleSave();
+  }
+  async removeFile(filePath) {
+    await this.loadIndex();
+    const resolvedPath = path.resolve(filePath);
+    await this.updateFileLinks(resolvedPath, "");
+  }
+  async renameFile(oldPath, newPath) {
+    await this.loadIndex();
+    const resolvedOld = path.resolve(oldPath);
+    const resolvedNew = path.resolve(newPath);
+    const targets = this.index.outgoing[resolvedOld] || [];
+    delete this.index.outgoing[resolvedOld];
+    if (targets.length > 0) {
+      this.index.outgoing[resolvedNew] = targets;
+    }
+    for (const key of Object.keys(this.index.incoming)) {
+      this.index.incoming[key] = this.index.incoming[key].map(
+        (p) => p === resolvedOld ? resolvedNew : p
+      );
+    }
+    this.scheduleSave();
+  }
+  async getConnections(filePath, noteTitle) {
+    await this.loadIndex();
+    const resolvedPath = filePath ? path.resolve(filePath) : null;
+    const outgoing = resolvedPath ? this.index.outgoing[resolvedPath] || [] : [];
+    const titleKey = noteTitle ? noteTitle.trim().toLowerCase() : null;
+    const incoming = titleKey ? this.index.incoming[titleKey] || [] : [];
+    return {
+      outgoing,
+      incoming
+    };
+  }
+}
+const linkIndexService = new LinkIndexService();
 const NOTE_EXT_REGEX = /\.(md|markdown|mdx|txt|pdf)$/i;
-const MAX_DIRECTORY_SCAN_DEPTH = 8;
-const IGNORED_NAMES = /* @__PURE__ */ new Set([
+const STRICT_IGNORE_NAMES = /* @__PURE__ */ new Set([
   "node_modules",
   ".git",
   ".obsidian",
@@ -17,13 +140,34 @@ const IGNORED_NAMES = /* @__PURE__ */ new Set([
   ".idea",
   "dist",
   "build",
-  "__pycache__"
+  "__pycache__",
+  ".svn",
+  ".hg"
+]);
+const STRICT_IGNORE_EXTENSIONS = /* @__PURE__ */ new Set([
+  "zip",
+  "tar",
+  "gz",
+  "iso",
+  "pcap",
+  "exe",
+  "bin",
+  "7z",
+  "rar",
+  "dmg",
+  "pkg"
 ]);
 function makeId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 function stripExt(name) {
   return name.replace(NOTE_EXT_REGEX, "").trim() || "Untitled";
+}
+function isStrictlyIgnored(name) {
+  if (name.startsWith(".") || STRICT_IGNORE_NAMES.has(name)) return true;
+  const ext = path.extname(name).slice(1).toLowerCase();
+  if (STRICT_IGNORE_EXTENSIONS.has(ext)) return true;
+  return false;
 }
 async function resolveUniqueChildPath(parentDir, baseName, extension = "") {
   let candidate = path.join(parentDir, `${baseName}${extension}`);
@@ -38,40 +182,47 @@ async function resolveUniqueChildPath(parentDir, baseName, extension = "") {
     }
   }
 }
-async function readDirectoryRecursive(dirPath, depth = 0) {
-  if (depth > MAX_DIRECTORY_SCAN_DEPTH) return [];
+async function readDirectoryShallow(dirPath) {
   const entries = await fs.readdir(dirPath, { withFileTypes: true });
   const folders = [];
   const notes = [];
   for (const entry of entries) {
-    if (entry.name.startsWith(".") || IGNORED_NAMES.has(entry.name)) {
+    if (isStrictlyIgnored(entry.name)) {
       continue;
     }
     const fullPath = path.join(dirPath, entry.name);
     if (entry.isDirectory()) {
-      const children = await readDirectoryRecursive(fullPath, depth + 1);
+      let hasChildren = false;
+      try {
+        const subEntries = await fs.readdir(fullPath);
+        hasChildren = subEntries.some((name) => !isStrictlyIgnored(name));
+      } catch {
+        hasChildren = false;
+      }
       folders.push({
         id: makeId("sub"),
         type: "folder",
         name: entry.name,
-        children,
+        hasChildren,
+        children: [],
         folderPath: fullPath
       });
     } else if (entry.isFile() && NOTE_EXT_REGEX.test(entry.name)) {
       const isPdf = entry.name.toLowerCase().endsWith(".pdf");
-      const [content, stat] = await Promise.all([
-        isPdf ? Promise.resolve("") : fs.readFile(fullPath, "utf-8"),
-        fs.stat(fullPath)
-      ]);
-      notes.push({
-        id: makeId("note"),
-        type: "note",
-        title: stripExt(entry.name),
-        content,
-        updatedAt: stat.mtime.toISOString().slice(0, 10),
-        filePath: fullPath,
-        fileType: isPdf ? "pdf" : "markdown"
-      });
+      try {
+        const stat = await fs.stat(fullPath);
+        notes.push({
+          id: makeId("note"),
+          type: "note",
+          title: stripExt(entry.name),
+          content: "",
+          // Lazy: Content read on demand via readFile()
+          updatedAt: stat.mtime.toISOString().slice(0, 10),
+          filePath: fullPath,
+          fileType: isPdf ? "pdf" : "markdown"
+        });
+      } catch {
+      }
     }
   }
   folders.sort(
@@ -88,14 +239,20 @@ async function scanFolder(folderPath) {
   if (!stat.isDirectory()) {
     throw new Error("Path is not a directory.");
   }
-  const items = await readDirectoryRecursive(resolved);
+  const items = await readDirectoryShallow(resolved);
   const rootName = path.basename(resolved) || "Notes";
   return { rootName, rootPath: resolved, items };
+}
+async function readFile(filePath) {
+  const resolved = path.resolve(filePath);
+  const content = await fs.readFile(resolved, "utf-8");
+  return content;
 }
 async function writeFile(filePath, content) {
   const resolved = path.resolve(filePath);
   await fs.mkdir(path.dirname(resolved), { recursive: true });
   await fs.writeFile(resolved, content ?? "", "utf-8");
+  void linkIndexService.updateFileLinks(resolved, content);
   return { ok: true, path: resolved };
 }
 async function createFile(parentPath, name, content = "") {
@@ -106,13 +263,15 @@ async function createFile(parentPath, name, content = "") {
   const targetFile = await resolveUniqueChildPath(resolvedParent, baseName, ".md");
   const initialContent = content || "";
   await fs.writeFile(targetFile, initialContent, "utf-8");
+  void linkIndexService.updateFileLinks(targetFile, initialContent);
   return {
     id: makeId("note"),
     type: "note",
     title: stripExt(path.basename(targetFile)),
     content: initialContent,
     updatedAt: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
-    filePath: targetFile
+    filePath: targetFile,
+    fileType: "markdown"
   };
 }
 async function createFolder(parentPath, name) {
@@ -124,6 +283,7 @@ async function createFolder(parentPath, name) {
     id: makeId("sub"),
     type: "folder",
     name: path.basename(targetDir),
+    hasChildren: false,
     children: [],
     folderPath: targetDir
   };
@@ -132,11 +292,13 @@ async function renamePath(oldPath, newPath) {
   const resolvedOld = path.resolve(oldPath);
   const resolvedNew = path.resolve(newPath);
   await fs.rename(resolvedOld, resolvedNew);
+  void linkIndexService.renameFile(resolvedOld, resolvedNew);
   return resolvedNew;
 }
 async function deletePath(targetPath) {
   const resolved = path.resolve(targetPath);
   await fs.rm(resolved, { recursive: true, force: true });
+  void linkIndexService.removeFile(resolved);
   return { ok: true };
 }
 const DATA_DIR = path.resolve("data");
@@ -368,6 +530,15 @@ function registerIpcHandlers() {
   ipcMain.handle("fs:delete", async (_, targetPath) => {
     return await deletePath(targetPath);
   });
+  ipcMain.handle("fs:read-file", async (_, filePath) => {
+    return await readFile(filePath);
+  });
+  ipcMain.handle("fs:read-dir", async (_, dirPath) => {
+    return await readDirectoryShallow(dirPath);
+  });
+  ipcMain.handle("links:get-connections", async (_, filePath, noteTitle) => {
+    return await linkIndexService.getConnections(filePath, noteTitle);
+  });
   ipcMain.handle("sessions:list", async () => {
     return await listAllSessions();
   });
@@ -439,12 +610,22 @@ function createWindow() {
     }
     return { action: "allow" };
   });
+  mainWindow.webContents.on("console-message", (_, level, message, line, sourceId) => {
+    console.log(`[Renderer Console] ${message} (${sourceId}:${line})`);
+  });
+  mainWindow.webContents.on("did-fail-load", (_, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Renderer Fail Load] ${errorCode} - ${errorDescription} at ${validatedURL}`);
+  });
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
     mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
 }
+app.commandLine.appendSwitch("disable-site-isolation-trials");
+app.commandLine.appendSwitch("renderer-process-limit", "2");
+app.commandLine.appendSwitch("disable-breakpad");
+app.commandLine.appendSwitch("disable-component-update");
 app.whenReady().then(() => {
   protocol.handle("pent-file", (request) => {
     try {

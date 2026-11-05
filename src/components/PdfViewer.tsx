@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Download, ExternalLink, FileText } from 'lucide-react';
 
 interface PdfViewerProps {
@@ -30,6 +30,22 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   pdfData,
   className = '',
 }) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const activeBlobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      // RFC-042 Pillar 3: Bound rendering pipeline and release GPU/Renderer bitmap contexts
+      if (iframeRef.current) {
+        iframeRef.current.src = 'about:blank';
+      }
+      if (activeBlobUrlRef.current) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+        activeBlobUrlRef.current = null;
+      }
+    };
+  }, []);
+
   const pdfUrl = useMemo(() => {
     if (pdfData) {
       return pdfData;
@@ -110,6 +126,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
 
       <div className="pdf-frame-wrapper">
         <iframe
+          ref={iframeRef}
           src={`${pdfUrl}#toolbar=1&navpanes=1`}
           title={title}
           className="pdf-embedded-frame"

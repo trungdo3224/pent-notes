@@ -6,6 +6,11 @@ export interface ScanResult {
   items: ExplorerNode[];
 }
 
+export interface LinkConnections {
+  outgoing: string[];
+  incoming: string[];
+}
+
 export interface ElectronSessionInfo {
   id: string;
   name: string;
@@ -36,6 +41,9 @@ export interface ElectronAPI {
     createFolder: (parentPath: string, name?: string) => Promise<FolderItem>;
     renamePath: (oldPath: string, newPath: string) => Promise<string>;
     deletePath: (targetPath: string) => Promise<{ ok: boolean }>;
+    readFile: (filePath: string) => Promise<string>;
+    readDir: (dirPath: string) => Promise<ExplorerNode[]>;
+    getConnections: (filePath?: string, noteTitle?: string) => Promise<LinkConnections>;
     getRawUrl: (filePath: string) => string;
   };
   sessions: {

@@ -304,6 +304,10 @@ export interface NotesState {
   secondaryViewMode: EditorViewMode;
   activePane: 'primary' | 'secondary';
 
+  // RFC-042 Pillar 1: Decoupled working document content
+  activeNoteContents: Record<string, string>;
+  loadingNoteIds: Record<string, boolean>;
+
   // Transient UI state
   isHydrated: boolean;
   isSettingsModalOpen: boolean;
@@ -349,6 +353,12 @@ export interface NotesState {
   clearPendingRenameGroup: () => void;
 
   selectNote: (noteId: string) => void;
+  loadNoteContent: (noteId: string, filePath?: string) => Promise<string>;
+  loadSubfolderChildren: (
+    folderId: string,
+    subfolderId: string,
+    subfolderPath: string
+  ) => Promise<void>;
   closeNoteTab: (noteId: string, folderId?: string) => void;
   navigateToNote: (topFolderId: string, noteId: string) => void;
   toggleNoteLink: (activeNoteId: string, targetNoteId: string) => void;
@@ -465,6 +475,8 @@ export const useNotesStore = create<NotesState>()(
       secondaryNoteId: null,
       secondaryViewMode: 'preview',
       activePane: 'primary',
+      activeNoteContents: {},
+      loadingNoteIds: {},
 
       isHydrated: false,
       isSettingsModalOpen: false,
@@ -728,18 +740,26 @@ export const useNotesStore = create<NotesState>()(
           };
         }),
 
-      selectNote: (noteId) =>
-        set((state) => {
-          if (!state.selectedFolderId) return state;
-          const folderId = state.selectedFolderId;
-          const currentOpen = state.openNotesByFolder[folderId] ?? [];
+      selectNote: (noteId) => {
+        const state = get();
+        if (!state.selectedFolderId) return;
+        const targetFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+        const targetNote = targetFolder ? findNoteNode(targetFolder.items, noteId) : null;
+        if (targetNote?.filePath && state.activeNoteContents[noteId] === undefined) {
+          void get().loadNoteContent(noteId, targetNote.filePath);
+        }
+
+        set((s) => {
+          if (!s.selectedFolderId) return s;
+          const folderId = s.selectedFolderId;
+          const currentOpen = s.openNotesByFolder[folderId] ?? [];
           const nextOpen = currentOpen.includes(noteId) ? currentOpen : [...currentOpen, noteId];
 
-          const leaves = getAllLeaves(state.paneLayout);
-          if (state.isSplitViewActive && state.activePaneId && leaves.length > 1) {
-            const updatedLayout = updateLeafInTree(state.paneLayout!, state.activePaneId, (l) => ({
+          const leaves = getAllLeaves(s.paneLayout);
+          if (s.isSplitViewActive && s.activePaneId && leaves.length > 1) {
+            const updatedLayout = updateLeafInTree(s.paneLayout!, s.activePaneId, (l) => ({
               ...l,
-              folderId: state.selectedFolderId,
+              folderId: s.selectedFolderId,
               noteId,
             }));
             const updatedLeaves = getAllLeaves(updatedLayout);
@@ -750,26 +770,91 @@ export const useNotesStore = create<NotesState>()(
               secondaryNoteId: secLeaf?.noteId ?? null,
               secondaryViewMode: secLeaf?.viewMode ?? 'preview',
               openNotesByFolder: {
-                ...state.openNotesByFolder,
+                ...s.openNotesByFolder,
                 [folderId]: nextOpen,
               },
               selectedNoteByFolder:
-                state.activePaneId === updatedLeaves[0]?.id
-                  ? { ...state.selectedNoteByFolder, [state.selectedFolderId]: noteId }
-                  : state.selectedNoteByFolder,
+                s.activePaneId === updatedLeaves[0]?.id
+                  ? { ...s.selectedNoteByFolder, [s.selectedFolderId]: noteId }
+                  : s.selectedNoteByFolder,
             };
           }
           return {
             openNotesByFolder: {
-              ...state.openNotesByFolder,
+              ...s.openNotesByFolder,
               [folderId]: nextOpen,
             },
             selectedNoteByFolder: {
-              ...state.selectedNoteByFolder,
-              [state.selectedFolderId]: noteId,
+              ...s.selectedNoteByFolder,
+              [s.selectedFolderId]: noteId,
             },
           };
-        }),
+        });
+      },
+
+      loadNoteContent: async (noteId, filePath) => {
+        const state = get();
+        if (state.activeNoteContents[noteId] !== undefined) {
+          return state.activeNoteContents[noteId];
+        }
+        if (state.loadingNoteIds[noteId]) {
+          return '';
+        }
+        set((s) => ({
+          loadingNoteIds: { ...s.loadingNoteIds, [noteId]: true },
+        }));
+
+        try {
+          let content = '';
+          if (filePath) {
+            content = await fsApi.readFile(filePath);
+          } else {
+            for (const f of state.folders) {
+              const n = findNoteNode(f.items, noteId);
+              if (n && n.content) {
+                content = n.content;
+                break;
+              }
+            }
+          }
+          set((s) => {
+            const nextLoading = { ...s.loadingNoteIds };
+            delete nextLoading[noteId];
+            return {
+              activeNoteContents: { ...s.activeNoteContents, [noteId]: content },
+              loadingNoteIds: nextLoading,
+            };
+          });
+          return content;
+        } catch (err) {
+          console.error(`Failed to load note content for ${noteId}:`, err);
+          set((s) => {
+            const nextLoading = { ...s.loadingNoteIds };
+            delete nextLoading[noteId];
+            return { loadingNoteIds: nextLoading };
+          });
+          return '';
+        }
+      },
+
+      loadSubfolderChildren: async (folderId, subfolderId, subfolderPath) => {
+        try {
+          const children = await fsApi.readDir(subfolderPath);
+          set((s) => ({
+            folders: mapFolderById(s.folders, folderId, (folder) => ({
+              ...folder,
+              items: updateFolderInTree(folder.items, subfolderId, (sub) => ({
+                ...sub,
+                children,
+                hasChildren: children.length > 0,
+                isLoaded: true,
+              })),
+            })),
+          }));
+        } catch (err) {
+          console.error(`Failed to load subfolder children for ${subfolderId}:`, err);
+        }
+      },
 
       closeNoteTab: (noteId, folderId) =>
         set((state) => {
@@ -791,7 +876,12 @@ export const useNotesStore = create<NotesState>()(
             }
           }
 
+          // RFC-042 Pillar 1: De-reference content for immediate GC
+          const nextContents = { ...state.activeNoteContents };
+          delete nextContents[noteId];
+
           return {
+            activeNoteContents: nextContents,
             openNotesByFolder: {
               ...state.openNotesByFolder,
               [targetFolderId]: nextOpen,
@@ -1159,9 +1249,16 @@ export const useNotesStore = create<NotesState>()(
         const targetNote = findNoteNode(containingFolder.items, noteId);
 
         set((s) => ({
+          activeNoteContents:
+            updates.content !== undefined
+              ? { ...s.activeNoteContents, [noteId]: updates.content }
+              : s.activeNoteContents,
           folders: mapFolderById(s.folders, targetFolderId, (folder) => ({
             ...folder,
-            items: updateNoteInTree(folder.items, noteId, updates),
+            items: updateNoteInTree(folder.items, noteId, {
+              ...updates,
+              content: '', // RFC-042: tree node does not hold raw file body
+            }),
           })),
         }));
 
@@ -1444,23 +1541,41 @@ export const useNotesStore = create<NotesState>()(
         }
       },
 
-      toggleSubfolderCollapse: (subfolderId) =>
-        set((state) => {
-          const exists = state.collapsedSubfolderIds.includes(subfolderId);
-          return {
-            collapsedSubfolderIds: exists
-              ? state.collapsedSubfolderIds.filter((id) => id !== subfolderId)
-              : [...state.collapsedSubfolderIds, subfolderId],
-          };
-        }),
+      toggleSubfolderCollapse: (subfolderId) => {
+        const state = get();
+        const exists = state.collapsedSubfolderIds.includes(subfolderId);
+        if (exists && state.selectedFolderId) {
+          const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+          if (currentFolder) {
+            const node = findFolderNode(currentFolder.items, subfolderId);
+            if (node?.folderPath && (!node.children || node.children.length === 0)) {
+              void get().loadSubfolderChildren(currentFolder.id, subfolderId, node.folderPath);
+            }
+          }
+        }
+        set({
+          collapsedSubfolderIds: exists
+            ? state.collapsedSubfolderIds.filter((id) => id !== subfolderId)
+            : [...state.collapsedSubfolderIds, subfolderId],
+        });
+      },
 
-      expandSubfolder: (subfolderId) =>
-        set((state) => {
-          if (!state.collapsedSubfolderIds.includes(subfolderId)) return state;
-          return {
-            collapsedSubfolderIds: state.collapsedSubfolderIds.filter((id) => id !== subfolderId),
-          };
-        }),
+      expandSubfolder: (subfolderId) => {
+        const state = get();
+        if (!state.collapsedSubfolderIds.includes(subfolderId)) return;
+        if (state.selectedFolderId) {
+          const currentFolder = state.folders.find((f) => f.id === state.selectedFolderId);
+          if (currentFolder) {
+            const node = findFolderNode(currentFolder.items, subfolderId);
+            if (node?.folderPath && (!node.children || node.children.length === 0)) {
+              void get().loadSubfolderChildren(currentFolder.id, subfolderId, node.folderPath);
+            }
+          }
+        }
+        set({
+          collapsedSubfolderIds: state.collapsedSubfolderIds.filter((id) => id !== subfolderId),
+        });
+      },
 
       collapseAllSubfolders: () => {
         const state = get();

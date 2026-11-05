@@ -68,6 +68,8 @@ export const NoteEditor: React.FC = () => {
   const closeSplitView = useNotesStore((s) => s.closeSplitView);
   const selectFolder = useNotesStore((s) => s.selectFolder);
   const selectNote = useNotesStore((s) => s.selectNote);
+  const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
+  const loadNoteContent = useNotesStore((s) => s.loadNoteContent);
 
   const [isLinkPickerOpen, setIsLinkPickerOpen] = useState(false);
   const [linkFilter, setLinkFilter] = useState('');
@@ -98,14 +100,22 @@ export const NoteEditor: React.FC = () => {
   const breadcrumb = activeNoteData?.path ?? (activeFolder ? [activeFolder.name] : []);
   const hasActiveFolder = Boolean(activeFolder);
 
+  const noteContent = note ? (activeNoteContents[note.id] ?? note.content ?? '') : '';
+
+  useEffect(() => {
+    if (note?.id && note?.filePath && activeNoteContents[note.id] === undefined) {
+      void loadNoteContent(note.id, note.filePath);
+    }
+  }, [note?.id, note?.filePath, activeNoteContents, loadNoteContent]);
+
   const totalPanes = useMemo(
     () => (paneLayout ? getAllLeaves(paneLayout).length : 1),
     [paneLayout]
   );
 
   const connections = useMemo(
-    () => resolveWorkspaceConnections(folders, note?.id ?? null),
-    [folders, note?.id]
+    () => resolveWorkspaceConnections(folders, note?.id ?? null, noteContent),
+    [folders, note?.id, noteContent]
   );
 
   const connectableNotes = useMemo(() => {
@@ -320,7 +330,7 @@ export const NoteEditor: React.FC = () => {
           {isObsidianMode(targetViewMode) ? (
             <MarkdownEditor
               key={`editor-obsidian-${targetNote.id}`}
-              content={targetNote.content}
+              content={noteContent}
               onChange={(val) => updateNote(targetNote.id, { content: val })}
               mode="live"
               readonly={false}
@@ -330,7 +340,7 @@ export const NoteEditor: React.FC = () => {
           ) : (
             <MilkdownViewer
               key={`editor-notebook-${targetNote.id}`}
-              content={targetNote.content}
+              content={noteContent}
               onChange={(val) => updateNote(targetNote.id, { content: val })}
               readonly={false}
             />

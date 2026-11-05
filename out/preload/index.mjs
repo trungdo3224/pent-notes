@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
     createFolder: (parentPath, name) => ipcRenderer.invoke("fs:create-folder", parentPath, name),
     renamePath: (oldPath, newPath) => ipcRenderer.invoke("fs:rename", oldPath, newPath),
     deletePath: (targetPath) => ipcRenderer.invoke("fs:delete", targetPath),
+    readFile: (filePath) => ipcRenderer.invoke("fs:read-file", filePath),
+    readDir: (dirPath) => ipcRenderer.invoke("fs:read-dir", dirPath),
+    getConnections: (filePath, noteTitle) => ipcRenderer.invoke("links:get-connections", filePath, noteTitle),
     getRawUrl: (filePath) => `pent-file://stream?path=${encodeURIComponent(filePath)}`
   },
   sessions: {

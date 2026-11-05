@@ -67,6 +67,13 @@ type ExplorerContextMenuState =
       y: number;
     };
 
+interface FlatExplorerNode {
+  id: string;
+  node: ExplorerNode;
+  depth: number;
+  parentFolderId: string | null;
+}
+
 export const FolderExplorer: React.FC = () => {
   const folders = useNotesStore((s) => s.folders);
   const selectedFolderId = useNotesStore((s) => s.selectedFolderId);
@@ -206,6 +213,57 @@ export const FolderExplorer: React.FC = () => {
     }
   }, [editingNodeId]);
 
+  const visibleFlatNodes = useMemo(() => {
+    if (!folder?.items) return [];
+    const flat: FlatExplorerNode[] = [];
+    const walk = (items: ExplorerNode[], depth: number, parentId: string | null) => {
+      const ordered = sortExplorerNodes(items, sortOrder);
+      for (const item of ordered) {
+        flat.push({
+          id: item.id,
+          node: item,
+          depth,
+          parentFolderId: parentId,
+        });
+        if (
+          item.type === 'folder' &&
+          !collapsedSet.has(item.id) &&
+          Array.isArray(item.children) &&
+          item.children.length > 0
+        ) {
+          walk(item.children, depth + 1, item.id);
+        }
+      }
+    };
+    walk(folder.items, 0, null);
+    return flat;
+  }, [folder?.items, sortOrder, collapsedSet]);
+
+  const treeContainerRef = useRef<HTMLDivElement>(null);
+  const [treeScrollTop, setTreeScrollTop] = useState(0);
+  const [treeViewportHeight, setTreeViewportHeight] = useState(700);
+
+  useEffect(() => {
+    if (!treeContainerRef.current) return;
+    const el = treeContainerRef.current;
+    setTreeViewportHeight(el.clientHeight || 700);
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setTreeViewportHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const handleTreeScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      setTreeScrollTop(e.currentTarget.scrollTop);
+      closeContextMenu();
+    },
+    [closeContextMenu]
+  );
+
   if (isCollapsed) {
     return null;
   }
@@ -296,255 +354,261 @@ export const FolderExplorer: React.FC = () => {
     setContextMenu({ kind: 'root', x, y });
   };
 
-  const renderNodes = (
-    nodes: ExplorerNode[],
-    depth: number,
-    parentFolderId: string | null = null
-  ): React.ReactNode => {
-    const ordered = sortExplorerNodes(nodes, sortOrder);
+  const ITEM_HEIGHT = 38;
+  const OVERSCAN = 6;
+  const totalTreeCount = visibleFlatNodes.length;
+  const totalTreeHeight = totalTreeCount * ITEM_HEIGHT;
 
-    return ordered.map((node) => {
-      const indentPx = BASE_INDENT_PX + depth * DEPTH_INDENT_STEP_PX;
+  const startIndex = Math.max(0, Math.floor(treeScrollTop / ITEM_HEIGHT) - OVERSCAN);
+  const endIndex = Math.min(
+    totalTreeCount,
+    Math.ceil((treeScrollTop + treeViewportHeight) / ITEM_HEIGHT) + OVERSCAN
+  );
 
-      if (node.type === 'folder') {
-        const isCollapsedFolder = collapsedSet.has(node.id);
-        const isEditing = editingNodeId === node.id;
-        const isParentLevel = depth === 0;
-        const isSelectedParent = activeFolderIdSet.has(node.id);
-        const linkedNoteCount = connections.linkedSubfolderCounts.get(node.id) ?? 0;
-        const isLinkedFolder = linkedNoteCount > 0;
-        const isContextTarget =
-          contextMenu?.kind === 'subfolder' && contextMenu.subfolder.id === node.id;
-        const folderLevelClass = isParentLevel ? 'is-parent-folder' : 'is-child-folder';
-        const folderSelectedClass = isSelectedParent ? 'is-selected-parent' : '';
-        const folderLinkedClass = isLinkedFolder ? 'is-linked-folder' : '';
+  const visibleSlice = visibleFlatNodes.slice(startIndex, endIndex);
+  const topSpacerPx = startIndex * ITEM_HEIGHT;
 
-        return (
-          <div
-            key={node.id}
-            className={`explorer-group ${isParentLevel ? 'is-root-group' : 'is-nested-group'} ${
-              isSelectedParent ? 'is-active-group' : ''
-            } ${isLinkedFolder ? 'is-linked-group' : ''}`}
-          >
-            <div
-              role="button"
-              tabIndex={0}
-              className={`explorer-row is-folder ${folderLevelClass} ${folderSelectedClass} ${folderLinkedClass} ${
-                isContextTarget ? 'is-context-open' : ''
-              }`}
-              style={{ paddingLeft: `${indentPx}px` }}
-              onClick={() => {
-                setFocusedFolderId(node.id);
-                toggleSubfolderCollapse(node.id);
-              }}
-              onDoubleClick={(e) => startSubfolderRename(node, e)}
-              onContextMenu={(e) => openSubfolderContextMenu(e, node)}
-              onKeyDown={(e) => {
-                if (isEditing) return;
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setFocusedFolderId(node.id);
-                  toggleSubfolderCollapse(node.id);
-                }
-              }}
-            >
-              <span className="explorer-chevron">
-                {isCollapsedFolder ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-              </span>
-              {isCollapsedFolder ? (
-                <Folder size={16} strokeWidth={1.8} className="explorer-item-icon is-folder-icon" />
-              ) : (
-                <FolderOpen
-                  size={16}
-                  strokeWidth={1.8}
-                  className="explorer-item-icon is-folder-icon"
-                />
-              )}
+  const renderFlatNode = (flatItem: FlatExplorerNode): React.ReactNode => {
+    const { node, depth, parentFolderId } = flatItem;
+    const indentPx = BASE_INDENT_PX + depth * DEPTH_INDENT_STEP_PX;
 
-              {isEditing ? (
-                <input
-                  ref={renameInputRef}
-                  type="text"
-                  className="explorer-rename-input"
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  onBlur={() => commitSubfolderRename(node.id)}
-                  onKeyDown={(e) => {
-                    e.stopPropagation();
-                    if (e.key === 'Enter') {
-                      commitSubfolderRename(node.id);
-                    } else if (e.key === 'Escape') {
-                      skipCommitRef.current = true;
-                      setEditingNodeId(null);
-                    }
-                  }}
-                />
-              ) : (
-                <span className="explorer-row-label">{node.name}</span>
-              )}
-
-              {isLinkedFolder && !isEditing && (
-                <span
-                  className="explorer-link-badge is-folder-badge"
-                  title={`${linkedNoteCount} ${
-                    linkedNoteCount === 1 ? 'note' : 'notes'
-                  } inside connected to current note`}
-                >
-                  <Link2 size={11} strokeWidth={2.2} />
-                  <span>{linkedNoteCount}</span>
-                </span>
-              )}
-
-              {/* Subfolder row hover actions */}
-              <div className="explorer-row-actions">
-                <button
-                  type="button"
-                  className="icon-action-btn"
-                  title="Rename subfolder"
-                  aria-label="Rename subfolder"
-                  onClick={(e) => startSubfolderRename(node, e)}
-                >
-                  <Pencil size={12} strokeWidth={1.9} />
-                </button>
-                <button
-                  type="button"
-                  className="icon-action-btn is-danger"
-                  title="Delete subfolder"
-                  aria-label="Delete subfolder"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteNode(node.id);
-                  }}
-                >
-                  <Trash2 size={12} strokeWidth={1.9} />
-                </button>
-              </div>
-            </div>
-
-            {!isCollapsedFolder && node.children.length > 0 && (
-              <div className="explorer-children">
-                {renderNodes(node.children, depth + 1, node.id)}
-              </div>
-            )}
-          </div>
-        );
-      }
-
-      const isSelected = node.id === currentActivePaneNoteId;
-      const isSecondarySelected = isSplitViewActive && !isSelected && openPaneNoteIds.has(node.id);
-      const isEditingNote = editingNodeId === node.id;
-      const isLinkedNote = !isSelected && !isSecondarySelected && connections.linkedNoteIds.has(node.id);
-      const isContextTarget = contextMenu?.kind === 'note' && contextMenu.note.id === node.id;
-      const isPdf = isPdfNote(node);
-      const noteLevelClass = depth > 0 ? 'is-child-note' : 'is-root-note';
+    if (node.type === 'folder') {
+      const isCollapsedFolder = collapsedSet.has(node.id);
+      const isEditing = editingNodeId === node.id;
+      const isParentLevel = depth === 0;
+      const isSelectedParent = activeFolderIdSet.has(node.id);
+      const linkedNoteCount = connections.linkedSubfolderCounts.get(node.id) ?? 0;
+      const isLinkedFolder = linkedNoteCount > 0;
+      const isContextTarget =
+        contextMenu?.kind === 'subfolder' && contextMenu.subfolder.id === node.id;
+      const folderLevelClass = isParentLevel ? 'is-parent-folder' : 'is-child-folder';
+      const folderSelectedClass = isSelectedParent ? 'is-selected-parent' : '';
+      const folderLinkedClass = isLinkedFolder ? 'is-linked-folder' : '';
 
       return (
         <div
           key={node.id}
-          role="button"
-          tabIndex={0}
-          className={`explorer-row is-note ${noteLevelClass} ${isSelected ? 'is-selected' : ''} ${
-            isSecondarySelected ? 'is-secondary-selected' : ''
-          } ${isLinkedNote ? 'is-linked-note' : ''} ${isContextTarget ? 'is-context-open' : ''}`}
-          style={{ paddingLeft: `${indentPx}px` }}
-          onClick={() => {
-            setFocusedFolderId(null);
-            selectNote(node.id);
-          }}
-          onMouseDown={(e) => {
-            if (e.button === 1 && folder) {
-              e.preventDefault();
-              openInSplitView(folder.id, node.id);
-            }
-          }}
-          onDoubleClick={(e) => startNoteRename(node, e)}
-          onContextMenu={(e) => openNoteContextMenu(e, node, parentFolderId)}
-          onKeyDown={(e) => {
-            if (isEditingNote) return;
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setFocusedFolderId(null);
-              selectNote(node.id);
-            }
-          }}
+          className={`explorer-group ${isParentLevel ? 'is-root-group' : 'is-nested-group'} ${
+            isSelectedParent ? 'is-active-group' : ''
+          } ${isLinkedFolder ? 'is-linked-group' : ''}`}
         >
-          <FileText
-            size={16}
-            strokeWidth={1.75}
-            className={`explorer-item-icon explorer-note-icon ${isPdf ? 'is-pdf-icon' : ''}`}
-          />
-          {isEditingNote ? (
-            <input
-              ref={renameInputRef}
-              type="text"
-              className="explorer-rename-input"
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              onBlur={() => commitNoteRename(node.id)}
-              onKeyDown={(e) => {
-                e.stopPropagation();
-                if (e.key === 'Enter') {
-                  commitNoteRename(node.id);
-                } else if (e.key === 'Escape') {
-                  skipCommitRef.current = true;
-                  setEditingNodeId(null);
-                }
-              }}
-            />
-          ) : (
-            <span className="explorer-row-label">{node.title.trim() || 'Untitled'}</span>
-          )}
-          {isLinkedNote && !isEditingNote && (
-            <span
-              className="explorer-link-badge"
-              title="Connected to current selected note (click link icon on hover to unlink)"
-            >
-              <Link2 size={11} strokeWidth={2.2} />
-              <span>Linked</span>
+          <div
+            role="button"
+            tabIndex={0}
+            className={`explorer-row is-folder ${folderLevelClass} ${folderSelectedClass} ${folderLinkedClass} ${
+              isContextTarget ? 'is-context-open' : ''
+            }`}
+            style={{ paddingLeft: `${indentPx}px` }}
+            onClick={() => {
+              setFocusedFolderId(node.id);
+              toggleSubfolderCollapse(node.id);
+            }}
+            onDoubleClick={(e) => startSubfolderRename(node, e)}
+            onContextMenu={(e) => openSubfolderContextMenu(e, node)}
+            onKeyDown={(e) => {
+              if (isEditing) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setFocusedFolderId(node.id);
+                toggleSubfolderCollapse(node.id);
+              }
+            }}
+          >
+            <span className="explorer-chevron">
+              {isCollapsedFolder ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
             </span>
-          )}
-          {isPdf && <span className="explorer-pdf-badge" title="PDF Document">PDF</span>}
-          <div className="explorer-row-actions">
-            {!isSelected && selectedNoteId && (
+            {isCollapsedFolder ? (
+              <Folder size={16} strokeWidth={1.8} className="explorer-item-icon is-folder-icon" />
+            ) : (
+              <FolderOpen
+                size={16}
+                strokeWidth={1.8}
+                className="explorer-item-icon is-folder-icon"
+              />
+            )}
+
+            {isEditing ? (
+              <input
+                ref={renameInputRef}
+                type="text"
+                className="explorer-rename-input"
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                onBlur={() => commitSubfolderRename(node.id)}
+                onKeyDown={(e) => {
+                  e.stopPropagation();
+                  if (e.key === 'Enter') {
+                    commitSubfolderRename(node.id);
+                  } else if (e.key === 'Escape') {
+                    skipCommitRef.current = true;
+                    setEditingNodeId(null);
+                  }
+                }}
+              />
+            ) : (
+              <span className="explorer-row-label">{node.name}</span>
+            )}
+
+            {isLinkedFolder && !isEditing && (
+              <span
+                className="explorer-link-badge is-folder-badge"
+                title={`${linkedNoteCount} ${
+                  linkedNoteCount === 1 ? 'note' : 'notes'
+                } inside connected to current note`}
+              >
+                <Link2 size={11} strokeWidth={2.2} />
+                <span>{linkedNoteCount}</span>
+              </span>
+            )}
+
+            {/* Subfolder row hover actions */}
+            <div className="explorer-row-actions">
               <button
                 type="button"
-                className={`icon-action-btn ${isLinkedNote ? 'is-linked-action' : ''}`}
-                title={
-                  isLinkedNote
-                    ? 'Unlink from current selected note'
-                    : 'Connect / link with current selected note'
-                }
-                aria-label={isLinkedNote ? 'Unlink note' : 'Link note'}
+                className="icon-action-btn"
+                title="Rename subfolder"
+                aria-label="Rename subfolder"
+                onClick={(e) => startSubfolderRename(node, e)}
+              >
+                <Pencil size={12} strokeWidth={1.9} />
+              </button>
+              <button
+                type="button"
+                className="icon-action-btn is-danger"
+                title="Delete subfolder"
+                aria-label="Delete subfolder"
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleNoteLink(selectedNoteId, node.id);
+                  deleteNode(node.id);
                 }}
               >
-                {isLinkedNote ? (
-                  <Unlink size={12} strokeWidth={2} />
-                ) : (
-                  <Link2 size={12} strokeWidth={2} />
-                )}
+                <Trash2 size={12} strokeWidth={1.9} />
               </button>
-            )}
-            <button
-              type="button"
-              className="icon-action-btn is-danger"
-              title="Delete note"
-              aria-label="Delete note"
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteNode(node.id);
-              }}
-            >
-              <Trash2 size={12} strokeWidth={1.9} />
-            </button>
+            </div>
           </div>
         </div>
       );
-    });
+    }
+
+    const isSelected = node.id === currentActivePaneNoteId;
+    const isSecondarySelected = isSplitViewActive && !isSelected && openPaneNoteIds.has(node.id);
+    const isEditingNote = editingNodeId === node.id;
+    const isLinkedNote =
+      !isSelected && !isSecondarySelected && connections.linkedNoteIds.has(node.id);
+    const isContextTarget = contextMenu?.kind === 'note' && contextMenu.note.id === node.id;
+    const isPdf = isPdfNote(node);
+    const noteLevelClass = depth > 0 ? 'is-child-note' : 'is-root-note';
+
+    return (
+      <div
+        key={node.id}
+        role="button"
+        tabIndex={0}
+        className={`explorer-row is-note ${noteLevelClass} ${isSelected ? 'is-selected' : ''} ${
+          isSecondarySelected ? 'is-secondary-selected' : ''
+        } ${isLinkedNote ? 'is-linked-note' : ''} ${isContextTarget ? 'is-context-open' : ''}`}
+        style={{ paddingLeft: `${indentPx}px` }}
+        onClick={() => {
+          setFocusedFolderId(null);
+          selectNote(node.id);
+        }}
+        onMouseDown={(e) => {
+          if (e.button === 1 && folder) {
+            e.preventDefault();
+            openInSplitView(folder.id, node.id);
+          }
+        }}
+        onDoubleClick={(e) => startNoteRename(node, e)}
+        onContextMenu={(e) => openNoteContextMenu(e, node, parentFolderId)}
+        onKeyDown={(e) => {
+          if (isEditingNote) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setFocusedFolderId(null);
+            selectNote(node.id);
+          }
+        }}
+      >
+        <FileText
+          size={16}
+          strokeWidth={1.75}
+          className={`explorer-item-icon explorer-note-icon ${isPdf ? 'is-pdf-icon' : ''}`}
+        />
+        {isEditingNote ? (
+          <input
+            ref={renameInputRef}
+            type="text"
+            className="explorer-rename-input"
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={() => commitNoteRename(node.id)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Enter') {
+                commitNoteRename(node.id);
+              } else if (e.key === 'Escape') {
+                skipCommitRef.current = true;
+                setEditingNodeId(null);
+              }
+            }}
+          />
+        ) : (
+          <span className="explorer-row-label">{node.title.trim() || 'Untitled'}</span>
+        )}
+        {isLinkedNote && !isEditingNote && (
+          <span
+            className="explorer-link-badge"
+            title="Connected to current selected note (click link icon on hover to unlink)"
+          >
+            <Link2 size={11} strokeWidth={2.2} />
+            <span>Linked</span>
+          </span>
+        )}
+        {isPdf && (
+          <span className="explorer-pdf-badge" title="PDF Document">
+            PDF
+          </span>
+        )}
+        <div className="explorer-row-actions">
+          {!isSelected && selectedNoteId && (
+            <button
+              type="button"
+              className={`icon-action-btn ${isLinkedNote ? 'is-linked-action' : ''}`}
+              title={
+                isLinkedNote
+                  ? 'Unlink from current selected note'
+                  : 'Connect / link with current selected note'
+              }
+              aria-label={isLinkedNote ? 'Unlink note' : 'Link note'}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleNoteLink(selectedNoteId, node.id);
+              }}
+            >
+              {isLinkedNote ? (
+                <Unlink size={12} strokeWidth={2} />
+              ) : (
+                <Link2 size={12} strokeWidth={2} />
+              )}
+            </button>
+          )}
+          <button
+            type="button"
+            className="icon-action-btn is-danger"
+            title="Delete note"
+            aria-label="Delete note"
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteNode(node.id);
+            }}
+          >
+            <Trash2 size={12} strokeWidth={1.9} />
+          </button>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -802,13 +866,15 @@ export const FolderExplorer: React.FC = () => {
         )} */}
       </div>
 
-      {/* Notes & subfolders list */}
+      {/* Notes & subfolders list (RFC-042 Pillar 3: Viewport virtualized tree window) */}
       <div
+        ref={treeContainerRef}
         className="explorer-tree"
-        onScroll={closeContextMenu}
+        onScroll={handleTreeScroll}
         onContextMenu={openRootContextMenu}
+        style={{ position: 'relative', overflowY: 'auto' }}
       >
-        {folder.items.length === 0 ? (
+        {totalTreeCount === 0 ? (
           <div className="explorer-empty">
             <p>No notes in this folder yet.</p>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -816,7 +882,19 @@ export const FolderExplorer: React.FC = () => {
             </span>
           </div>
         ) : (
-          renderNodes(folder.items, 0, null)
+          <div style={{ height: `${totalTreeHeight}px`, position: 'relative', width: '100%' }}>
+            <div
+              style={{
+                transform: `translateY(${topSpacerPx}px)`,
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+              }}
+            >
+              {visibleSlice.map((flatItem) => renderFlatNode(flatItem))}
+            </div>
+          </div>
         )}
       </div>
 

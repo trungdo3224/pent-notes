@@ -425,7 +425,8 @@ function setsIntersect(a: Set<string>, b: Set<string>): boolean {
 
 export function resolveWorkspaceConnections(
   folders: TopLevelFolder[],
-  activeNoteId: string | null
+  activeNoteId: string | null,
+  activeContent?: string
 ): WorkspaceConnections {
   const empty: WorkspaceConnections = {
     linkedNotes: [],
@@ -445,6 +446,22 @@ export function resolveWorkspaceConnections(
   const activeIndexed = allNotes.find((item) => item.note.id === activeNoteId);
   if (!activeIndexed) {
     return empty;
+  }
+
+  if (activeContent !== undefined) {
+    activeIndexed.outgoingKeys.clear();
+    const links = extractNoteLinks(activeContent);
+    for (const raw of links) {
+      const linkKey = normalizeLinkKey(raw);
+      if (linkKey) {
+        activeIndexed.outgoingKeys.add(linkKey);
+        const segments = linkKey.split('/');
+        const baseKey = segments[segments.length - 1]?.trim();
+        if (baseKey) {
+          activeIndexed.outgoingKeys.add(baseKey);
+        }
+      }
+    }
   }
 
   for (const candidate of allNotes) {

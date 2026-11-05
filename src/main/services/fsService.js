@@ -1,10 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { linkIndexService } from './linkIndexService.js';
+
+/**
+ * RFC-042: Low-Footprint Architecture & Memory Optimization
+ * - Decoupled Metadata Index (does NOT load raw file contents into store)
+ * - Shallow Traversal (depth: 1, loads subdirectories on demand)
+ * - Strict Watcher / Scanner Ignore List
+ */
 
 const NOTE_EXT_REGEX = /\.(md|markdown|mdx|txt|pdf)$/i;
-const MAX_DIRECTORY_SCAN_DEPTH = 8;
 
-const IGNORED_NAMES = new Set([
+const STRICT_IGNORE_NAMES = new Set([
   'node_modules',
   '.git',
   '.obsidian',
@@ -13,6 +20,22 @@ const IGNORED_NAMES = new Set([
   'dist',
   'build',
   '__pycache__',
+  '.svn',
+  '.hg',
+]);
+
+const STRICT_IGNORE_EXTENSIONS = new Set([
+  'zip',
+  'tar',
+  'gz',
+  'iso',
+  'pcap',
+  'exe',
+  'bin',
+  '7z',
+  'rar',
+  'dmg',
+  'pkg',
 ]);
 
 function makeId(prefix) {
@@ -21,6 +44,13 @@ function makeId(prefix) {
 
 function stripExt(name) {
   return name.replace(NOTE_EXT_REGEX, '').trim() || 'Untitled';
+}
+
+function isStrictlyIgnored(name) {
+  if (name.startsWith('.') || STRICT_IGNORE_NAMES.has(name)) return true;
+  const ext = path.extname(name).slice(1).toLowerCase();
+  if (STRICT_IGNORE_EXTENSIONS.has(ext)) return true;
+  return false;
 }
 
 async function resolveUniqueChildPath(parentDir, baseName, extension = '') {
@@ -37,41 +67,54 @@ async function resolveUniqueChildPath(parentDir, baseName, extension = '') {
   }
 }
 
-export async function readDirectoryRecursive(dirPath, depth = 0) {
-  if (depth > MAX_DIRECTORY_SCAN_DEPTH) return [];
+/**
+ * Shallow directory read (Depth: 1)
+ * Extracts lightweight metadata only. Does NOT read file contents into memory.
+ */
+export async function readDirectoryShallow(dirPath) {
   const entries = await fs.readdir(dirPath, { withFileTypes: true });
   const folders = [];
   const notes = [];
 
   for (const entry of entries) {
-    if (entry.name.startsWith('.') || IGNORED_NAMES.has(entry.name)) {
+    if (isStrictlyIgnored(entry.name)) {
       continue;
     }
     const fullPath = path.join(dirPath, entry.name);
+
     if (entry.isDirectory()) {
-      const children = await readDirectoryRecursive(fullPath, depth + 1);
+      let hasChildren = false;
+      try {
+        const subEntries = await fs.readdir(fullPath);
+        hasChildren = subEntries.some((name) => !isStrictlyIgnored(name));
+      } catch {
+        hasChildren = false;
+      }
+
       folders.push({
         id: makeId('sub'),
         type: 'folder',
         name: entry.name,
-        children,
+        hasChildren,
+        children: [],
         folderPath: fullPath,
       });
     } else if (entry.isFile() && NOTE_EXT_REGEX.test(entry.name)) {
       const isPdf = entry.name.toLowerCase().endsWith('.pdf');
-      const [content, stat] = await Promise.all([
-        isPdf ? Promise.resolve('') : fs.readFile(fullPath, 'utf-8'),
-        fs.stat(fullPath),
-      ]);
-      notes.push({
-        id: makeId('note'),
-        type: 'note',
-        title: stripExt(entry.name),
-        content,
-        updatedAt: stat.mtime.toISOString().slice(0, 10),
-        filePath: fullPath,
-        fileType: isPdf ? 'pdf' : 'markdown',
-      });
+      try {
+        const stat = await fs.stat(fullPath);
+        notes.push({
+          id: makeId('note'),
+          type: 'note',
+          title: stripExt(entry.name),
+          content: '', // Lazy: Content read on demand via readFile()
+          updatedAt: stat.mtime.toISOString().slice(0, 10),
+          filePath: fullPath,
+          fileType: isPdf ? 'pdf' : 'markdown',
+        });
+      } catch {
+        // Skip unreadable files
+      }
     }
   }
 
@@ -85,21 +128,37 @@ export async function readDirectoryRecursive(dirPath, depth = 0) {
   return [...folders, ...notes];
 }
 
+/**
+ * Scans a folder shallowly (Depth: 1) for rapid startup with zero memory scaling.
+ */
 export async function scanFolder(folderPath) {
   const resolved = path.resolve(folderPath);
   const stat = await fs.stat(resolved);
   if (!stat.isDirectory()) {
     throw new Error('Path is not a directory.');
   }
-  const items = await readDirectoryRecursive(resolved);
+  const items = await readDirectoryShallow(resolved);
   const rootName = path.basename(resolved) || 'Notes';
   return { rootName, rootPath: resolved, items };
+}
+
+/**
+ * On-demand file content read strictly when opened in an active editor tab.
+ */
+export async function readFile(filePath) {
+  const resolved = path.resolve(filePath);
+  const content = await fs.readFile(resolved, 'utf-8');
+  return content;
 }
 
 export async function writeFile(filePath, content) {
   const resolved = path.resolve(filePath);
   await fs.mkdir(path.dirname(resolved), { recursive: true });
   await fs.writeFile(resolved, content ?? '', 'utf-8');
+
+  // Update cross-file inverted link index in background
+  void linkIndexService.updateFileLinks(resolved, content);
+
   return { ok: true, path: resolved };
 }
 
@@ -113,6 +172,8 @@ export async function createFile(parentPath, name, content = '') {
   const initialContent = content || '';
   await fs.writeFile(targetFile, initialContent, 'utf-8');
 
+  void linkIndexService.updateFileLinks(targetFile, initialContent);
+
   return {
     id: makeId('note'),
     type: 'note',
@@ -120,6 +181,7 @@ export async function createFile(parentPath, name, content = '') {
     content: initialContent,
     updatedAt: new Date().toISOString().slice(0, 10),
     filePath: targetFile,
+    fileType: 'markdown',
   };
 }
 
@@ -133,6 +195,7 @@ export async function createFolder(parentPath, name) {
     id: makeId('sub'),
     type: 'folder',
     name: path.basename(targetDir),
+    hasChildren: false,
     children: [],
     folderPath: targetDir,
   };
@@ -142,12 +205,17 @@ export async function renamePath(oldPath, newPath) {
   const resolvedOld = path.resolve(oldPath);
   const resolvedNew = path.resolve(newPath);
   await fs.rename(resolvedOld, resolvedNew);
+
+  void linkIndexService.renameFile(resolvedOld, resolvedNew);
+
   return resolvedNew;
 }
 
 export async function deletePath(targetPath) {
   const resolved = path.resolve(targetPath);
   await fs.rm(resolved, { recursive: true, force: true });
+
+  void linkIndexService.removeFile(resolved);
+
   return { ok: true };
 }
-
