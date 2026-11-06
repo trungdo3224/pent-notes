@@ -36,7 +36,7 @@ import {
 import { getAllLeaves } from "../lib/paneLayoutTree";
 import { resolveActiveNoteData, useNotesStore } from "../store/useNotesStore";
 import { NoteItem } from "../types";
-import { MilkdownViewer } from "./MilkdownViewer";
+import { MarkdownEditor } from "./MarkdownEditor";
 import { NoteTabsBar } from "./NoteTabsBar";
 import { PaneSplitTree } from "./PaneSplitTree";
 import { PdfViewer } from "./PdfViewer";
@@ -335,11 +335,10 @@ export const NoteEditor: React.FC = () => {
           {isContentLoading ? (
             <div className="editor-loading-placeholder" />
           ) : (
-            <MilkdownViewer
-              key={`editor-notebook-${targetNote.id}`}
-              content={noteContent}
+            <MarkdownEditor
+              key={`editor-${targetNote.id}`}
+              value={noteContent}
               onChange={(val) => updateNote(targetNote.id, { content: val })}
-              readonly={false}
             />
           )}
 

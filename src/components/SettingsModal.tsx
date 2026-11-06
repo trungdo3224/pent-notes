@@ -220,8 +220,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                     <div>
                       <h3>Typography & Readability</h3>
                       <p>
-                        Configure typography for the Markdown note editor,
-                        Milkdown canvas, and code blocks.
+                        Configure typography for the Markdown note editor and
+                        code blocks.
                       </p>
                     </div>
 

@@ -20,7 +20,12 @@ export default defineConfig({
         "react-dom",
         "zustand",
         "lucide-react",
-        "@milkdown/crepe",
+        "@codemirror/state",
+        "@codemirror/view",
+        "@codemirror/commands",
+        "@codemirror/language",
+        "@codemirror/lang-markdown",
+        "@lezer/markdown",
       ],
     },
     build: {
@@ -28,8 +33,8 @@ export default defineConfig({
         output: {
           manualChunks(id) {
             if (id.includes("node_modules")) {
-              if (id.includes("@milkdown") || id.includes("prosemirror")) {
-                return "vendor-milkdown";
+              if (id.includes("@codemirror") || id.includes("@lezer")) {
+                return "vendor-editor";
               }
               if (
                 id.includes("react") ||

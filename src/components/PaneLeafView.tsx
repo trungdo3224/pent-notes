@@ -20,7 +20,7 @@ import { isPdfNote } from "../lib/fileUtils";
 import { findNoteAndPath } from "../lib/treeUtils";
 import { useNotesStore } from "../store/useNotesStore";
 import { PaneLeafNode, TopLevelFolder } from "../types";
-import { MilkdownViewer } from "./MilkdownViewer";
+import { MarkdownEditor } from "./MarkdownEditor";
 import { PdfViewer } from "./PdfViewer";
 
 interface PaneLeafViewProps {
@@ -309,11 +309,10 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
               ) ? (
                 <div className="editor-loading-placeholder" />
               ) : (
-                <MilkdownViewer
-                  key={`editor-notebook-${leaf.id}-${note.id}`}
-                  content={noteContent}
+                <MarkdownEditor
+                  key={`editor-${leaf.id}-${note.id}`}
+                  value={noteContent}
                   onChange={(val) => updateNote(note.id, { content: val })}
-                  readonly={false}
                 />
               )}
 

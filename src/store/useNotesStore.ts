@@ -433,7 +433,7 @@ export const useNotesStore = create<NotesState>()(
       openNotesByFolder: {},
       collapsedSubfolderIds: [],
       expandedFolderIds: [],
-      viewMode: "notebook",
+      viewMode: "editor",
       isSidebarCollapsed: false,
       isNavbarCollapsed: false,
       isRightSidebarCollapsed: false,
@@ -1146,7 +1146,7 @@ export const useNotesStore = create<NotesState>()(
             ],
           },
           collapsedSubfolderIds: nextCollapsed,
-          viewMode: s.viewMode === "preview" ? "notebook" : s.viewMode,
+          viewMode: s.viewMode === "preview" ? "editor" : s.viewMode,
           shouldFocusNoteTitle: true,
         }));
 
@@ -1878,7 +1878,7 @@ export const useNotesStore = create<NotesState>()(
         const newLeaf = createLeafNode(
           fId ?? state.selectedFolderId,
           nId,
-          "notebook",
+          "editor",
         );
 
         let nextLayout: PaneLayoutNode;
@@ -2286,8 +2286,12 @@ export const useNotesStore = create<NotesState>()(
           } else {
             applyFontSettings(initialFontSettings());
           }
-          if ((state.viewMode as string) === "split") {
-            state.setViewMode("notebook");
+          if (
+            (state.viewMode as string) === "split" ||
+            (state.viewMode as string) === "notebook" ||
+            (state.viewMode as string) === "write"
+          ) {
+            state.setViewMode("editor");
           }
           if ((state.secondaryViewMode as string) === "split") {
             state.setSecondaryViewMode("preview");

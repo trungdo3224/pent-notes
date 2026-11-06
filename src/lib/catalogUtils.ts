@@ -264,7 +264,7 @@ function extractNoteLinks(markdown: string): string[] {
     }
     if (inCodeBlock) continue;
 
-    // 1. Obsidian-style wikilinks: [[Target]] or Milkdown escaped \[\[Target\]\]
+    // 1. Wikilinks: [[Target]] or escaped \[\[Target\]\]
     const wikiMatches = rawLine.matchAll(/\\?\[\\?\[([^\]]+?)\\?\]\\?\]/g);
     for (const match of wikiMatches) {
       const target = match[1]
@@ -553,20 +553,29 @@ export function scrollToHeading(headingText: string, level: number): boolean {
 
   const elements = Array.from(
     document.querySelectorAll<HTMLElement>(
-      ".editor-pane h1, .editor-pane h2, .editor-pane h3, .editor-pane h4, .editor-pane h5, .editor-pane h6",
+      ".editor-pane h1, .editor-pane h2, .editor-pane h3, .editor-pane h4, .editor-pane h5, .editor-pane h6, .editor-pane .cm-h1, .editor-pane .cm-h2, .editor-pane .cm-h3, .editor-pane .cm-h4, .editor-pane .cm-h5, .editor-pane .cm-h6",
     ),
   );
 
-  const exactMatch = elements.find(
-    (el) =>
-      el.tagName === targetTag &&
-      el.textContent?.trim().toLowerCase() === cleanTarget,
-  );
+  const exactMatch = elements.find((el) => {
+    const isLevelMatch =
+      el.tagName === targetTag || el.classList.contains(`cm-h${level}`);
+    if (!isLevelMatch) return false;
+    const text = el.textContent
+      ?.trim()
+      .toLowerCase()
+      .replace(/^#+\s*/, "");
+    return text === cleanTarget;
+  });
   const foundEl =
     exactMatch ??
-    elements.find((el) =>
-      el.textContent?.trim().toLowerCase().includes(cleanTarget),
-    ) ??
+    elements.find((el) => {
+      const text = el.textContent
+        ?.trim()
+        .toLowerCase()
+        .replace(/^#+\s*/, "");
+      return text?.includes(cleanTarget);
+    }) ??
     null;
 
   if (foundEl) {
