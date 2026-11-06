@@ -2,6 +2,8 @@ import {
   Decoration,
   DecorationSet,
   EditorView,
+  ViewPlugin,
+  ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
@@ -45,6 +47,81 @@ class CheckboxWidget extends WidgetType {
 
     return input;
   }
+}
+
+class CodeBlockCopyWidget extends WidgetType {
+  constructor(readonly codeText: string) {
+    super();
+  }
+
+  eq(other: CodeBlockCopyWidget): boolean {
+    return other.codeText === this.codeText;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+
+  coordsAt(): null {
+    return null;
+  }
+
+  toDOM(): HTMLElement {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cm-codeblock-copy-btn";
+    btn.title = "Copy code to clipboard";
+    btn.setAttribute("aria-label", "Copy code");
+
+    const copySvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`;
+    const checkSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+    btn.innerHTML = `${copySvg}<span>Copy</span>`;
+
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const textToCopy =
+        (btn as { __codeText?: string }).__codeText ?? this.codeText;
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard
+          .writeText(textToCopy)
+          .then(() => {
+            btn.innerHTML = `${checkSvg}<span>Copied!</span>`;
+            btn.classList.add("is-copied");
+            setTimeout(() => {
+              btn.innerHTML = `${copySvg}<span>Copy</span>`;
+              btn.classList.remove("is-copied");
+            }, 2000);
+          })
+          .catch((err) => {
+            console.error("Failed to copy code block:", err);
+          });
+      }
+    });
+
+    return btn;
+  }
+
+  updateDOM(dom: HTMLElement): boolean {
+    (dom as { __codeText?: string }).__codeText = this.codeText;
+    return true;
+  }
+}
+
+function extractCodeBlockText(
+  state: EditorState,
+  startLineNum: number,
+  endLineNum: number,
+): string {
+  if (endLineNum > startLineNum + 1) {
+    const codeStart = state.doc.line(startLineNum + 1).from;
+    const codeEnd = state.doc.line(endLineNum - 1).to;
+    return state.sliceDoc(codeStart, codeEnd);
+  }
+  return "";
 }
 
 function isCursorInRange(
@@ -96,12 +173,10 @@ function buildDecorations(state: EditorState): DecorationSet {
         const cursorOnHeading = isCursorOnLine(state, from);
 
         if (!cursorOnHeading) {
-          // Find the HeaderMark (# marks + following space)
           const markMatch = state.sliceDoc(from, to).match(/^#+\s*/);
           const markLen = markMatch ? markMatch[0].length : Number(level) + 1;
           const markEnd = Math.min(from + markLen, to);
 
-          // Hide # mark and style the heading text
           if (markEnd > from) {
             decorations.push(emptyReplace.range(from, markEnd));
           }
@@ -114,7 +189,6 @@ function buildDecorations(state: EditorState): DecorationSet {
             );
           }
         } else {
-          // Cursor on line: reveal # marks with subtle styling, style whole heading
           decorations.push(
             Decoration.mark({ class: `cm-heading cm-h${level}` }).range(
               from,
@@ -128,13 +202,13 @@ function buildDecorations(state: EditorState): DecorationSet {
       // 3. Strong Emphasis (**bold**)
       if (name === "StrongEmphasis") {
         const cursorInside = isCursorInRange(state, from, to);
-        if (!cursorInside && to - from >= 4) {
+        if (!cursorInside && to - from > 4) {
           decorations.push(emptyReplace.range(from, from + 2));
           decorations.push(
             Decoration.mark({ class: "cm-bold" }).range(from + 2, to - 2),
           );
           decorations.push(emptyReplace.range(to - 2, to));
-        } else {
+        } else if (to > from) {
           decorations.push(
             Decoration.mark({ class: "cm-bold" }).range(from, to),
           );
@@ -145,13 +219,13 @@ function buildDecorations(state: EditorState): DecorationSet {
       // 4. Emphasis (*italic*)
       if (name === "Emphasis") {
         const cursorInside = isCursorInRange(state, from, to);
-        if (!cursorInside && to - from >= 2) {
+        if (!cursorInside && to - from > 2) {
           decorations.push(emptyReplace.range(from, from + 1));
           decorations.push(
             Decoration.mark({ class: "cm-italic" }).range(from + 1, to - 1),
           );
           decorations.push(emptyReplace.range(to - 1, to));
-        } else {
+        } else if (to > from) {
           decorations.push(
             Decoration.mark({ class: "cm-italic" }).range(from, to),
           );
@@ -162,7 +236,7 @@ function buildDecorations(state: EditorState): DecorationSet {
       // 5. Strikethrough (~~del~~)
       if (name === "Strikethrough") {
         const cursorInside = isCursorInRange(state, from, to);
-        if (!cursorInside && to - from >= 4) {
+        if (!cursorInside && to - from > 4) {
           decorations.push(emptyReplace.range(from, from + 2));
           decorations.push(
             Decoration.mark({ class: "cm-strikethrough" }).range(
@@ -171,7 +245,7 @@ function buildDecorations(state: EditorState): DecorationSet {
             ),
           );
           decorations.push(emptyReplace.range(to - 2, to));
-        } else {
+        } else if (to > from) {
           decorations.push(
             Decoration.mark({ class: "cm-strikethrough" }).range(from, to),
           );
@@ -182,7 +256,7 @@ function buildDecorations(state: EditorState): DecorationSet {
       // 6. InlineCode (`code`)
       if (name === "InlineCode") {
         const cursorInside = isCursorInRange(state, from, to);
-        if (!cursorInside && to - from >= 2) {
+        if (!cursorInside && to - from > 2) {
           decorations.push(emptyReplace.range(from, from + 1));
           decorations.push(
             Decoration.mark({ class: "cm-inline-code" }).range(
@@ -191,7 +265,7 @@ function buildDecorations(state: EditorState): DecorationSet {
             ),
           );
           decorations.push(emptyReplace.range(to - 1, to));
-        } else {
+        } else if (to > from) {
           decorations.push(
             Decoration.mark({ class: "cm-inline-code" }).range(from, to),
           );
@@ -210,12 +284,18 @@ function buildDecorations(state: EditorState): DecorationSet {
           const labelStart = from + 1;
           const labelEnd = labelStart + label.length;
 
-          decorations.push(emptyReplace.range(from, labelStart));
-          decorations.push(
-            Decoration.mark({ class: "cm-link" }).range(labelStart, labelEnd),
-          );
-          decorations.push(emptyReplace.range(labelEnd, to));
-        } else {
+          if (labelStart > from) {
+            decorations.push(emptyReplace.range(from, labelStart));
+          }
+          if (labelEnd > labelStart) {
+            decorations.push(
+              Decoration.mark({ class: "cm-link" }).range(labelStart, labelEnd),
+            );
+          }
+          if (to > labelEnd) {
+            decorations.push(emptyReplace.range(labelEnd, to));
+          }
+        } else if (to > from) {
           decorations.push(
             Decoration.mark({ class: "cm-link" }).range(from, to),
           );
@@ -225,13 +305,16 @@ function buildDecorations(state: EditorState): DecorationSet {
 
       // 8. TaskMarker: [ ] or [x]
       if (name === "TaskMarker") {
-        const markerText = state.sliceDoc(from, to).toLowerCase();
-        const isChecked = markerText.includes("x");
-        decorations.push(
-          Decoration.replace({
-            widget: new CheckboxWidget(isChecked, from),
-          }).range(from, to),
-        );
+        const cursorInside = isCursorInRange(state, from, to);
+        if (!cursorInside) {
+          const markerText = state.sliceDoc(from, to).toLowerCase();
+          const isChecked = markerText.includes("x");
+          decorations.push(
+            Decoration.replace({
+              widget: new CheckboxWidget(isChecked, from),
+            }).range(from, to),
+          );
+        }
         return false;
       }
 
@@ -250,13 +333,13 @@ function buildDecorations(state: EditorState): DecorationSet {
       }
 
       // 10. Blockquotes
-      if (name === "Blockquote") {
+      if (name === "Blockquote" && to > from) {
         decorations.push(
           Decoration.mark({ class: "cm-blockquote" }).range(from, to),
         );
       }
 
-      // 11. Fenced Code Blocks: Style full lines as continuous terminal block
+      // 11. Fenced Code Blocks: Continuous terminal block with Copy button
       if (name === "FencedCode") {
         const startLine = state.doc.lineAt(from);
         const endLine = state.doc.lineAt(to);
@@ -267,8 +350,31 @@ function buildDecorations(state: EditorState): DecorationSet {
           if (l === endLine.number) cls += " cm-codeblock-last";
           decorations.push(Decoration.line({ class: cls }).range(line.from));
         }
+
+        const codeText = extractCodeBlockText(
+          state,
+          startLine.number,
+          endLine.number,
+        );
         decorations.push(
-          Decoration.mark({ class: "cm-codeblock-text" }).range(from, to),
+          Decoration.widget({
+            widget: new CodeBlockCopyWidget(codeText),
+            side: 1,
+          }).range(startLine.to),
+        );
+        return true;
+      }
+
+      if (name === "CodeMark" && to > from) {
+        decorations.push(
+          Decoration.mark({ class: "cm-codeblock-fence" }).range(from, to),
+        );
+        return false;
+      }
+
+      if (name === "CodeInfo" && to > from) {
+        decorations.push(
+          Decoration.mark({ class: "cm-codeblock-info" }).range(from, to),
         );
         return false;
       }
@@ -289,3 +395,30 @@ export const livePreviewField = StateField.define<DecorationSet>({
   },
   provide: (field) => EditorView.decorations.from(field),
 });
+
+export const codeBlockCursorPlugin = ViewPlugin.fromClass(
+  class {
+    constructor(view: EditorView) {
+      this.checkCodeBlock(view);
+    }
+    update(update: ViewUpdate) {
+      if (update.selectionSet || update.docChanged) {
+        this.checkCodeBlock(update.view);
+      }
+    }
+    checkCodeBlock(view: EditorView) {
+      const pos = view.state.selection.main.head;
+      const node = syntaxTree(view.state).resolveInner(pos, 1);
+      let inCode = false;
+      let cur: typeof node | null = node;
+      while (cur) {
+        if (cur.name === "FencedCode" || cur.name === "CodeBlock") {
+          inCode = true;
+          break;
+        }
+        cur = cur.parent;
+      }
+      view.dom.classList.toggle("cm-in-codeblock", inCode);
+    }
+  },
+);

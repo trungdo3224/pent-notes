@@ -7,9 +7,9 @@
    1. SHARED DARK BASE (Soft Slate Charcoal — lighter than pitch black)
    -------------------------------------------------------------------------- */
 :root,
-:root[data-theme='midnight'],
-:root[data-theme='evergreen'],
-:root[data-theme='ember'] {
+:root[data-theme="midnight"],
+:root[data-theme="evergreen"],
+:root[data-theme="ember"] {
   color-scheme: dark;
 
   /* Base Surfaces */
@@ -31,13 +31,17 @@
   /* Code Syntax Base */
   --code-bg: #12161f;
   --code-header: #181e29;
+  --code-border: #283142;
   --code-text: #e2e8f0;
-  --code-comment: #6e8098;
-  --inline-code-bg: #232a3a;
+  --code-comment: #94a3b8;
+  --inline-code-bg: #1e2638;
+  --inline-code-border: #2e3a52;
+  --inline-code-text: #38bdf8;
 
   /* Shared Link Highlight */
   --link-highlight: #c084fc;
   --selection-text: #ffffff;
+  --code-caret: #00e5ff;
 
   /* Subtle Scrollbars */
   --scrollbar-thumb: rgba(255, 255, 255, 0.12);
@@ -55,7 +59,7 @@
 
 /* Default Dark Accent: Cyber Cyan (midnight) */
 :root,
-:root[data-theme='midnight'] {
+:root[data-theme="midnight"] {
   --forest: #00e5ff;
   --primary-hover: #38bdf8;
   --button-text: #05101a;
@@ -63,14 +67,18 @@
   --secondary: #f43f5e;
   --folder-contrast: #f97316;
   --caret: #00e5ff;
+  --code-caret: #00e5ff;
   --selection-bg: rgba(0, 229, 255, 0.34);
   --code-keyword: #38bdf8;
   --code-string: #4ade80;
   --code-title: #00e5ff;
+  --inline-code-bg: #1e2638;
+  --inline-code-border: #2e3a52;
+  --inline-code-text: #38bdf8;
 }
 
 /* Dark Accent: Terminal Green (evergreen) */
-:root[data-theme='evergreen'] {
+:root[data-theme="evergreen"] {
   --forest: #10b981;
   --primary-hover: #34d399;
   --button-text: #041a12;
@@ -78,14 +86,18 @@
   --secondary: #06b6d4;
   --folder-contrast: #f97316;
   --caret: #10b981;
+  --code-caret: #34d399;
   --selection-bg: rgba(16, 185, 129, 0.36);
   --code-keyword: #34d399;
   --code-string: #a3e635;
   --code-title: #10b981;
+  --inline-code-bg: #162923;
+  --inline-code-border: #1f3d34;
+  --inline-code-text: #34d399;
 }
 
 /* Dark Accent: Flame Ember (ember) */
-:root[data-theme='ember'] {
+:root[data-theme="ember"] {
   --forest: #f97316;
   --primary-hover: #fb923c;
   --button-text: #1f0b03;
@@ -93,18 +105,22 @@
   --secondary: #f43f5e;
   --folder-contrast: #00e5ff;
   --caret: #f97316;
+  --code-caret: #fb923c;
   --selection-bg: rgba(249, 115, 22, 0.38);
   --code-keyword: #fb923c;
   --code-string: #34d399;
   --code-title: #f97316;
+  --inline-code-bg: #2c201c;
+  --inline-code-border: #443028;
+  --inline-code-text: #fb923c;
 }
 
 /* --------------------------------------------------------------------------
    2. SHARED LIGHT BASE (Dimmed Soft Alabaster — reduced white glare)
    -------------------------------------------------------------------------- */
-:root[data-theme='parchment'],
-:root[data-theme='glacier'],
-:root[data-theme='rosewood'] {
+:root[data-theme="parchment"],
+:root[data-theme="glacier"],
+:root[data-theme="rosewood"] {
   color-scheme: light;
 
   /* Base Surfaces */
@@ -124,14 +140,18 @@
   --line-strong: #bcc7d6;
 
   /* Code Syntax Base */
-  --code-bg: #161d2a;
-  --code-header: #1e293b;
-  --code-text: #f8fafc;
-  --code-comment: #94a3b8;
-  --inline-code-bg: #e2e8f0;
+  --code-bg: #e8ecf2;
+  --code-header: #dde3eb;
+  --code-border: #cbd5e1;
+  --code-text: #0f172a;
+  --code-comment: #64748b;
+  --inline-code-bg: rgba(15, 23, 42, 0.07);
+  --inline-code-border: rgba(15, 23, 42, 0.16);
+  --inline-code-text: #0f172a;
 
   /* Shared Button Text */
   --button-text: #ffffff;
+  --code-caret: #0284c7;
 
   /* Subtle Scrollbars */
   --scrollbar-thumb: rgba(15, 23, 42, 0.12);
@@ -148,23 +168,27 @@
 }
 
 /* Light Accent: Solar Amber (parchment) */
-:root[data-theme='parchment'] {
+:root[data-theme="parchment"] {
   --forest: #ea580c;
   --primary-hover: #c2410c;
   --accent: #0284c7;
   --secondary: #0284c7;
   --folder-contrast: #0284c7;
   --link-highlight: #7c3aed;
-  --caret: #c2410c;
+  --caret: #ea580c;
+  --code-caret: #ea580c;
   --selection-bg: rgba(234, 88, 12, 0.26);
   --selection-text: #0f172a;
-  --code-keyword: #38bdf8;
-  --code-string: #4ade80;
+  --code-keyword: #0284c7;
+  --code-string: #16a34a;
   --code-title: #ea580c;
+  --inline-code-bg: rgba(234, 88, 12, 0.08);
+  --inline-code-border: rgba(234, 88, 12, 0.24);
+  --inline-code-text: #c2410c;
 }
 
 /* Light Accent: Glacier Blue (glacier) */
-:root[data-theme='glacier'] {
+:root[data-theme="glacier"] {
   --forest: #0284c7;
   --primary-hover: #0369a1;
   --accent: #0d9488;
@@ -172,25 +196,33 @@
   --folder-contrast: #ea580c;
   --link-highlight: #7c3aed;
   --caret: #0284c7;
+  --code-caret: #0284c7;
   --selection-bg: rgba(2, 132, 199, 0.26);
   --selection-text: #082f49;
-  --code-keyword: #38bdf8;
-  --code-string: #34d399;
+  --code-keyword: #0369a1;
+  --code-string: #0d9488;
   --code-title: #0284c7;
+  --inline-code-bg: rgba(2, 132, 199, 0.08);
+  --inline-code-border: rgba(2, 132, 199, 0.24);
+  --inline-code-text: #0369a1;
 }
 
 /* Light Accent: Prism Berry (rosewood) */
-:root[data-theme='rosewood'] {
+:root[data-theme="rosewood"] {
   --forest: #be185d;
   --primary-hover: #9d174d;
   --accent: #6366f1;
   --secondary: #6366f1;
   --folder-contrast: #0d9488;
   --link-highlight: #0284c7;
-  --caret: #9d174d;
+  --caret: #be185d;
+  --code-caret: #be185d;
   --selection-bg: rgba(190, 24, 93, 0.24);
   --selection-text: #4c0519;
-  --code-keyword: #818cf8;
-  --code-string: #f472b6;
+  --code-keyword: #4338ca;
+  --code-string: #be185d;
   --code-title: #be185d;
+  --inline-code-bg: rgba(190, 24, 93, 0.08);
+  --inline-code-border: rgba(190, 24, 93, 0.24);
+  --inline-code-text: #9d174d;
 }

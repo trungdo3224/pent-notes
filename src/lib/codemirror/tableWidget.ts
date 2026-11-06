@@ -291,11 +291,21 @@ export class TableWidget extends WidgetType {
     return true;
   }
 
+  get estimatedHeight(): number {
+    const lines = this.rawText.split("\n").length;
+    return Math.max(lines * 34 + 60, 90);
+  }
+
   updateDOM(dom: HTMLElement): boolean {
     // If user is currently typing inside this table, preserve the DOM to keep focus and cursor intact
     if (dom.contains(document.activeElement)) {
       dom.dataset.from = String(this.from);
       dom.dataset.to = String(this.to);
+      const inner = dom.querySelector<HTMLElement>(".cm-table-container");
+      if (inner) {
+        inner.dataset.from = String(this.from);
+        inner.dataset.to = String(this.to);
+      }
       return true;
     }
     return false;
@@ -311,10 +321,16 @@ export class TableWidget extends WidgetType {
       return fallback;
     }
 
+    const wrapper = document.createElement("div");
+    wrapper.className = "cm-table-wrapper";
+    wrapper.dataset.from = String(this.from);
+    wrapper.dataset.to = String(this.to);
+
     const container = document.createElement("div");
     container.className = "cm-table-container";
     container.dataset.from = String(this.from);
     container.dataset.to = String(this.to);
+    wrapper.appendChild(container);
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -331,6 +347,7 @@ export class TableWidget extends WidgetType {
           changes: { from: curFrom, to: curTo, insert: newMarkdown },
         });
         container.dataset.to = String(curFrom + newMarkdown.length);
+        wrapper.dataset.to = String(curFrom + newMarkdown.length);
       }
     };
 
@@ -529,6 +546,6 @@ export class TableWidget extends WidgetType {
       }
     });
 
-    return container;
+    return wrapper;
   }
 }

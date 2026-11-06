@@ -16,9 +16,14 @@ import {
   indentWithTab,
 } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { syntaxHighlighting } from "@codemirror/language";
+import { languages } from "@codemirror/language-data";
 import { GFM } from "@lezer/markdown";
-import { livePreviewField } from "../lib/codemirror/livePreview";
-import { editorTheme } from "../lib/codemirror/theme";
+import {
+  codeBlockCursorPlugin,
+  livePreviewField,
+} from "../lib/codemirror/livePreview";
+import { codeHighlightStyle, editorTheme } from "../lib/codemirror/theme";
 
 interface MarkdownEditorProps {
   value: string;
@@ -48,7 +53,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     const startState = EditorState.create({
       doc: value || "",
       extensions: [
-        markdown({ base: markdownLanguage, extensions: [GFM] }),
+        markdown({
+          base: markdownLanguage,
+          codeLanguages: languages,
+          extensions: [GFM],
+        }),
+        syntaxHighlighting(codeHighlightStyle),
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
         EditorView.lineWrapping,
@@ -59,6 +69,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         crosshairCursor(),
         placeholderExt(placeholder),
         livePreviewField,
+        codeBlockCursorPlugin,
         editorTheme,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -87,18 +98,24 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     const view = viewRef.current;
     if (!view) return;
 
+    const currentDoc = view.state.doc.toString();
+    const targetValue = value || "";
+    if (currentDoc === targetValue) {
+      isInternalChangeRef.current = false;
+      return;
+    }
+
     if (isInternalChangeRef.current) {
       isInternalChangeRef.current = false;
       return;
     }
 
-    const currentDoc = view.state.doc.toString();
-    const targetValue = value || "";
-    if (currentDoc !== targetValue) {
-      view.dispatch({
-        changes: { from: 0, to: currentDoc.length, insert: targetValue },
-      });
-    }
+    view.dispatch({
+      changes: { from: 0, to: currentDoc.length, insert: targetValue },
+      selection: {
+        anchor: Math.min(view.state.selection.main.anchor, targetValue.length),
+      },
+    });
   }, [value]);
 
   return (

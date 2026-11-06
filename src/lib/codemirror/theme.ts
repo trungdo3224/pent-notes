@@ -1,4 +1,61 @@
 import { EditorView } from "@codemirror/view";
+import { HighlightStyle } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
+
+export const codeHighlightStyle = HighlightStyle.define([
+  {
+    tag: tags.comment,
+    color: "var(--code-comment, #94a3b8)",
+    fontStyle: "italic",
+  },
+  {
+    tag: tags.lineComment,
+    color: "var(--code-comment, #94a3b8)",
+    fontStyle: "italic",
+  },
+  {
+    tag: tags.blockComment,
+    color: "var(--code-comment, #94a3b8)",
+    fontStyle: "italic",
+  },
+  {
+    tag: tags.keyword,
+    color: "var(--code-keyword, #38bdf8)",
+    fontWeight: "600",
+  },
+  { tag: tags.string, color: "var(--code-string, #4ade80)" },
+  { tag: tags.number, color: "var(--accent, #f43f5e)" },
+  { tag: tags.bool, color: "var(--accent, #f43f5e)" },
+  { tag: tags.operator, color: "var(--code-keyword, #38bdf8)" },
+  {
+    tag: tags.function(tags.variableName),
+    color: "var(--code-title, #00e5ff)",
+  },
+  { tag: tags.propertyName, color: "var(--code-title, #00e5ff)" },
+  { tag: tags.typeName, color: "var(--code-title, #00e5ff)" },
+  {
+    tag: tags.definition(tags.variableName),
+    color: "var(--code-title, #00e5ff)",
+  },
+  {
+    tag: tags.standard(tags.variableName),
+    color: "var(--code-title, #00e5ff)",
+  },
+  {
+    tag: tags.special(tags.variableName),
+    color: "var(--code-keyword, #38bdf8)",
+  },
+  { tag: tags.className, color: "var(--code-title, #00e5ff)" },
+  { tag: tags.macroName, color: "var(--code-keyword, #38bdf8)" },
+  { tag: tags.labelName, color: "var(--code-title, #00e5ff)" },
+  { tag: tags.modifier, color: "var(--code-keyword, #38bdf8)" },
+  { tag: tags.literal, color: "var(--code-string, #4ade80)" },
+  { tag: tags.atom, color: "var(--code-title, #00e5ff)" },
+  { tag: tags.heading, color: "var(--text-primary)", fontWeight: "700" },
+  { tag: tags.emphasis, fontStyle: "italic" },
+  { tag: tags.strong, fontWeight: "700" },
+  { tag: tags.link, color: "var(--forest)", textDecoration: "underline" },
+]);
 
 export const editorTheme = EditorView.theme({
   "&": {
@@ -13,21 +70,36 @@ export const editorTheme = EditorView.theme({
     fontFamily: "inherit",
     lineHeight: "inherit",
     overflow: "auto",
+    color: "var(--text-primary)",
   },
   ".cm-content": {
     padding: "0",
     maxWidth: "100%",
     caretColor: "var(--caret)",
+    color: "var(--text-primary)",
   },
   ".cm-focused": {
     outline: "none",
   },
   ".cm-line": {
     padding: "1px 0",
+    color: "var(--text-primary)",
   },
-  ".cm-cursor": {
-    borderLeftColor: "var(--caret)",
-    borderLeftWidth: "2px",
+  ".cm-cursor, .cm-dropCursor": {
+    borderLeftColor: "var(--caret) !important",
+    borderLeftWidth: "2px !important",
+  },
+  "&.cm-focused .cm-cursor, &.cm-focused .cm-dropCursor": {
+    borderLeftColor: "var(--caret) !important",
+  },
+  "&.cm-in-codeblock .cm-cursor, &.cm-in-codeblock .cm-dropCursor": {
+    borderLeftColor: "var(--code-caret, #38bdf8) !important",
+  },
+  "&.cm-in-codeblock .cm-content": {
+    caretColor: "var(--code-caret, #38bdf8) !important",
+  },
+  "&.cm-in-codeblock .cm-selectionBackground, &.cm-in-codeblock ::selection": {
+    color: "#ffffff !important",
   },
   ".cm-selectionBackground, ::selection": {
     backgroundColor: "var(--selection-bg) !important",
@@ -46,7 +118,6 @@ export const editorTheme = EditorView.theme({
     color: "var(--text-primary)",
     borderBottom: "1px solid var(--border-subtle)",
     paddingBottom: "4px",
-    marginBottom: "4px",
   },
   ".cm-h2": {
     fontSize: "1.5em",
@@ -89,9 +160,10 @@ export const editorTheme = EditorView.theme({
     fontSize: "0.88em",
     padding: "2px 6px",
     borderRadius: "4px",
-    backgroundColor: "var(--inline-code-bg, #e2e8f0)",
-    color: "var(--accent)",
-    border: "1px solid var(--border-subtle)",
+    backgroundColor: "var(--inline-code-bg)",
+    color: "var(--inline-code-text, var(--accent))",
+    border: "1px solid var(--inline-code-border, var(--border-subtle))",
+    fontWeight: "500",
   },
   ".cm-link": {
     color: "var(--forest)",
@@ -111,7 +183,9 @@ export const editorTheme = EditorView.theme({
   ".cm-bullet-mark": {
     color: "var(--forest)",
     fontWeight: "700",
-    marginRight: "6px",
+    display: "inline-block",
+    width: "1ch",
+    textAlign: "center",
   },
   ".cm-task-checkbox": {
     cursor: "pointer",
@@ -119,43 +193,89 @@ export const editorTheme = EditorView.theme({
     marginRight: "6px",
     transform: "scale(1.1)",
   },
+
   /* Fenced Code Blocks - Continuous High-Contrast Terminal Block */
   ".cm-codeblock-line": {
-    backgroundColor: "var(--code-bg, #161d2a) !important",
-    color: "var(--code-text, #f8fafc) !important",
+    backgroundColor: "var(--code-bg) !important",
+    color: "var(--code-text) !important",
     fontFamily: "var(--font-mono)",
     fontSize: "0.9em",
     paddingLeft: "16px !important",
     paddingRight: "16px !important",
-    borderLeft: "1px solid var(--border-subtle)",
-    borderRight: "1px solid var(--border-subtle)",
-  },
-  ".cm-codeblock-line *": {
-    color: "var(--code-text, #f8fafc) !important",
+    borderLeft: "1px solid var(--code-border, var(--border-subtle))",
+    borderRight: "1px solid var(--code-border, var(--border-subtle))",
+    margin: "0 !important",
+    borderRadius: "0 !important",
   },
   ".cm-codeblock-first": {
-    borderTop: "1px solid var(--border-subtle)",
+    position: "relative",
+    borderTop: "1px solid var(--code-border, var(--border-subtle))",
     borderTopLeftRadius: "8px",
     borderTopRightRadius: "8px",
-    marginTop: "0.8em",
-    paddingTop: "6px",
+    paddingTop: "10px !important",
+    paddingRight: "80px !important",
+    margin: "0 !important",
   },
   ".cm-codeblock-last": {
-    borderBottom: "1px solid var(--border-subtle)",
+    borderBottom: "1px solid var(--code-border, var(--border-subtle))",
     borderBottomLeftRadius: "8px",
     borderBottomRightRadius: "8px",
-    marginBottom: "0.8em",
-    paddingBottom: "6px",
+    paddingBottom: "10px !important",
+    margin: "0 !important",
   },
-  ".cm-codeblock-text": {
-    color: "var(--code-text, #f8fafc) !important",
+  ".cm-codeblock-fence": {
+    color: "var(--code-comment) !important",
+    opacity: "0.7",
     fontFamily: "var(--font-mono)",
+  },
+  ".cm-codeblock-info": {
+    color: "var(--code-keyword) !important",
+    fontWeight: "600",
+    fontFamily: "var(--font-mono)",
+  },
+  ".cm-codeblock-copy-btn": {
+    position: "absolute",
+    right: "10px",
+    top: "6px",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    padding: "3px 8px",
+    fontSize: "11px",
+    fontWeight: "550",
+    fontFamily: "var(--font-sans)",
+    color: "var(--code-comment)",
+    backgroundColor: "color-mix(in srgb, var(--surface) 80%, transparent)",
+    border: "1px solid var(--code-border, var(--border-subtle))",
+    borderRadius: "5px",
+    cursor: "pointer",
+    userSelect: "none",
+    zIndex: "5",
+    transition: "all 0.15s ease",
+    lineHeight: "1.2",
+  },
+  ".cm-codeblock-copy-btn:hover": {
+    color: "var(--code-text) !important",
+    backgroundColor: "color-mix(in srgb, var(--forest) 20%, var(--surface))",
+    borderColor: "var(--forest)",
+  },
+  ".cm-codeblock-copy-btn.is-copied": {
+    color: "#10b981 !important",
+    borderColor: "#10b981 !important",
+    backgroundColor:
+      "color-mix(in srgb, #10b981 18%, var(--surface)) !important",
   },
 
   /* Elevated In-Place Table Widget */
+  ".cm-table-wrapper": {
+    width: "100%",
+    padding: "10px 0",
+    margin: "0",
+    boxSizing: "border-box",
+  },
   ".cm-table-container": {
     width: "100%",
-    margin: "1.4em 0",
+    margin: "0",
     overflowX: "auto",
     border: "1px solid var(--border-tab-hover)",
     borderRadius: "8px",
@@ -246,13 +366,14 @@ export const editorTheme = EditorView.theme({
     backgroundColor: "color-mix(in srgb, var(--forest) 8%, var(--hover))",
   },
   ".cm-table-inline-code": {
-    backgroundColor: "var(--inline-code-bg, #e2e8f0)",
-    border: "1px solid var(--border-subtle)",
-    color: "var(--accent)",
+    backgroundColor: "var(--inline-code-bg)",
+    border: "1px solid var(--inline-code-border, var(--border-subtle))",
+    color: "var(--inline-code-text, var(--accent))",
     padding: "2px 6px",
     borderRadius: "4px",
     fontSize: "0.88em",
     fontFamily: "var(--font-mono)",
+    fontWeight: "500",
   },
   ".cm-table-link": {
     color: "var(--forest)",
