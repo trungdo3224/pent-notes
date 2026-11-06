@@ -256,11 +256,21 @@ function buildDecorations(state: EditorState): DecorationSet {
         );
       }
 
-      // 11. Fenced Code Blocks
+      // 11. Fenced Code Blocks: Style full lines as continuous terminal block
       if (name === "FencedCode") {
+        const startLine = state.doc.lineAt(from);
+        const endLine = state.doc.lineAt(to);
+        for (let l = startLine.number; l <= endLine.number; l++) {
+          const line = state.doc.line(l);
+          let cls = "cm-codeblock-line";
+          if (l === startLine.number) cls += " cm-codeblock-first";
+          if (l === endLine.number) cls += " cm-codeblock-last";
+          decorations.push(Decoration.line({ class: cls }).range(line.from));
+        }
         decorations.push(
-          Decoration.mark({ class: "cm-code-block" }).range(from, to),
+          Decoration.mark({ class: "cm-codeblock-text" }).range(from, to),
         );
+        return false;
       }
     });
 

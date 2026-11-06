@@ -87,9 +87,9 @@ export const editorTheme = EditorView.theme({
   ".cm-inline-code": {
     fontFamily: "var(--font-mono)",
     fontSize: "0.88em",
-    padding: "2px 5px",
+    padding: "2px 6px",
     borderRadius: "4px",
-    backgroundColor: "var(--inline-code-bg, rgba(255, 255, 255, 0.08))",
+    backgroundColor: "var(--inline-code-bg, #e2e8f0)",
     color: "var(--accent)",
     border: "1px solid var(--border-subtle)",
   },
@@ -103,6 +103,10 @@ export const editorTheme = EditorView.theme({
     paddingLeft: "12px",
     color: "var(--text-secondary)",
     fontStyle: "italic",
+    backgroundColor: "color-mix(in srgb, var(--forest) 6%, transparent)",
+    borderRadius: "0 6px 6px 0",
+    paddingTop: "2px",
+    paddingBottom: "2px",
   },
   ".cm-bullet-mark": {
     color: "var(--forest)",
@@ -115,12 +119,37 @@ export const editorTheme = EditorView.theme({
     marginRight: "6px",
     transform: "scale(1.1)",
   },
-  ".cm-code-block": {
+  /* Fenced Code Blocks - Continuous High-Contrast Terminal Block */
+  ".cm-codeblock-line": {
+    backgroundColor: "var(--code-bg, #161d2a) !important",
+    color: "var(--code-text, #f8fafc) !important",
     fontFamily: "var(--font-mono)",
-    backgroundColor: "var(--code-bg, rgba(0, 0, 0, 0.25))",
-    borderRadius: "6px",
-    padding: "4px 8px",
-    border: "1px solid var(--border-subtle)",
+    fontSize: "0.9em",
+    paddingLeft: "16px !important",
+    paddingRight: "16px !important",
+    borderLeft: "1px solid var(--border-subtle)",
+    borderRight: "1px solid var(--border-subtle)",
+  },
+  ".cm-codeblock-line *": {
+    color: "var(--code-text, #f8fafc) !important",
+  },
+  ".cm-codeblock-first": {
+    borderTop: "1px solid var(--border-subtle)",
+    borderTopLeftRadius: "8px",
+    borderTopRightRadius: "8px",
+    marginTop: "0.8em",
+    paddingTop: "6px",
+  },
+  ".cm-codeblock-last": {
+    borderBottom: "1px solid var(--border-subtle)",
+    borderBottomLeftRadius: "8px",
+    borderBottomRightRadius: "8px",
+    marginBottom: "0.8em",
+    paddingBottom: "6px",
+  },
+  ".cm-codeblock-text": {
+    color: "var(--code-text, #f8fafc) !important",
+    fontFamily: "var(--font-mono)",
   },
 
   /* Elevated In-Place Table Widget */
@@ -217,12 +246,13 @@ export const editorTheme = EditorView.theme({
     backgroundColor: "color-mix(in srgb, var(--forest) 8%, var(--hover))",
   },
   ".cm-table-inline-code": {
-    backgroundColor: "var(--code-bg, rgba(0, 0, 0, 0.25))",
+    backgroundColor: "var(--inline-code-bg, #e2e8f0)",
     border: "1px solid var(--border-subtle)",
     color: "var(--accent)",
-    padding: "2px 5px",
+    padding: "2px 6px",
     borderRadius: "4px",
     fontSize: "0.88em",
+    fontFamily: "var(--font-mono)",
   },
   ".cm-table-link": {
     color: "var(--forest)",

@@ -3195,15 +3195,20 @@ body.is-col-resizing * {
 
 /* Codeblock Background & Fences */
 .cm-codeblock-line {
-  background-color: var(--code-bg, #12161f);
+  background-color: var(--code-bg, #161d2a) !important;
+  color: var(--code-text, #f8fafc) !important;
   font-family: var(--font-mono, "JetBrains Mono", monospace) !important;
   font-size: 0.88em !important;
-  padding-left: 14px !important;
-  padding-right: 14px !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
+
+.cm-codeblock-line * {
+  color: var(--code-text, #f8fafc) !important;
 }
 
 .cm-codeblock-fence {
-  color: var(--muted, #8b9bb4) !important;
+  color: var(--code-comment, #94a3b8) !important;
   font-weight: 600;
 }
 
