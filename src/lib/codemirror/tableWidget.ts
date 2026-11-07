@@ -356,31 +356,38 @@ export class TableWidget extends WidgetType {
       debounceTimer = setTimeout(dispatchUpdate, 150);
     };
 
-    // Toolbar with + Row, + Column, - Row
+    // Toolbar with +R, -R, +C, -C
     const toolbar = document.createElement("div");
     toolbar.className = "cm-table-toolbar";
 
     const addRowBtn = document.createElement("button");
     addRowBtn.type = "button";
     addRowBtn.className = "cm-table-btn";
-    addRowBtn.textContent = "+ Row";
-    addRowBtn.title = "Add a new row to the table";
-
-    const addColBtn = document.createElement("button");
-    addColBtn.type = "button";
-    addColBtn.className = "cm-table-btn";
-    addColBtn.textContent = "+ Column";
-    addColBtn.title = "Add a new column to the table";
+    addRowBtn.textContent = "+R";
+    addRowBtn.title = "Add row (+R)";
 
     const delRowBtn = document.createElement("button");
     delRowBtn.type = "button";
     delRowBtn.className = "cm-table-btn";
-    delRowBtn.textContent = "- Row";
-    delRowBtn.title = "Delete the bottom row";
+    delRowBtn.textContent = "-R";
+    delRowBtn.title = "Delete row (-R)";
+
+    const addColBtn = document.createElement("button");
+    addColBtn.type = "button";
+    addColBtn.className = "cm-table-btn";
+    addColBtn.textContent = "+C";
+    addColBtn.title = "Add column (+C)";
+
+    const delColBtn = document.createElement("button");
+    delColBtn.type = "button";
+    delColBtn.className = "cm-table-btn";
+    delColBtn.textContent = "-C";
+    delColBtn.title = "Delete column (-C)";
 
     toolbar.appendChild(addRowBtn);
-    toolbar.appendChild(addColBtn);
     toolbar.appendChild(delRowBtn);
+    toolbar.appendChild(addColBtn);
+    toolbar.appendChild(delColBtn);
     container.appendChild(toolbar);
 
     const table = document.createElement("table");
@@ -455,10 +462,36 @@ export class TableWidget extends WidgetType {
       dispatchUpdate();
     };
 
+    // In-table row deletion
+    const deleteLastRow = () => {
+      const lastTr = tbody.querySelector("tr:last-child");
+      if (lastTr && tbody.children.length > 1) {
+        lastTr.remove();
+        dispatchUpdate();
+      }
+    };
+
+    // In-table column deletion
+    const deleteLastColumn = () => {
+      const ths = thead.querySelectorAll("th.cm-table-cell");
+      if (ths.length > 1) {
+        thead.querySelector("tr")?.lastElementChild?.remove();
+        tbody.querySelectorAll("tr").forEach((tr) => {
+          tr.lastElementChild?.remove();
+        });
+        dispatchUpdate();
+      }
+    };
+
     // Button event listeners
     addRowBtn.addEventListener("click", (e) => {
       e.preventDefault();
       addNewRow();
+    });
+
+    delRowBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      deleteLastRow();
     });
 
     addColBtn.addEventListener("click", (e) => {
@@ -466,13 +499,9 @@ export class TableWidget extends WidgetType {
       addNewColumn();
     });
 
-    delRowBtn.addEventListener("click", (e) => {
+    delColBtn.addEventListener("click", (e) => {
       e.preventDefault();
-      const lastTr = tbody.querySelector("tr:last-child");
-      if (lastTr && tbody.children.length > 1) {
-        lastTr.remove();
-        dispatchUpdate();
-      }
+      deleteLastColumn();
     });
 
     // Content editing & input sync

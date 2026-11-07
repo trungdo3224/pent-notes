@@ -42,6 +42,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
 }) => {
   const updateNote = useNotesStore((s) => s.updateNote);
   const setPaneNote = useNotesStore((s) => s.setPaneNote);
+  const openInSplitView = useNotesStore((s) => s.openInSplitView);
   const closePane = useNotesStore((s) => s.closePane);
   const toggleNoteLink = useNotesStore((s) => s.toggleNoteLink);
   const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
@@ -320,6 +321,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                   key={`editor-${leaf.id}-${note.id}`}
                   value={noteContent}
                   onChange={(val) => updateNote(note.id, { content: val })}
+                  filePath={note.filePath}
                 />
               )}
 
@@ -346,9 +348,9 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                           type="button"
                           className="connected-note-label-btn"
                           onClick={() =>
-                            setPaneNote(leaf.id, item.topFolderId, item.note.id)
+                            openInSplitView(item.topFolderId, item.note.id)
                           }
-                          title={`Open "${item.note.title.trim() || "Untitled"}" here`}
+                          title={`Open "${item.note.title.trim() || "Untitled"}" in separated tab`}
                         >
                           <span className="connected-note-title">
                             {item.note.title.trim() || "Untitled"}

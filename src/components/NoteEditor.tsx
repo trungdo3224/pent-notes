@@ -68,7 +68,7 @@ export const NoteEditor: React.FC = () => {
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
   const clearFocusNoteTitle = useNotesStore((s) => s.clearFocusNoteTitle);
   const closeSplitView = useNotesStore((s) => s.closeSplitView);
-  const navigateToNote = useNotesStore((s) => s.navigateToNote);
+  const openInSplitView = useNotesStore((s) => s.openInSplitView);
   const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
   const loadNoteContent = useNotesStore((s) => s.loadNoteContent);
 
@@ -346,6 +346,7 @@ export const NoteEditor: React.FC = () => {
               key={`editor-${targetNote.id}`}
               value={noteContent}
               onChange={(val) => updateNote(targetNote.id, { content: val })}
+              filePath={targetNote.filePath}
             />
           )}
 
@@ -367,9 +368,9 @@ export const NoteEditor: React.FC = () => {
                       type="button"
                       className="connected-note-label-btn"
                       onClick={() =>
-                        navigateToNote(item.topFolderId, item.note.id)
+                        openInSplitView(item.topFolderId, item.note.id)
                       }
-                      title={`Jump to "${item.note.title.trim() || "Untitled"}"`}
+                      title={`Open "${item.note.title.trim() || "Untitled"}" in separated tab`}
                     >
                       <span className="connected-note-title">
                         {item.note.title.trim() || "Untitled"}

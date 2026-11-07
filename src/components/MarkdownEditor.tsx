@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef } from "react";
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import {
   crosshairCursor,
   drawSelection,
@@ -20,9 +20,11 @@ import { syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { GFM } from "@lezer/markdown";
 import {
+  activeFilePathFacet,
   codeBlockCursorPlugin,
   livePreviewField,
 } from "../lib/codemirror/livePreview";
+import { createImageDropPasteExtension } from "../lib/codemirror/imageDropPaste";
 import { codeHighlightStyle, editorTheme } from "../lib/codemirror/theme";
 
 interface MarkdownEditorProps {
@@ -30,6 +32,7 @@ interface MarkdownEditorProps {
   onChange: (val: string) => void;
   className?: string;
   placeholder?: string;
+  filePath?: string;
 }
 
 interface MarkdownEditorElement extends HTMLDivElement {
@@ -41,18 +44,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   onChange,
   className = "",
   placeholder = "Start writing markdown...",
+  filePath,
 }) => {
   const containerRef = useRef<MarkdownEditorElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const isInternalChangeRef = useRef(false);
   const onChangeRef = useRef(onChange);
+  const filePathRef = useRef(filePath);
+  const filePathCompartmentRef = useRef<Compartment | null>(null);
 
   useLayoutEffect(() => {
     onChangeRef.current = onChange;
+    filePathRef.current = filePath;
   });
 
   useEffect(() => {
     if (!containerRef.current) return;
+
+    const filePathCompartment = new Compartment();
+    filePathCompartmentRef.current = filePathCompartment;
 
     const startState = EditorState.create({
       doc: value || "",
@@ -72,8 +82,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         rectangularSelection(),
         crosshairCursor(),
         placeholderExt(placeholder),
+        filePathCompartment.of(activeFilePathFacet.of(filePath)),
         livePreviewField,
         codeBlockCursorPlugin,
+        createImageDropPasteExtension({
+          getFilePath: () => filePathRef.current,
+        }),
         editorTheme,
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
@@ -99,6 +113,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       viewRef.current = null;
     };
   }, []); // Mount once per key
+
+  // Sync filePath changes
+  useEffect(() => {
+    const view = viewRef.current;
+    const compartment = filePathCompartmentRef.current;
+    if (!view || !compartment) return;
+
+    view.dispatch({
+      effects: compartment.reconfigure(activeFilePathFacet.of(filePath)),
+    });
+  }, [filePath]);
 
   // Sync external value updates (e.g. note switching or disk sync)
   useEffect(() => {

@@ -106,4 +106,19 @@ export const fsApi = {
     );
     return data.items;
   },
+
+  async saveImage(
+    parentDir: string,
+    fileName: string,
+    base64Data: string,
+  ): Promise<{ ok: boolean; absolutePath: string; relativePath: string }> {
+    if (typeof window !== "undefined" && window.electronAPI?.fs?.saveImage) {
+      return await window.electronAPI.fs.saveImage(
+        parentDir,
+        fileName,
+        base64Data,
+      );
+    }
+    throw new Error("Native filesystem image saving is not available");
+  },
 };

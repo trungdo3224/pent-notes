@@ -304,14 +304,6 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
     >
       {/* Header */}
       <div className="catalog-header">
-        <div className="catalog-title-wrapper">
-          <BookOpen
-            size={16}
-            strokeWidth={1.8}
-            className="catalog-header-icon"
-          />
-          <span className="catalog-header-title">NOTE CATALOG</span>
-        </div>
         <button
           type="button"
           className="catalog-close-btn"

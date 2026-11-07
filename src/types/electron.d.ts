@@ -45,6 +45,11 @@ export interface ElectronAPI {
     deletePath: (targetPath: string) => Promise<{ ok: boolean }>;
     readFile: (filePath: string) => Promise<string>;
     readDir: (dirPath: string) => Promise<ExplorerNode[]>;
+    saveImage?: (
+      parentDir: string,
+      fileName: string,
+      base64Data: string,
+    ) => Promise<{ ok: boolean; absolutePath: string; relativePath: string }>;
     getRawUrl: (filePath: string) => string;
   };
   sessions: {

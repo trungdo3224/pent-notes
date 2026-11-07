@@ -154,12 +154,12 @@ function areNodeTreesEqual(a: ExplorerNode[], b: ExplorerNode[]): boolean {
 }
 
 const TAB_GROUP_COLORS: TabGroupColorId[] = [
-  "cyan",
+  "blue",
+  "purple",
   "emerald",
   "amber",
-  "purple",
   "rose",
-  "blue",
+  "cyan",
 ];
 
 function cleanupEmptyTabGroups(
@@ -2003,7 +2003,80 @@ export const useNotesStore = create<NotesState>()(
       },
 
       openInSplitView: (folderId, noteId, direction = "horizontal") => {
+        const state = get();
+        const leaves = getAllLeaves(state.paneLayout);
+
+        // 1. If note is already open in one of the split panes, focus it
+        const existingLeaf = leaves.find(
+          (l) => l.noteId === noteId && l.folderId === folderId,
+        );
+        if (existingLeaf) {
+          state.setActivePaneId(existingLeaf.id);
+          return;
+        }
+
+        // 2. If split view is already active with 2 panes, reuse the secondary pane
+        if (
+          state.isSplitViewActive &&
+          state.paneLayout &&
+          leaves.length === 2
+        ) {
+          const targetLeaf =
+            leaves.find((l) => l.id !== state.activePaneId) ?? leaves[1];
+          state.setPaneNote(targetLeaf.id, folderId, noteId);
+          state.setActivePaneId(targetLeaf.id);
+
+          const currentOpen = state.openNotesByFolder[folderId] ?? [];
+          const nextOpen = currentOpen.includes(noteId)
+            ? currentOpen
+            : [...currentOpen, noteId];
+          const targetTopFolder = state.folders.find((f) => f.id === folderId);
+          const ancestors = targetTopFolder
+            ? (findAncestorFolderIds(targetTopFolder.items, noteId) ?? [])
+            : [];
+          const ancestorSet = new Set(ancestors);
+          set({
+            openNotesByFolder: {
+              ...state.openNotesByFolder,
+              [folderId]: nextOpen,
+            },
+            expandedFolderIds: Array.from(
+              new Set([...(state.expandedFolderIds ?? []), ...ancestorSet]),
+            ),
+            collapsedSubfolderIds: state.collapsedSubfolderIds.filter(
+              (id) => !ancestorSet.has(id),
+            ),
+          });
+          return;
+        }
+
+        // 3. Otherwise perform a standard split
         get().splitPane(direction, folderId, noteId);
+
+        const nextState = get();
+        const currentOpen = nextState.openNotesByFolder[folderId] ?? [];
+        const nextOpen = currentOpen.includes(noteId)
+          ? currentOpen
+          : [...currentOpen, noteId];
+        const targetTopFolder = nextState.folders.find(
+          (f) => f.id === folderId,
+        );
+        const ancestors = targetTopFolder
+          ? (findAncestorFolderIds(targetTopFolder.items, noteId) ?? [])
+          : [];
+        const ancestorSet = new Set(ancestors);
+        set({
+          openNotesByFolder: {
+            ...nextState.openNotesByFolder,
+            [folderId]: nextOpen,
+          },
+          expandedFolderIds: Array.from(
+            new Set([...(nextState.expandedFolderIds ?? []), ...ancestorSet]),
+          ),
+          collapsedSubfolderIds: nextState.collapsedSubfolderIds.filter(
+            (id) => !ancestorSet.has(id),
+          ),
+        });
       },
 
       closeSplitView: () => {

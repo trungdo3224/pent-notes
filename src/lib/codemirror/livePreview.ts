@@ -7,8 +7,20 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
-import { EditorState, Range, StateField } from "@codemirror/state";
+import { EditorState, Facet, Range, StateField } from "@codemirror/state";
 import { TableWidget } from "./tableWidget";
+import {
+  ImageWidget,
+  parseImageMarkdown,
+  resolveImageUrl,
+} from "./imageWidget";
+
+export const activeFilePathFacet = Facet.define<
+  string | undefined,
+  string | undefined
+>({
+  combine: (values) => values[0] ?? undefined,
+});
 
 class BulletWidget extends WidgetType {
   toDOM(): HTMLElement {
@@ -147,6 +159,7 @@ const emptyReplace = Decoration.replace({});
 
 function buildDecorations(state: EditorState): DecorationSet {
   const decorations: Range<Decoration>[] = [];
+  const activeFilePath = state.facet(activeFilePathFacet);
 
   syntaxTree(state)
     .cursor()
@@ -303,7 +316,38 @@ function buildDecorations(state: EditorState): DecorationSet {
         return false;
       }
 
-      // 8. TaskMarker: [ ] or [x]
+      // 8. Images: ![alt](url) or ![alt|width](url)
+      if (name === "Image") {
+        const cursorInside = isCursorInRange(state, from, to);
+        if (!cursorInside) {
+          const rawText = state.sliceDoc(from, to);
+          const parsed = parseImageMarkdown(rawText);
+          if (parsed && parsed.url) {
+            const line = state.doc.lineAt(from);
+            const isBlock = line.text.trim() === rawText.trim();
+            const resolvedUrl = resolveImageUrl(parsed.url, activeFilePath);
+            decorations.push(
+              Decoration.replace({
+                widget: new ImageWidget(
+                  rawText,
+                  parsed.url,
+                  resolvedUrl,
+                  parsed.alt,
+                  parsed.title,
+                  parsed.width,
+                  parsed.height,
+                  from,
+                  to,
+                  isBlock,
+                ),
+              }).range(from, to),
+            );
+          }
+        }
+        return false;
+      }
+
+      // 9. TaskMarker: [ ] or [x]
       if (name === "TaskMarker") {
         const cursorInside = isCursorInRange(state, from, to);
         if (!cursorInside) {
@@ -318,7 +362,7 @@ function buildDecorations(state: EditorState): DecorationSet {
         return false;
       }
 
-      // 9. Bullet List Markers (-, *, +)
+      // 10. Bullet List Markers (-, *, +)
       if (name === "ListMark") {
         const markText = state.sliceDoc(from, to);
         if (
@@ -332,14 +376,14 @@ function buildDecorations(state: EditorState): DecorationSet {
         return false;
       }
 
-      // 10. Blockquotes
+      // 11. Blockquotes
       if (name === "Blockquote" && to > from) {
         decorations.push(
           Decoration.mark({ class: "cm-blockquote" }).range(from, to),
         );
       }
 
-      // 11. Fenced Code Blocks: Continuous terminal block with Copy button
+      // 12. Fenced Code Blocks: Continuous terminal block with Copy button
       if (name === "FencedCode") {
         const startLine = state.doc.lineAt(from);
         const endLine = state.doc.lineAt(to);

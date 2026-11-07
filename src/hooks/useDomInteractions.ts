@@ -49,22 +49,26 @@ export function useClickOutside(
   containerRef: RefObject<HTMLElement | null>,
   isOpen: boolean,
   onClose: () => void,
+  shouldIgnore?: (target: HTMLElement) => boolean,
 ): void {
   useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
       if (
         containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
+        target &&
+        !containerRef.current.contains(target)
       ) {
+        if (shouldIgnore?.(target)) return;
         onClose();
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [containerRef, isOpen, onClose]);
+  }, [containerRef, isOpen, onClose, shouldIgnore]);
 }
 
 /**

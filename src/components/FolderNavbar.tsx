@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import {
   ChevronDown,
-  ChevronRight,
   FileUp,
   Folder,
   FolderPlus,
@@ -45,12 +44,12 @@ const GROUP_COLOR_SWATCHES: Array<{
   label: string;
   hex: string;
 }> = [
-  { id: "cyan", label: "Cyan", hex: "#00e5ff" },
+  { id: "blue", label: "Blue", hex: "#3b82f6" },
+  { id: "purple", label: "Purple", hex: "#8b5cf6" },
   { id: "emerald", label: "Emerald", hex: "#10b981" },
   { id: "amber", label: "Amber", hex: "#f59e0b" },
-  { id: "purple", label: "Purple", hex: "#c084fc" },
   { id: "rose", label: "Rose", hex: "#f43f5e" },
-  { id: "blue", label: "Blue", hex: "#3b82f6" },
+  { id: "cyan", label: "Sky", hex: "#0ea5e9" },
 ];
 
 type NavbarContextMenuState =
@@ -82,6 +81,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
   const toggleNavbar = useNotesStore((s) => s.toggleNavbar);
   const selectFolder = useNotesStore((s) => s.selectFolder);
+  const openInSplitView = useNotesStore((s) => s.openInSplitView);
   const navigateToNote = useNotesStore((s) => s.navigateToNote);
   const createTopFolder = useNotesStore((s) => s.createTopFolder);
   const renameTopFolder = useNotesStore((s) => s.renameTopFolder);
@@ -94,7 +94,6 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const assignFolderToTabGroup = useNotesStore((s) => s.assignFolderToTabGroup);
   const renameTabGroup = useNotesStore((s) => s.renameTabGroup);
   const setTabGroupColor = useNotesStore((s) => s.setTabGroupColor);
-  const toggleTabGroupCollapse = useNotesStore((s) => s.toggleTabGroupCollapse);
   const ungroupTabGroup = useNotesStore((s) => s.ungroupTabGroup);
   const deleteTabGroupAndFolders = useNotesStore(
     (s) => s.deleteTabGroupAndFolders,
@@ -131,6 +130,12 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const [contextMenu, setContextMenu] = useState<NavbarContextMenuState | null>(
     null,
   );
+  const [openGroupDropdown, setOpenGroupDropdown] = useState<{
+    group: TabGroup;
+    x: number;
+    y: number;
+    minWidth: number;
+  } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const groupInputRef = useRef<HTMLInputElement>(null);
@@ -139,11 +144,23 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const skipGroupCommitRef = useRef(false);
   const plusMenuRef = useRef<HTMLDivElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const groupDropdownRef = useRef<HTMLDivElement>(null);
 
   const closePlusMenu = useCallback(() => setIsPlusMenuOpen(false), []);
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const closeGroupDropdown = useCallback(() => setOpenGroupDropdown(null), []);
   useClickOutside(plusMenuRef, isPlusMenuOpen, closePlusMenu);
   useClickOutside(contextMenuRef, Boolean(contextMenu), closeContextMenu);
+  const isTargetInGroupChip = useCallback(
+    (target: HTMLElement) => Boolean(target.closest?.(".tab-group-chip")),
+    [],
+  );
+  useClickOutside(
+    groupDropdownRef,
+    Boolean(openGroupDropdown),
+    closeGroupDropdown,
+    isTargetInGroupChip,
+  );
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -153,6 +170,22 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [contextMenu]);
+
+  useEffect(() => {
+    if (!openGroupDropdown) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenGroupDropdown(null);
+    };
+    const handleScrollOrResize = () => setOpenGroupDropdown(null);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", handleScrollOrResize);
+    window.addEventListener("scroll", handleScrollOrResize, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleScrollOrResize);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+    };
+  }, [openGroupDropdown]);
 
   useEffect(() => {
     if (pendingRenameFolderId) {
@@ -448,7 +481,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
       ) {
         setDragOverGroupOrder({ groupId: group.id, position: "before" });
       }
-    } else if (group.collapsed && relX > 0.78) {
+    } else if (relX > 0.78) {
       setDragOverGroupId(null);
       if (
         dragOverGroupOrder?.groupId !== group.id ||
@@ -570,23 +603,13 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     return segments;
   }, [folders, tabGroups]);
 
-  const renderFolderTab = (folder: TopLevelFolder) => {
-    const isSelected = folder.id === selectedFolderId;
-    const isEditing = folder.id === editingId;
-    const linkedNoteCount = !isSelected
-      ? (connections.linkedTopFolderCounts.get(folder.id) ?? 0)
-      : 0;
-    const isLinkedFolder = linkedNoteCount > 0;
-    const isDraggingThis = draggedFolderId === folder.id;
-    const isContextOpen =
-      contextMenu?.kind === "tab" && contextMenu.folder.id === folder.id;
-    const dropIndicatorClass =
-      dragOverInfo?.folderId === folder.id && draggedFolderId !== folder.id
-        ? `is-drop-${dragOverInfo.position}`
-        : "";
-
-    const handleSelectFolderTab = () => {
-      if (isLinkedFolder) {
+  const onSelectFolderTab = useCallback(
+    (folder: TopLevelFolder) => {
+      const isSelected = folder.id === selectedFolderId;
+      const linkedNoteCount = !isSelected
+        ? (connections.linkedTopFolderCounts.get(folder.id) ?? 0)
+        : 0;
+      if (linkedNoteCount > 0) {
         const currentNoteInTarget = resolveActiveNoteData(
           folder,
           selectedNoteByFolder,
@@ -605,7 +628,56 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
         }
       }
       selectFolder(folder.id);
-    };
+    },
+    [
+      connections,
+      selectedFolderId,
+      selectedNoteByFolder,
+      sortOrder,
+      navigateToNote,
+      selectFolder,
+    ],
+  );
+
+  const handleGroupChipClick = (
+    e: React.MouseEvent<HTMLDivElement>,
+    group: TabGroup,
+  ) => {
+    if (editingGroupId === group.id) return;
+    if (openGroupDropdown?.group.id === group.id) {
+      setOpenGroupDropdown(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = Math.max(rect.width, 220);
+    const clamped = clampMenuPosition(
+      rect.left,
+      rect.bottom + 4,
+      menuWidth,
+      260,
+    );
+    setOpenGroupDropdown({
+      group,
+      x: clamped.x,
+      y: clamped.y,
+      minWidth: menuWidth,
+    });
+  };
+
+  const renderFolderTab = (folder: TopLevelFolder) => {
+    const isSelected = folder.id === selectedFolderId;
+    const isEditing = folder.id === editingId;
+    const linkedNoteCount = !isSelected
+      ? (connections.linkedTopFolderCounts.get(folder.id) ?? 0)
+      : 0;
+    const isLinkedFolder = linkedNoteCount > 0;
+    const isDraggingThis = draggedFolderId === folder.id;
+    const isContextOpen =
+      contextMenu?.kind === "tab" && contextMenu.folder.id === folder.id;
+    const dropIndicatorClass =
+      dragOverInfo?.folderId === folder.id && draggedFolderId !== folder.id
+        ? `is-drop-${dragOverInfo.position}`
+        : "";
 
     return (
       <div
@@ -619,7 +691,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
         } ${isNavbarCollapsed ? "is-slim" : ""} ${isDraggingThis ? "is-dragging" : ""} ${
           isContextOpen ? "is-context-open" : ""
         } ${dropIndicatorClass}`}
-        onClick={handleSelectFolderTab}
+        onClick={() => onSelectFolderTab(folder)}
         onDoubleClick={(e) => startRename(folder, e)}
         onContextMenu={(e) => openTabContextMenu(e, folder)}
         onDragStart={(e) => handleTabDragStart(e, folder.id)}
@@ -630,7 +702,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
           if (isEditing) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            handleSelectFolderTab();
+            onSelectFolderTab(folder);
           }
         }}
       >
@@ -657,7 +729,15 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                 className="tab-link-indicator"
                 title={`${linkedNoteCount} ${
                   linkedNoteCount === 1 ? "note" : "notes"
-                } in "${folder.name}" connected to current note`}
+                } in "${folder.name}" connected to current note (click to open in separated tab)`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const firstLinkedId =
+                    connections.firstLinkedNoteByTopFolder.get(folder.id);
+                  if (firstLinkedId) {
+                    openInSplitView(folder.id, firstLinkedId);
+                  }
+                }}
               >
                 <Link2 size={10} strokeWidth={2.2} />
                 <span>{linkedNoteCount}</span>
@@ -735,18 +815,6 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
         className="plus-menu-item"
         onClick={() => {
           closePlusMenu();
-          openLinkModal("new-tab");
-        }}
-      >
-        <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
-        <span>Add folder...</span>
-      </button>
-
-      <button
-        type="button"
-        className="plus-menu-item"
-        onClick={() => {
-          closePlusMenu();
           createTopFolder();
         }}
       >
@@ -761,25 +829,23 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
         className="plus-menu-item"
         onClick={() => {
           closePlusMenu();
-          noteFileInputRef.current?.click();
+          openLinkModal("new-tab");
         }}
       >
-        <FileUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
-        <span>Import notes & PDFs (.md, .txt, .pdf)</span>
+        <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+        <span>Import folder</span>
       </button>
-
-      <div className="plus-menu-divider" />
 
       <button
         type="button"
         className="plus-menu-item"
         onClick={() => {
           closePlusMenu();
-          openSettingsModal();
+          noteFileInputRef.current?.click();
         }}
       >
-        <Settings size={15} strokeWidth={1.8} className="plus-menu-icon" />
-        <span>Settings</span>
+        <FileUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+        <span>Import notes & PDFs (.md, .txt, .pdf)</span>
       </button>
     </div>
   );
@@ -922,8 +988,12 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
 
               const { group, folders: groupFolders } = segment;
               const isGroupEditing = editingGroupId === group.id;
-              const isGroupCollapsed = Boolean(group.collapsed);
+              const isGroupDropdownOpen =
+                openGroupDropdown?.group.id === group.id;
               const hasActiveTabInside = groupFolders.some(
+                (f) => f.id === selectedFolderId,
+              );
+              const activeFolder = groupFolders.find(
                 (f) => f.id === selectedFolderId,
               );
               const groupLinkedNotesCount = groupFolders.reduce((sum, f) => {
@@ -943,30 +1013,30 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
 
               return (
                 <div
-                  key={`group-${group.id}-${groupFolders[0]?.id}`}
+                  key={`group-${group.id}`}
                   className={`tab-group-container is-color-${group.color} ${
-                    isGroupCollapsed ? "is-collapsed" : ""
-                  } ${hasActiveTabInside ? "has-active-tab" : ""} ${
-                    groupLinkedNotesCount > 0 ? "has-linked-tab" : ""
-                  } ${isNavbarCollapsed ? "is-slim" : ""} ${
+                    isNavbarCollapsed ? "is-slim" : ""
+                  } ${
                     isDropTargetGroup ? "is-drop-target" : ""
                   } ${isDraggingGroup ? "is-dragging" : ""} ${groupDropOrderClass}`}
                 >
                   <div
                     role="button"
                     tabIndex={0}
+                    aria-haspopup="true"
+                    aria-expanded={isGroupDropdownOpen}
                     draggable={!isGroupEditing}
-                    className={`tab-group-chip ${isGroupContextOpen ? "is-context-open" : ""}`}
+                    className={`tab-group-chip ${
+                      isNavbarCollapsed ? "is-slim" : ""
+                    } ${
+                      isGroupContextOpen ? "is-context-open" : ""
+                    } ${isGroupDropdownOpen ? "is-open" : ""} ${
+                      hasActiveTabInside ? "has-active-tab" : ""
+                    }`}
                     title={`${group.name} (${groupFolders.length} ${
                       groupFolders.length === 1 ? "tab" : "tabs"
-                    }) — Drag to rearrange group, click to ${
-                      isGroupCollapsed ? "expand" : "collapse"
-                    }, double-click to rename, right-click for group options`}
-                    onClick={() => {
-                      if (!isGroupEditing) {
-                        toggleTabGroupCollapse(group.id);
-                      }
-                    }}
+                    }) — Click to view tabs, double-click to rename, right-click for options`}
+                    onClick={(e) => handleGroupChipClick(e, group)}
                     onDoubleClick={(e) => startGroupRename(group, e)}
                     onContextMenu={(e) => openGroupContextMenu(e, group)}
                     onDragStart={(e) => handleGroupDragStart(e, group.id)}
@@ -977,7 +1047,10 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                       if (isGroupEditing) return;
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        toggleTabGroupCollapse(group.id);
+                        handleGroupChipClick(
+                          e as unknown as React.MouseEvent<HTMLDivElement>,
+                          group,
+                        );
                       }
                     }}
                   >
@@ -1003,34 +1076,41 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                     ) : (
                       <span className="tab-group-name">{group.name}</span>
                     )}
-                    <span className="tab-group-count">
-                      {groupFolders.length}
-                    </span>
-                    {isGroupCollapsed && groupLinkedNotesCount > 0 && (
+
+                    {hasActiveTabInside && activeFolder && (
+                      <span
+                        className="tab-group-active-tab"
+                        title={`Active tab: ${activeFolder.name}`}
+                      >
+                        / {activeFolder.name}
+                      </span>
+                    )}
+
+                    {!hasActiveTabInside && (
+                      <span className="tab-group-count">
+                        {groupFolders.length}
+                      </span>
+                    )}
+
+                    {groupLinkedNotesCount > 0 && (
                       <span
                         className="tab-link-indicator"
                         title={`${groupLinkedNotesCount} connected ${
                           groupLinkedNotesCount === 1 ? "note" : "notes"
-                        } inside collapsed group "${group.name}"`}
+                        } inside group "${group.name}"`}
                       >
                         <Link2 size={10} strokeWidth={2.2} />
                         <span>{groupLinkedNotesCount}</span>
                       </span>
                     )}
+
                     <span className="tab-group-chevron">
-                      {isGroupCollapsed ? (
-                        <ChevronRight size={12} strokeWidth={2.2} />
-                      ) : (
-                        <ChevronDown size={12} strokeWidth={2.2} />
-                      )}
+                      <ChevronDown
+                        size={isNavbarCollapsed ? 11 : 12}
+                        strokeWidth={2.2}
+                      />
                     </span>
                   </div>
-
-                  {!isGroupCollapsed && (
-                    <div className="tab-group-items">
-                      {groupFolders.map((folder) => renderFolderTab(folder))}
-                    </div>
-                  )}
                 </div>
               );
             })
@@ -1097,6 +1177,110 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
           </div>
         )}
       </nav>
+
+      {/* Dropdown Menu for Tab Groups */}
+      {openGroupDropdown &&
+        (() => {
+          const liveGroup =
+            tabGroups.find((g) => g.id === openGroupDropdown.group.id) ??
+            openGroupDropdown.group;
+          const liveGroupFolders = folders.filter(
+            (f) => f.groupId === liveGroup.id,
+          );
+
+          return (
+            <div
+              ref={groupDropdownRef}
+              className={`tab-group-dropdown is-color-${liveGroup.color}`}
+              style={{
+                top: `${openGroupDropdown.y}px`,
+                left: `${openGroupDropdown.x}px`,
+                minWidth: `${openGroupDropdown.minWidth}px`,
+              }}
+              role="menu"
+              aria-label={`${liveGroup.name} tabs`}
+            >
+              <div className="tab-group-dropdown-header">
+                <div className="dropdown-header-left">
+                  <span className="tab-group-dot" />
+                  <span className="tab-group-dropdown-title">
+                    {liveGroup.name}
+                  </span>
+                </div>
+                <div className="dropdown-header-right">
+                  <span className="tab-group-dropdown-count">
+                    {liveGroupFolders.length}{" "}
+                    {liveGroupFolders.length === 1 ? "tab" : "tabs"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="tab-group-dropdown-list">
+                {liveGroupFolders.map((folder) => {
+                  const isSelected = folder.id === selectedFolderId;
+                  const linkedCount =
+                    connections.linkedTopFolderCounts.get(folder.id) ?? 0;
+                  return (
+                    <div
+                      key={folder.id}
+                      role="menuitem"
+                      tabIndex={0}
+                      className={`tab-group-dropdown-item ${
+                        isSelected ? "is-selected" : ""
+                      }`}
+                      onClick={() => {
+                        closeGroupDropdown();
+                        onSelectFolderTab(folder);
+                      }}
+                      onContextMenu={(e) => {
+                        closeGroupDropdown();
+                        openTabContextMenu(e, folder);
+                      }}
+                    >
+                      <div className="dropdown-item-left">
+                        <Folder
+                          size={14}
+                          strokeWidth={1.8}
+                          className={`folder-tab-icon ${
+                            isSelected ? "is-selected-icon" : ""
+                          }`}
+                        />
+                        <span className="dropdown-item-name">
+                          {folder.name}
+                        </span>
+                      </div>
+
+                      <div className="dropdown-item-right">
+                        {folder.localPath && (
+                          <span
+                            className="tab-disk-indicator"
+                            title={`Synced with: ${folder.localPath}`}
+                          >
+                            <HardDrive size={10} />
+                          </span>
+                        )}
+                        {linkedCount > 0 && (
+                          <span
+                            className="tab-link-indicator"
+                            title={`${linkedCount} connected ${
+                              linkedCount === 1 ? "note" : "notes"
+                            }`}
+                          >
+                            <Link2 size={10} strokeWidth={2.2} />
+                            <span>{linkedCount}</span>
+                          </span>
+                        )}
+                        {isSelected && (
+                          <span className="dropdown-item-check-dot" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
       {/* Right-Click Context Menu for Folder Tabs & Tab Groups */}
       {contextMenu && (
@@ -1257,20 +1441,43 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                 className="dropdown-menu-item"
                 role="menuitem"
                 onClick={() => {
-                  const targetGroupId = contextMenu.group.id;
+                  const targetGroup = contextMenu.group;
+                  const isCurrentOpen =
+                    openGroupDropdown?.group.id === targetGroup.id;
                   closeContextMenu();
-                  toggleTabGroupCollapse(targetGroupId);
+                  if (isCurrentOpen) {
+                    setOpenGroupDropdown(null);
+                  } else {
+                    const menuWidth = 220;
+                    const clamped = clampMenuPosition(
+                      contextMenu.x,
+                      contextMenu.y,
+                      menuWidth,
+                      260,
+                    );
+                    setOpenGroupDropdown({
+                      group: targetGroup,
+                      x: clamped.x,
+                      y: clamped.y,
+                      minWidth: menuWidth,
+                    });
+                  }
                 }}
               >
-                {contextMenu.group.collapsed ? (
-                  <ChevronDown size={14} strokeWidth={1.8} />
-                ) : (
-                  <ChevronRight size={14} strokeWidth={1.8} />
-                )}
+                <ChevronDown
+                  size={14}
+                  strokeWidth={1.8}
+                  style={{
+                    transform:
+                      openGroupDropdown?.group.id === contextMenu.group.id
+                        ? "rotate(180deg)"
+                        : "none",
+                  }}
+                />
                 <span>
-                  {contextMenu.group.collapsed
-                    ? "Expand group"
-                    : "Collapse group"}
+                  {openGroupDropdown?.group.id === contextMenu.group.id
+                    ? "Collapse group tabs"
+                    : "Show group tabs"}
                 </span>
               </button>
 

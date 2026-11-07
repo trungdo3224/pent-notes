@@ -218,3 +218,23 @@ export async function deletePath(targetPath) {
   await fs.rm(resolved, { recursive: true, force: true });
   return { ok: true };
 }
+
+export async function saveImage(parentDir, fileName, base64Data) {
+  const resolvedParent = path.resolve(parentDir);
+  const assetsDir = path.join(resolvedParent, "assets");
+  await fs.mkdir(assetsDir, { recursive: true });
+
+  const parsed = path.parse(fileName);
+  const baseName = parsed.name || "image";
+  const ext = parsed.ext || ".png";
+  const targetPath = await resolveUniqueChildPath(assetsDir, baseName, ext);
+
+  const buffer = Buffer.from(base64Data, "base64");
+  await fs.writeFile(targetPath, buffer);
+
+  return {
+    ok: true,
+    absolutePath: targetPath,
+    relativePath: `./assets/${path.basename(targetPath)}`,
+  };
+}

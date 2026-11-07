@@ -53,6 +53,13 @@ function registerIpcHandlers() {
     return await fsService.readDirectoryShallow(dirPath);
   });
 
+  ipcMain.handle(
+    "fs:save-image",
+    async (_, parentDir, fileName, base64Data) => {
+      return await fsService.saveImage(parentDir, fileName, base64Data);
+    },
+  );
+
   // Sessions handlers
   ipcMain.handle("sessions:list", async () => {
     return await sessionService.listAllSessions();

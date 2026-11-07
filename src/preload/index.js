@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     deletePath: (targetPath) => ipcRenderer.invoke("fs:delete", targetPath),
     readFile: (filePath) => ipcRenderer.invoke("fs:read-file", filePath),
     readDir: (dirPath) => ipcRenderer.invoke("fs:read-dir", dirPath),
+    saveImage: (parentDir, fileName, base64Data) =>
+      ipcRenderer.invoke("fs:save-image", parentDir, fileName, base64Data),
     getRawUrl: (filePath) =>
       `pent-file://stream?path=${encodeURIComponent(filePath)}`,
   },
