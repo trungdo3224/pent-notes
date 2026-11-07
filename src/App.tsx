@@ -40,6 +40,7 @@ export const App: React.FC = () => {
   const toggleSidebar = useNotesStore((s) => s.toggleSidebar);
   const toggleNavbar = useNotesStore((s) => s.toggleNavbar);
   const toggleRightSidebar = useNotesStore((s) => s.toggleRightSidebar);
+  const createNote = useNotesStore((s) => s.createNote);
   const syncFolderFromDisk = useNotesStore((s) => s.syncFolderFromDisk);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -139,11 +140,25 @@ export const App: React.FC = () => {
       } else if (e.key === ",") {
         e.preventDefault();
         openSettingsModal();
+      } else if (
+        !e.shiftKey &&
+        e.key.toLowerCase() === "n" &&
+        selectedFolderId
+      ) {
+        e.preventDefault();
+        void createNote(null);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleSidebar, toggleNavbar, toggleRightSidebar, openSettingsModal]);
+  }, [
+    toggleSidebar,
+    toggleNavbar,
+    toggleRightSidebar,
+    openSettingsModal,
+    createNote,
+    selectedFolderId,
+  ]);
 
   return (
     <div className="app-shell">
@@ -216,5 +231,3 @@ export const App: React.FC = () => {
     </div>
   );
 };
-
-export default App;

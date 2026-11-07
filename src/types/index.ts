@@ -39,8 +39,6 @@ export interface TopLevelFolder {
   groupId?: string;
 }
 
-export type EditorViewMode = "editor" | "preview";
-
 export type SplitDirection = "horizontal" | "vertical";
 
 export interface PaneLeafNode {
@@ -48,7 +46,6 @@ export interface PaneLeafNode {
   type: "leaf";
   folderId: string | null;
   noteId: string | null;
-  viewMode: EditorViewMode;
 }
 
 export interface PaneBranchNode {
@@ -66,9 +63,3 @@ export type SortOrder = "name-asc" | "name-desc" | "date-desc" | "date-asc";
 export type LinkModalTargetMode = "new-tab" | "subfolder" | "current-tab";
 
 export type CatalogTab = "outline" | "tags" | "info";
-
-export interface NoteWikilinkOption {
-  id: string;
-  title: string;
-  folderPath?: string;
-}

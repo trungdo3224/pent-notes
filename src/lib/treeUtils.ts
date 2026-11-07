@@ -11,15 +11,26 @@ export type NoteUpdates = Partial<
   Pick<NoteItem, "title" | "content" | "filePath" | "fileType" | "pdfData">
 >;
 
-export type FolderUpdates = Partial<
+type FolderUpdates = Partial<
   Pick<
     FolderItem,
     "name" | "folderPath" | "children" | "hasChildren" | "isLoaded"
   >
 >;
 
-export function naturalCompare(a: string, b: string): number {
+function naturalCompare(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
+export function collectAllFolderIds(nodes: ExplorerNode[]): string[] {
+  const ids: string[] = [];
+  for (const node of nodes) {
+    if (node.type === "folder") {
+      ids.push(node.id);
+      ids.push(...collectAllFolderIds(node.children));
+    }
+  }
+  return ids;
 }
 
 export function sortExplorerNodes(
@@ -131,27 +142,6 @@ export function findNoteNode(
     }
     if (node.type === "folder") {
       const found = findNoteNode(node.children, noteId);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-export function findNoteByTitle(
-  nodes: ExplorerNode[],
-  targetTitle: string,
-): NoteItem | null {
-  const normalized = targetTitle.trim().toLowerCase();
-  if (!normalized) return null;
-  for (const node of nodes) {
-    if (
-      node.type === "note" &&
-      node.title.trim().toLowerCase() === normalized
-    ) {
-      return node;
-    }
-    if (node.type === "folder") {
-      const found = findNoteByTitle(node.children, targetTitle);
       if (found) return found;
     }
   }

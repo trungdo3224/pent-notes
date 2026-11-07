@@ -26,7 +26,10 @@ import {
   Trash2,
   Unlink,
 } from "lucide-react";
-import { useClickOutside } from "../hooks/useDomInteractions";
+import {
+  clampMenuPosition,
+  useClickOutside,
+} from "../hooks/useDomInteractions";
 import { resolveWorkspaceConnections } from "../lib/catalogUtils";
 import { NOTE_FILE_ACCEPT } from "../lib/fileUtils";
 import { sessionApi } from "../lib/sessionManager";
@@ -107,6 +110,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const openSessionModal = useNotesStore((s) => s.openSessionModal);
   const currentSessionName = useNotesStore((s) => s.currentSessionName);
   const openSettingsModal = useNotesStore((s) => s.openSettingsModal);
+  const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
@@ -514,20 +518,14 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   const openTabContextMenu = (e: React.MouseEvent, folder: TopLevelFolder) => {
     e.preventDefault();
     e.stopPropagation();
-    const menuWidth = 225;
-    const menuHeight = 290;
-    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
-    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 225, 290);
     setContextMenu({ kind: "tab", folder, x, y });
   };
 
   const openGroupContextMenu = (e: React.MouseEvent, group: TabGroup) => {
     e.preventDefault();
     e.stopPropagation();
-    const menuWidth = 225;
-    const menuHeight = 260;
-    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
-    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 225, 260);
     setContextMenu({ kind: "group", group, x, y });
   };
 
@@ -541,8 +539,14 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
   );
 
   const connections = useMemo(
-    () => resolveWorkspaceConnections(folders, activeNoteId),
-    [folders, activeNoteId],
+    () =>
+      resolveWorkspaceConnections(
+        folders,
+        activeNoteId,
+        activeNoteId ? activeNoteContents[activeNoteId] : undefined,
+        activeNoteContents,
+      ),
+    [folders, activeNoteId, activeNoteContents],
   );
 
   const tabSegments = useMemo<TabSegment[]>(() => {
@@ -712,6 +716,74 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     );
   };
 
+  const renderPlusMenu = () => (
+    <div className="plus-dropdown-menu">
+      <button
+        type="button"
+        className="plus-menu-item"
+        onClick={() => {
+          closePlusMenu();
+          sessionApi.openSessionInNewTab();
+        }}
+      >
+        <Layers size={15} strokeWidth={1.8} className="plus-menu-icon" />
+        <span>New session (new tab)...</span>
+      </button>
+
+      <button
+        type="button"
+        className="plus-menu-item"
+        onClick={() => {
+          closePlusMenu();
+          openLinkModal("new-tab");
+        }}
+      >
+        <FolderUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+        <span>Add folder...</span>
+      </button>
+
+      <button
+        type="button"
+        className="plus-menu-item"
+        onClick={() => {
+          closePlusMenu();
+          createTopFolder();
+        }}
+      >
+        <FolderPlus size={15} strokeWidth={1.8} className="plus-menu-icon" />
+        <span>New empty folder</span>
+      </button>
+
+      <div className="plus-menu-divider" />
+
+      <button
+        type="button"
+        className="plus-menu-item"
+        onClick={() => {
+          closePlusMenu();
+          noteFileInputRef.current?.click();
+        }}
+      >
+        <FileUp size={15} strokeWidth={1.8} className="plus-menu-icon" />
+        <span>Import notes & PDFs (.md, .txt, .pdf)</span>
+      </button>
+
+      <div className="plus-menu-divider" />
+
+      <button
+        type="button"
+        className="plus-menu-item"
+        onClick={() => {
+          closePlusMenu();
+          openSettingsModal();
+        }}
+      >
+        <Settings size={15} strokeWidth={1.8} className="plus-menu-icon" />
+        <span>Settings</span>
+      </button>
+    </div>
+  );
+
   return (
     <header className={`navbar ${isNavbarCollapsed ? "is-collapsed" : ""}`}>
       {/* Hidden file picker for importing separate note files */}
@@ -775,93 +847,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                 <Plus size={17} strokeWidth={1.9} />
               </button>
 
-              {isPlusMenuOpen && (
-                <div className="plus-dropdown-menu">
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      sessionApi.openSessionInNewTab();
-                    }}
-                  >
-                    <Layers
-                      size={15}
-                      strokeWidth={1.8}
-                      className="plus-menu-icon"
-                    />
-                    <span>New session (new tab)...</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      openLinkModal("new-tab");
-                    }}
-                  >
-                    <FolderUp
-                      size={15}
-                      strokeWidth={1.8}
-                      className="plus-menu-icon"
-                    />
-                    <span>Add folder...</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      createTopFolder();
-                    }}
-                  >
-                    <FolderPlus
-                      size={15}
-                      strokeWidth={1.8}
-                      className="plus-menu-icon"
-                    />
-                    <span>New empty folder</span>
-                  </button>
-
-                  <div className="plus-menu-divider" />
-
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      noteFileInputRef.current?.click();
-                    }}
-                  >
-                    <FileUp
-                      size={15}
-                      strokeWidth={1.8}
-                      className="plus-menu-icon"
-                    />
-                    <span>Import notes & PDFs (.md, .txt, .pdf)</span>
-                  </button>
-
-                  <div className="plus-menu-divider" />
-
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      openSettingsModal();
-                    }}
-                  >
-                    <Settings
-                      size={15}
-                      strokeWidth={1.8}
-                      className="plus-menu-icon"
-                    />
-                    <span>Settings</span>
-                  </button>
-                </div>
-              )}
+              {isPlusMenuOpen && renderPlusMenu()}
             </div>
 
             {/* Settings button (Themes, Fonts, Layout) */}
@@ -1086,93 +1072,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
                 <Plus size={15} strokeWidth={2} />
               </button>
 
-              {isPlusMenuOpen && (
-                <div className="plus-dropdown-menu">
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      sessionApi.openSessionInNewTab();
-                    }}
-                  >
-                    <Layers
-                      size={15}
-                      strokeWidth={1.8}
-                      className="plus-menu-icon"
-                    />
-                    <span>New session (new tab)...</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      openLinkModal("new-tab");
-                    }}
-                  >
-                    <FolderUp
-                      size={15}
-                      strokeWidth={1.8}
-                      className="plus-menu-icon"
-                    />
-                    <span>Add folder...</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      createTopFolder();
-                    }}
-                  >
-                    <FolderPlus
-                      size={15}
-                      strokeWidth={1.8}
-                      className="plus-menu-icon"
-                    />
-                    <span>New empty folder</span>
-                  </button>
-
-                  <div className="plus-menu-divider" />
-
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      noteFileInputRef.current?.click();
-                    }}
-                  >
-                    <FileUp
-                      size={15}
-                      strokeWidth={1.8}
-                      className="plus-menu-icon"
-                    />
-                    <span>Import notes & PDFs (.md, .txt, .pdf)</span>
-                  </button>
-
-                  <div className="plus-menu-divider" />
-
-                  <button
-                    type="button"
-                    className="plus-menu-item"
-                    onClick={() => {
-                      closePlusMenu();
-                      openSettingsModal();
-                    }}
-                  >
-                    <Settings
-                      size={15}
-                      strokeWidth={1.8}
-                      className="plus-menu-icon"
-                    />
-                    <span>Settings</span>
-                  </button>
-                </div>
-              )}
+              {isPlusMenuOpen && renderPlusMenu()}
             </div>
 
             <button

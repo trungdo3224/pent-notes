@@ -205,7 +205,7 @@ export const editorTheme = EditorView.theme({
     borderLeft: "1px solid var(--code-border, var(--border-subtle))",
     borderRight: "1px solid var(--code-border, var(--border-subtle))",
     margin: "0 !important",
-    borderRadius: "0 !important",
+    borderRadius: "0",
   },
   ".cm-codeblock-first": {
     position: "relative",
@@ -323,6 +323,7 @@ export const editorTheme = EditorView.theme({
     backgroundColor:
       "color-mix(in srgb, var(--forest) 12%, var(--surface-muted))",
     color: "var(--forest)",
+    minWidth: "100px",
     fontWeight: "650",
     fontSize: "13px",
     letterSpacing: "0.03em",

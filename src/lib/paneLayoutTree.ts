@@ -1,12 +1,11 @@
 import {
-  EditorViewMode,
   PaneBranchNode,
   PaneLayoutNode,
   PaneLeafNode,
   SplitDirection,
 } from "../types";
 
-export function createPaneId(): string {
+function createPaneId(): string {
   return "pane-" + Math.random().toString(36).slice(2, 9);
 }
 
@@ -17,7 +16,6 @@ export function createBranchId(): string {
 export function createLeafNode(
   folderId: string | null,
   noteId: string | null,
-  viewMode: EditorViewMode = "editor",
   id?: string,
 ): PaneLeafNode {
   return {
@@ -25,7 +23,6 @@ export function createLeafNode(
     type: "leaf",
     folderId,
     noteId,
-    viewMode,
   };
 }
 

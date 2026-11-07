@@ -108,12 +108,19 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
   // Connected notes for this note
   const connections = useMemo(
     () =>
-      note ? resolveWorkspaceConnections(folders, note.id, noteContent) : null,
-    [folders, note, noteContent],
+      note
+        ? resolveWorkspaceConnections(
+            folders,
+            note.id,
+            noteContent,
+            activeNoteContents,
+          )
+        : null,
+    [folders, note, noteContent, activeNoteContents],
   );
 
   const isPdf = note ? isPdfNote(note) : false;
-  const words = note ? countWords(note.content) : 0;
+  const words = note ? countWords(noteContent) : 0;
 
   return (
     <section

@@ -1,14 +1,9 @@
-import { ExplorerNode, FolderItem, NoteItem } from './index';
+import { ExplorerNode, FolderItem, NoteItem } from "./index";
 
 export interface ScanResult {
   rootName: string;
   rootPath: string;
   items: ExplorerNode[];
-}
-
-export interface LinkConnections {
-  outgoing: string[];
-  incoming: string[];
 }
 
 export interface ElectronSessionInfo {
@@ -36,25 +31,31 @@ export interface ElectronAPI {
   };
   fs: {
     scanFolder: (folderPath: string) => Promise<ScanResult>;
-    writeFile: (filePath: string, content: string) => Promise<{ ok: boolean; path: string }>;
-    createFile: (parentPath: string, name?: string, content?: string) => Promise<NoteItem>;
+    writeFile: (
+      filePath: string,
+      content: string,
+    ) => Promise<{ ok: boolean; path: string }>;
+    createFile: (
+      parentPath: string,
+      name?: string,
+      content?: string,
+    ) => Promise<NoteItem>;
     createFolder: (parentPath: string, name?: string) => Promise<FolderItem>;
     renamePath: (oldPath: string, newPath: string) => Promise<string>;
     deletePath: (targetPath: string) => Promise<{ ok: boolean }>;
     readFile: (filePath: string) => Promise<string>;
     readDir: (dirPath: string) => Promise<ExplorerNode[]>;
-    getConnections: (filePath?: string, noteTitle?: string) => Promise<LinkConnections>;
     getRawUrl: (filePath: string) => string;
   };
   sessions: {
     list: () => Promise<ElectronSessionInfo[]>;
     get: (sessionId: string) => Promise<ElectronSessionData>;
-    save: (sessionId: string, name: string | undefined, payload: string) => Promise<{ ok: boolean }>;
+    save: (
+      sessionId: string,
+      name: string | undefined,
+      payload: string,
+    ) => Promise<{ ok: boolean }>;
     delete: (sessionId: string) => Promise<{ ok: boolean }>;
-  };
-  state: {
-    get: () => Promise<string | null>;
-    save: (rawJson: string) => Promise<{ ok: boolean }>;
   };
   window?: {
     setTitleBarOverlay: (options: {
@@ -70,4 +71,3 @@ declare global {
     electronAPI?: ElectronAPI;
   }
 }
-

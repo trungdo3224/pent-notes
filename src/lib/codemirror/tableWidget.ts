@@ -1,11 +1,11 @@
 import { EditorView, WidgetType } from "@codemirror/view";
 
-export interface TableCellData {
+interface TableCellData {
   text: string;
   align: "left" | "center" | "right" | "";
 }
 
-export interface ParsedTableData {
+interface ParsedTableData {
   headers: TableCellData[];
   rows: TableCellData[][];
 }
@@ -43,7 +43,7 @@ function splitPipes(line: string): string[] {
 /**
  * Parses markdown pipe table text into headers, alignments, and data rows.
  */
-export function parseMarkdownTable(rawText: string): ParsedTableData | null {
+function parseMarkdownTable(rawText: string): ParsedTableData | null {
   const lines = rawText
     .split("\n")
     .map((l) => l.trim())
@@ -179,7 +179,7 @@ function serializeTableToMarkdown(container: HTMLElement): string {
  * Renders cell content into a target element, translating <br> tags into line breaks
  * and rendering inline markdown safely.
  */
-export function renderCellContent(raw: string, targetEl: HTMLElement): void {
+function renderCellContent(raw: string, targetEl: HTMLElement): void {
   const lines = raw.split(/<br\s*\/?>/gi);
 
   lines.forEach((lineText, lineIdx) => {

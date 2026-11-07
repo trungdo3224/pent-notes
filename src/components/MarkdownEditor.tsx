@@ -32,13 +32,17 @@ interface MarkdownEditorProps {
   placeholder?: string;
 }
 
+interface MarkdownEditorElement extends HTMLDivElement {
+  __cmView?: EditorView;
+}
+
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   value,
   onChange,
   className = "",
   placeholder = "Start writing markdown...",
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<MarkdownEditorElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const isInternalChangeRef = useRef(false);
   const onChangeRef = useRef(onChange);
@@ -80,14 +84,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       ],
     });
 
+    const containerEl = containerRef.current;
     const view = new EditorView({
       state: startState,
-      parent: containerRef.current,
+      parent: containerEl,
     });
 
+    containerEl.__cmView = view;
     viewRef.current = view;
 
     return () => {
+      delete containerEl.__cmView;
       view.destroy();
       viewRef.current = null;
     };
@@ -131,5 +138,3 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     />
   );
 };
-
-export default MarkdownEditor;

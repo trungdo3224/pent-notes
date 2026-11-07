@@ -1,6 +1,5 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { linkIndexService } from './linkIndexService.js';
+import fs from "node:fs/promises";
+import path from "node:path";
 
 /**
  * RFC-042: Low-Footprint Architecture & Memory Optimization
@@ -12,30 +11,30 @@ import { linkIndexService } from './linkIndexService.js';
 const NOTE_EXT_REGEX = /\.(md|markdown|mdx|txt|pdf)$/i;
 
 const STRICT_IGNORE_NAMES = new Set([
-  'node_modules',
-  '.git',
-  '.obsidian',
-  '.vscode',
-  '.idea',
-  'dist',
-  'build',
-  '__pycache__',
-  '.svn',
-  '.hg',
+  "node_modules",
+  ".git",
+  ".obsidian",
+  ".vscode",
+  ".idea",
+  "dist",
+  "build",
+  "__pycache__",
+  ".svn",
+  ".hg",
 ]);
 
 const STRICT_IGNORE_EXTENSIONS = new Set([
-  'zip',
-  'tar',
-  'gz',
-  'iso',
-  'pcap',
-  'exe',
-  'bin',
-  '7z',
-  'rar',
-  'dmg',
-  'pkg',
+  "zip",
+  "tar",
+  "gz",
+  "iso",
+  "pcap",
+  "exe",
+  "bin",
+  "7z",
+  "rar",
+  "dmg",
+  "pkg",
 ]);
 
 function makeId(prefix) {
@@ -43,17 +42,17 @@ function makeId(prefix) {
 }
 
 function stripExt(name) {
-  return name.replace(NOTE_EXT_REGEX, '').trim() || 'Untitled';
+  return name.replace(NOTE_EXT_REGEX, "").trim() || "Untitled";
 }
 
 function isStrictlyIgnored(name) {
-  if (name.startsWith('.') || STRICT_IGNORE_NAMES.has(name)) return true;
+  if (name.startsWith(".") || STRICT_IGNORE_NAMES.has(name)) return true;
   const ext = path.extname(name).slice(1).toLowerCase();
   if (STRICT_IGNORE_EXTENSIONS.has(ext)) return true;
   return false;
 }
 
-async function resolveUniqueChildPath(parentDir, baseName, extension = '') {
+async function resolveUniqueChildPath(parentDir, baseName, extension = "") {
   let candidate = path.join(parentDir, `${baseName}${extension}`);
   let counter = 1;
   while (true) {
@@ -92,25 +91,25 @@ export async function readDirectoryShallow(dirPath) {
       }
 
       folders.push({
-        id: makeId('sub'),
-        type: 'folder',
+        id: makeId("sub"),
+        type: "folder",
         name: entry.name,
         hasChildren,
         children: [],
         folderPath: fullPath,
       });
     } else if (entry.isFile() && NOTE_EXT_REGEX.test(entry.name)) {
-      const isPdf = entry.name.toLowerCase().endsWith('.pdf');
+      const isPdf = entry.name.toLowerCase().endsWith(".pdf");
       try {
         const stat = await fs.stat(fullPath);
         notes.push({
-          id: makeId('note'),
-          type: 'note',
+          id: makeId("note"),
+          type: "note",
           title: stripExt(entry.name),
-          content: '', // Lazy: Content read on demand via readFile()
+          content: "", // Lazy: Content read on demand via readFile()
           updatedAt: stat.mtime.toISOString().slice(0, 10),
           filePath: fullPath,
-          fileType: isPdf ? 'pdf' : 'markdown',
+          fileType: isPdf ? "pdf" : "markdown",
         });
       } catch {
         // Skip unreadable files
@@ -119,10 +118,16 @@ export async function readDirectoryShallow(dirPath) {
   }
 
   folders.sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+    a.name.localeCompare(b.name, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    }),
   );
   notes.sort((a, b) =>
-    a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' })
+    a.title.localeCompare(b.title, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    }),
   );
 
   return [...folders, ...notes];
@@ -135,10 +140,10 @@ export async function scanFolder(folderPath) {
   const resolved = path.resolve(folderPath);
   const stat = await fs.stat(resolved);
   if (!stat.isDirectory()) {
-    throw new Error('Path is not a directory.');
+    throw new Error("Path is not a directory.");
   }
   const items = await readDirectoryShallow(resolved);
-  const rootName = path.basename(resolved) || 'Notes';
+  const rootName = path.basename(resolved) || "Notes";
   return { rootName, rootPath: resolved, items };
 }
 
@@ -147,53 +152,53 @@ export async function scanFolder(folderPath) {
  */
 export async function readFile(filePath) {
   const resolved = path.resolve(filePath);
-  const content = await fs.readFile(resolved, 'utf-8');
+  const content = await fs.readFile(resolved, "utf-8");
   return content;
 }
 
 export async function writeFile(filePath, content) {
   const resolved = path.resolve(filePath);
   await fs.mkdir(path.dirname(resolved), { recursive: true });
-  await fs.writeFile(resolved, content ?? '', 'utf-8');
-
-  // Update cross-file inverted link index in background
-  void linkIndexService.updateFileLinks(resolved, content);
-
+  await fs.writeFile(resolved, content ?? "", "utf-8");
   return { ok: true, path: resolved };
 }
 
-export async function createFile(parentPath, name, content = '') {
-  const rawFileName = name && typeof name === 'string' ? name.trim() : 'Untitled Note';
+export async function createFile(parentPath, name, content = "") {
+  const rawFileName =
+    name && typeof name === "string" ? name.trim() : "Untitled Note";
   const baseName = stripExt(rawFileName);
   const resolvedParent = path.resolve(parentPath);
   await fs.mkdir(resolvedParent, { recursive: true });
 
-  const targetFile = await resolveUniqueChildPath(resolvedParent, baseName, '.md');
-  const initialContent = content || '';
-  await fs.writeFile(targetFile, initialContent, 'utf-8');
-
-  void linkIndexService.updateFileLinks(targetFile, initialContent);
+  const targetFile = await resolveUniqueChildPath(
+    resolvedParent,
+    baseName,
+    ".md",
+  );
+  const initialContent = content || "";
+  await fs.writeFile(targetFile, initialContent, "utf-8");
 
   return {
-    id: makeId('note'),
-    type: 'note',
+    id: makeId("note"),
+    type: "note",
     title: stripExt(path.basename(targetFile)),
     content: initialContent,
     updatedAt: new Date().toISOString().slice(0, 10),
     filePath: targetFile,
-    fileType: 'markdown',
+    fileType: "markdown",
   };
 }
 
 export async function createFolder(parentPath, name) {
-  const folderName = name && typeof name === 'string' ? name.trim() : 'New Folder';
+  const folderName =
+    name && typeof name === "string" ? name.trim() : "New Folder";
   const resolvedParent = path.resolve(parentPath);
   const targetDir = await resolveUniqueChildPath(resolvedParent, folderName);
   await fs.mkdir(targetDir, { recursive: true });
 
   return {
-    id: makeId('sub'),
-    type: 'folder',
+    id: makeId("sub"),
+    type: "folder",
     name: path.basename(targetDir),
     hasChildren: false,
     children: [],
@@ -205,17 +210,11 @@ export async function renamePath(oldPath, newPath) {
   const resolvedOld = path.resolve(oldPath);
   const resolvedNew = path.resolve(newPath);
   await fs.rename(resolvedOld, resolvedNew);
-
-  void linkIndexService.renameFile(resolvedOld, resolvedNew);
-
   return resolvedNew;
 }
 
 export async function deletePath(targetPath) {
   const resolved = path.resolve(targetPath);
   await fs.rm(resolved, { recursive: true, force: true });
-
-  void linkIndexService.removeFile(resolved);
-
   return { ok: true };
 }

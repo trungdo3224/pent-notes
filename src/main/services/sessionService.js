@@ -232,17 +232,3 @@ export async function deleteSession(sessionId) {
   await fs.unlink(sessionPath).catch(() => {});
   return { ok: true };
 }
-
-export async function getWorkspaceState() {
-  try {
-    return await fs.readFile(STATE_FILE, "utf-8");
-  } catch {
-    return "null";
-  }
-}
-
-export async function saveWorkspaceState(rawJson) {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await writeFileAtomic(STATE_FILE, rawJson);
-  return { ok: true };
-}

@@ -68,6 +68,7 @@ export const NoteEditor: React.FC = () => {
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
   const clearFocusNoteTitle = useNotesStore((s) => s.clearFocusNoteTitle);
   const closeSplitView = useNotesStore((s) => s.closeSplitView);
+  const navigateToNote = useNotesStore((s) => s.navigateToNote);
   const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
   const loadNoteContent = useNotesStore((s) => s.loadNoteContent);
 
@@ -121,8 +122,14 @@ export const NoteEditor: React.FC = () => {
   );
 
   const connections = useMemo(
-    () => resolveWorkspaceConnections(folders, note?.id ?? null, noteContent),
-    [folders, note?.id, noteContent],
+    () =>
+      resolveWorkspaceConnections(
+        folders,
+        note?.id ?? null,
+        noteContent,
+        activeNoteContents,
+      ),
+    [folders, note?.id, noteContent, activeNoteContents],
   );
 
   const connectableNotes = useMemo(() => {
@@ -356,12 +363,18 @@ export const NoteEditor: React.FC = () => {
               <div className="connected-notes-list">
                 {connections.linkedNotes.map((item) => (
                   <div key={item.note.id} className="connected-note-pill">
-                    <span
-                      className="connected-note-title"
-                      title={item.note.title}
+                    <button
+                      type="button"
+                      className="connected-note-label-btn"
+                      onClick={() =>
+                        navigateToNote(item.topFolderId, item.note.id)
+                      }
+                      title={`Jump to "${item.note.title.trim() || "Untitled"}"`}
                     >
-                      {item.note.title.trim() || "Untitled"}
-                    </span>
+                      <span className="connected-note-title">
+                        {item.note.title.trim() || "Untitled"}
+                      </span>
+                    </button>
 
                     <button
                       type="button"
@@ -382,7 +395,7 @@ export const NoteEditor: React.FC = () => {
     );
   };
 
-  const primaryWords = note ? countWords(note.content) : 0;
+  const primaryWords = note ? countWords(noteContent) : 0;
   const isPrimaryPdf = note ? isPdfNote(note) : false;
 
   return (
@@ -480,7 +493,7 @@ export const NoteEditor: React.FC = () => {
                     <>
                       <button
                         type="button"
-                        className="is-attach-btn"
+                        className="editor-link-option is-attach-btn"
                         onClick={() => {
                           closeLinkPicker();
                           pdfAttachInputRef.current?.click();

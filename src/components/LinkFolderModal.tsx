@@ -39,6 +39,8 @@ export const LinkFolderModal: React.FC = () => {
     if (isOpen) {
       setTargetMode(activeFolder ? initialTargetMode : "new-tab");
     } else {
+      setFolderPath("");
+      setCustomName("");
       setError("");
       setBusy(false);
     }

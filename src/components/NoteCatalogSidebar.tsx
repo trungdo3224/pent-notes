@@ -52,9 +52,6 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
   );
   const activeTab = useNotesStore((s) => s.rightSidebarTab ?? "outline");
   const isSplitViewActive = useNotesStore((s) => s.isSplitViewActive);
-  const activePane = useNotesStore((s) => s.activePane);
-  const secondaryFolderId = useNotesStore((s) => s.secondaryFolderId);
-  const secondaryNoteId = useNotesStore((s) => s.secondaryNoteId);
   const paneLayout = useNotesStore((s) => s.paneLayout);
   const activePaneId = useNotesStore((s) => s.activePaneId);
 
@@ -72,7 +69,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
   );
 
   const activeNoteData = useMemo(() => {
-    if (paneLayout && activePaneId) {
+    if (isSplitViewActive && paneLayout && activePaneId) {
       const activeLeaf = findLeaf(paneLayout, activePaneId);
       if (activeLeaf && activeLeaf.noteId) {
         if (activeLeaf.folderId) {
@@ -90,29 +87,11 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
         }
       }
     }
-    if (isSplitViewActive && activePane === "secondary" && secondaryNoteId) {
-      if (secondaryFolderId) {
-        const secFolder = folders.find((f) => f.id === secondaryFolderId);
-        if (secFolder) {
-          const found = findNoteAndPath(secFolder.items, secondaryNoteId, [
-            secFolder.name,
-          ]);
-          if (found) return found;
-        }
-      }
-      for (const f of folders) {
-        const found = findNoteAndPath(f.items, secondaryNoteId, [f.name]);
-        if (found) return found;
-      }
-    }
     return resolveActiveNoteData(activeFolder, selectedNoteByFolder, sortOrder);
   }, [
     paneLayout,
     activePaneId,
     isSplitViewActive,
-    activePane,
-    secondaryFolderId,
-    secondaryNoteId,
     folders,
     activeFolder,
     selectedNoteByFolder,
@@ -143,9 +122,11 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
   const [collapsedHeadingIds, setCollapsedHeadingIds] = useState<Set<string>>(
     new Set(),
   );
+  const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
 
   useEffect(() => {
     setCollapsedHeadingIds(new Set());
+    setActiveHeadingId(null);
   }, [note?.id]);
 
   const { headingTree, collapsibleSubheaderIds } = useMemo(() => {
@@ -236,13 +217,22 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
   }, [noteContent]);
 
   const allWorkspaceTags = useMemo(() => {
-    return extractAllWorkspaceTags(folders);
-  }, [folders]);
+    return extractAllWorkspaceTags(folders, activeNoteContents);
+  }, [folders, activeNoteContents]);
 
   const stats = useMemo(() => {
     if (!noteContent) return null;
     return calculateNoteStats(noteContent);
   }, [noteContent]);
+
+  const handleHeadingClick = (
+    node: HeadingNode,
+    el: HTMLElement | null,
+  ): void => {
+    setActiveHeadingId(node.id);
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    scrollToHeading(node.text, node.level, node.line);
+  };
 
   const renderHeadingNodes = (nodes: HeadingNode[]): React.ReactNode => {
     return nodes.map((node) => {
@@ -250,6 +240,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
       const isCollapsed = headingFilter.trim()
         ? false
         : collapsedHeadingIds.has(node.id);
+      const isActive = activeHeadingId === node.id;
       const indentLevel = Math.max(0, node.level - 1);
 
       return (
@@ -257,13 +248,13 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
           <div
             role="button"
             tabIndex={0}
-            className={`outline-item level-${node.level} ${isCollapsed ? "is-collapsed" : ""}`}
+            className={`outline-item outline-level-${node.level} ${isCollapsed ? "is-collapsed" : ""} ${isActive ? "is-active" : ""}`}
             style={{ paddingLeft: `${6 + indentLevel * 12}px` }}
-            onClick={() => scrollToHeading(node.text, node.level)}
+            onClick={(e) => handleHeadingClick(node, e.currentTarget)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                scrollToHeading(node.text, node.level);
+                handleHeadingClick(node, e.currentTarget);
               }
             }}
             title={`Jump to line ${node.line}: ${node.text}`}
@@ -294,7 +285,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
             )}
 
             <span className={`outline-level-dot dot-level-${node.level}`} />
-            <span className="outline-item-text">{node.text}</span>
+            <span className="outline-item-title">{node.text}</span>
           </div>
 
           {!isCollapsed && hasChildren && renderHeadingNodes(node.children)}
@@ -380,13 +371,15 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
       {/* Content Area */}
       <div className="catalog-content">
         {!note ? (
-          <div className="catalog-empty">
+          <div className="catalog-empty-state">
             <BookOpen
               size={24}
               strokeWidth={1.4}
               className="catalog-empty-icon"
             />
-            <p>Select a note to inspect its outline and catalog.</p>
+            <p className="catalog-empty-title">
+              Select a note to inspect its outline and catalog.
+            </p>
           </div>
         ) : (
           <>
@@ -444,22 +437,23 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                 )}
 
                 {headings.length === 0 ? (
-                  <div className="catalog-empty">
-                    <p>No headings in this note.</p>
-                    <span className="catalog-empty-hint">
+                  <div className="catalog-empty-state">
+                    <p className="catalog-empty-title">
+                      No headings in this note.
+                    </p>
+                    <span className="catalog-empty-subtitle">
                       Use <code># Heading 1</code> or <code>## Heading 2</code>{" "}
                       to create sections.
                     </span>
                   </div>
                 ) : filteredHeadingTree.length === 0 ? (
-                  <div className="catalog-empty">
-                    <p>No headings match &ldquo;{headingFilter}&rdquo;</p>
+                  <div className="catalog-empty-state">
+                    <p className="catalog-empty-title">
+                      No headings match &ldquo;{headingFilter}&rdquo;
+                    </p>
                   </div>
                 ) : (
-                  <nav
-                    className="catalog-outline-tree"
-                    aria-label="Table of Contents"
-                  >
+                  <nav className="outline-list" aria-label="Table of Contents">
                     {renderHeadingNodes(filteredHeadingTree)}
                   </nav>
                 )}
@@ -489,7 +483,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                         >
                           <Hash size={11} className="tag-hash-icon" />
                           <span>{t.tag}</span>
-                          <span className="tag-pill-count">{t.count}</span>
+                          <span className="catalog-tag-count">{t.count}</span>
                         </button>
                       ))}
                     </div>
@@ -516,7 +510,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                         >
                           <Hash size={11} className="tag-hash-icon" />
                           <span>{t.tag}</span>
-                          <span className="tag-pill-count">{t.count}</span>
+                          <span className="catalog-tag-count">{t.count}</span>
                         </button>
                       ))}
                     </div>
@@ -532,24 +526,26 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                 <div className="catalog-section">
                   <div className="catalog-section-label">NOTE STATISTICS</div>
                   <div className="catalog-stats-grid">
-                    <div className="catalog-stat-box">
+                    <div className="catalog-stat-card">
                       <FileText size={14} className="stat-icon" />
-                      <span className="stat-value">
+                      <span className="catalog-stat-value">
                         {stats.words.toLocaleString()}
                       </span>
-                      <span className="stat-label">Words</span>
+                      <span className="catalog-stat-label">Words</span>
                     </div>
-                    <div className="catalog-stat-box">
+                    <div className="catalog-stat-card">
                       <FileCode size={14} className="stat-icon" />
-                      <span className="stat-value">
+                      <span className="catalog-stat-value">
                         {stats.chars.toLocaleString()}
                       </span>
-                      <span className="stat-label">Characters</span>
+                      <span className="catalog-stat-label">Characters</span>
                     </div>
-                    <div className="catalog-stat-box">
+                    <div className="catalog-stat-card">
                       <ListTree size={14} className="stat-icon" />
-                      <span className="stat-value">{headings.length}</span>
-                      <span className="stat-label">Headings</span>
+                      <span className="catalog-stat-value">
+                        {headings.length}
+                      </span>
+                      <span className="catalog-stat-label">Headings</span>
                     </div>
                   </div>
                 </div>
@@ -565,7 +561,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
                           Live disk file
                         </span>
                       </div>
-                      <code className="catalog-disk-path" title={note.filePath}>
+                      <code className="catalog-path-code" title={note.filePath}>
                         {note.filePath}
                       </code>
                       <button

@@ -35,12 +35,15 @@ import {
   Trash2,
   Unlink,
 } from "lucide-react";
-import { useClickOutside } from "../hooks/useDomInteractions";
+import {
+  clampMenuPosition,
+  useClickOutside,
+} from "../hooks/useDomInteractions";
 import { resolveWorkspaceConnections } from "../lib/catalogUtils";
 import { isPdfNote, NOTE_FILE_ACCEPT } from "../lib/fileUtils";
 import { findLeaf, getAllLeaves } from "../lib/paneLayoutTree";
 import {
-  collectAllSubfolderIds,
+  collectAllFolderIds,
   DEFAULT_SIDEBAR_WIDTH,
   findAncestorFolderIds,
   findFolderNode,
@@ -122,6 +125,7 @@ export const FolderExplorer: React.FC = () => {
   const expandAllSubfolders = useNotesStore((s) => s.expandAllSubfolders);
   const paneLayout = useNotesStore((s) => s.paneLayout);
   const activePaneId = useNotesStore((s) => s.activePaneId);
+  const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
 
   const folder = useMemo(
     () => folders.find((f) => f.id === selectedFolderId) ?? null,
@@ -142,7 +146,7 @@ export const FolderExplorer: React.FC = () => {
 
   const allSubfolderIds = useMemo(() => {
     if (!folder) return [];
-    return collectAllSubfolderIds(folder.items);
+    return collectAllFolderIds(folder.items);
   }, [folder]);
 
   const isAllSubfoldersCollapsed = useMemo(() => {
@@ -206,8 +210,14 @@ export const FolderExplorer: React.FC = () => {
   }, [folder, focusedFolderId, selectedNoteId]);
 
   const connections = useMemo(
-    () => resolveWorkspaceConnections(folders, selectedNoteId),
-    [folders, selectedNoteId],
+    () =>
+      resolveWorkspaceConnections(
+        folders,
+        selectedNoteId,
+        selectedNoteId ? activeNoteContents[selectedNoteId] : undefined,
+        activeNoteContents,
+      ),
+    [folders, selectedNoteId, activeNoteContents],
   );
 
   useEffect(() => {
@@ -344,18 +354,6 @@ export const FolderExplorer: React.FC = () => {
     setEditingNodeId(null);
   };
 
-  const clampMenuPosition = (
-    clientX: number,
-    clientY: number,
-    menuHeight = 250,
-  ) => {
-    const menuWidth = 215;
-    return {
-      x: Math.min(clientX, window.innerWidth - menuWidth - 8),
-      y: Math.min(clientY, window.innerHeight - menuHeight - 8),
-    };
-  };
-
   const openNoteContextMenu = (
     e: React.MouseEvent,
     node: NoteItem,
@@ -363,20 +361,20 @@ export const FolderExplorer: React.FC = () => {
   ) => {
     e.preventDefault();
     e.stopPropagation();
-    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 290);
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 215, 290);
     setContextMenu({ kind: "note", note: node, parentFolderId, x, y });
   };
 
   const openSubfolderContextMenu = (e: React.MouseEvent, node: FolderItem) => {
     e.preventDefault();
     e.stopPropagation();
-    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 210);
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 215, 210);
     setContextMenu({ kind: "subfolder", subfolder: node, x, y });
   };
 
   const openRootContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 190);
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 215, 190);
     setContextMenu({ kind: "root", x, y });
   };
 
@@ -913,20 +911,6 @@ export const FolderExplorer: React.FC = () => {
             )}
           </div>
         </div>
-
-        {/* Local Folder Sync Status Bar if linked */}
-        {/* {folder.localPath && (
-          <div
-            className="explorer-local-badge"
-            title={`Auto-synced with local disk: ${folder.localPath}`}
-          >
-            <div className="explorer-local-badge-info">
-              <span className={`local-dot-indicator ${isSyncingThis ? 'is-syncing' : ''}`} />
-              <HardDrive size={12} className="local-badge-icon" />
-              <span className="local-folder-name">{getBasename(folder.localPath)}</span>
-            </div>
-          </div>
-        )} */}
       </div>
 
       {/* Notes & subfolders list (RFC-042 Pillar 3: Viewport virtualized tree window) */}

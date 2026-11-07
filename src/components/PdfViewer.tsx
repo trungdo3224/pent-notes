@@ -78,7 +78,12 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   const handleOpenExternal = () => {
     if (pdfData) {
       try {
-        window.open(convertDataUrlToBlobUrl(pdfData), "_blank");
+        if (activeBlobUrlRef.current) {
+          URL.revokeObjectURL(activeBlobUrlRef.current);
+        }
+        const blobUrl = convertDataUrlToBlobUrl(pdfData);
+        activeBlobUrlRef.current = blobUrl;
+        window.open(blobUrl, "_blank");
         return;
       } catch {
         window.open(pdfUrl, "_blank");

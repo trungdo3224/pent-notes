@@ -1,4 +1,4 @@
-import { RefObject, useCallback, useEffect, useState } from 'react';
+import { RefObject, useCallback, useEffect, useState } from "react";
 
 const COPY_FEEDBACK_DURATION_MS = 2000;
 
@@ -9,13 +9,13 @@ const COPY_FEEDBACK_DURATION_MS = 2000;
 export function usePointerDrag(
   isDragging: boolean,
   onMove: (clientX: number, clientY: number) => void,
-  onEnd: () => void
+  onEnd: () => void,
 ): void {
   useEffect(() => {
     if (!isDragging) return;
 
     const handlePointerMove = (event: MouseEvent | TouchEvent) => {
-      const touch = 'touches' in event ? event.touches[0] : null;
+      const touch = "touches" in event ? event.touches[0] : null;
       const clientX = touch ? touch.clientX : (event as MouseEvent).clientX;
       const clientY = touch ? touch.clientY : (event as MouseEvent).clientY;
       onMove(clientX, clientY);
@@ -23,21 +23,21 @@ export function usePointerDrag(
 
     const handlePointerUp = () => {
       onEnd();
-      document.body.classList.remove('is-col-resizing');
+      document.body.classList.remove("is-col-resizing");
     };
 
-    document.body.classList.add('is-col-resizing');
-    window.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
-    window.addEventListener('touchmove', handlePointerMove);
-    window.addEventListener('touchend', handlePointerUp);
+    document.body.classList.add("is-col-resizing");
+    window.addEventListener("mousemove", handlePointerMove);
+    window.addEventListener("mouseup", handlePointerUp);
+    window.addEventListener("touchmove", handlePointerMove);
+    window.addEventListener("touchend", handlePointerUp);
 
     return () => {
-      document.body.classList.remove('is-col-resizing');
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-      window.removeEventListener('touchmove', handlePointerMove);
-      window.removeEventListener('touchend', handlePointerUp);
+      document.body.classList.remove("is-col-resizing");
+      window.removeEventListener("mousemove", handlePointerMove);
+      window.removeEventListener("mouseup", handlePointerUp);
+      window.removeEventListener("touchmove", handlePointerMove);
+      window.removeEventListener("touchend", handlePointerUp);
     };
   }, [isDragging, onMove, onEnd]);
 }
@@ -48,19 +48,22 @@ export function usePointerDrag(
 export function useClickOutside(
   containerRef: RefObject<HTMLElement | null>,
   isOpen: boolean,
-  onClose: () => void
+  onClose: () => void,
 ): void {
   useEffect(() => {
     if (!isOpen) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
         onClose();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [containerRef, isOpen, onClose]);
 }
 
@@ -72,13 +75,13 @@ export function useEscapeKey(isActive: boolean, onEscape: () => void): void {
     if (!isActive) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         onEscape();
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isActive, onEscape]);
 }
 
@@ -86,7 +89,7 @@ export function useEscapeKey(isActive: boolean, onEscape: () => void): void {
  * Provides clipboard copy with temporary boolean confirmation state.
  */
 export function useCopyFeedback(
-  durationMs: number = COPY_FEEDBACK_DURATION_MS
+  durationMs: number = COPY_FEEDBACK_DURATION_MS,
 ): [boolean, (text: string) => void] {
   const [copied, setCopied] = useState(false);
 
@@ -97,9 +100,27 @@ export function useCopyFeedback(
         setTimeout(() => setCopied(false), durationMs);
       });
     },
-    [durationMs]
+    [durationMs],
   );
 
   return [copied, copyText];
 }
 
+/**
+ * Clamps context menu coordinates so the menu stays within the viewport.
+ */
+export function clampMenuPosition(
+  x: number,
+  y: number,
+  menuWidth: number,
+  menuHeight: number,
+): { x: number; y: number } {
+  const maxX =
+    typeof window !== "undefined" ? window.innerWidth - menuWidth - 10 : x;
+  const maxY =
+    typeof window !== "undefined" ? window.innerHeight - menuHeight - 10 : y;
+  return {
+    x: Math.max(8, Math.min(x, maxX)),
+    y: Math.max(8, Math.min(y, maxY)),
+  };
+}

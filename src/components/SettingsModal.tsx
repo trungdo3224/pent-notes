@@ -34,6 +34,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const resetFontSettings = useNotesStore((s) => s.resetFontSettings);
   const activeTab = useNotesStore((s) => s.settingsActiveTab);
   const setActiveTab = useNotesStore((s) => s.setSettingsActiveTab);
+  const isNavbarCollapsed = useNotesStore((s) => s.isNavbarCollapsed);
+  const toggleNavbar = useNotesStore((s) => s.toggleNavbar);
+  const isSidebarCollapsed = useNotesStore((s) => s.isSidebarCollapsed);
+  const toggleSidebar = useNotesStore((s) => s.toggleSidebar);
+  const isRightSidebarCollapsed = useNotesStore(
+    (s) => s.isRightSidebarCollapsed,
+  );
+  const toggleRightSidebar = useNotesStore((s) => s.toggleRightSidebar);
+  const resetLayoutWidths = useNotesStore((s) => s.resetLayoutWidths);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -119,7 +128,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
             >
               <LayoutTemplate size={16} strokeWidth={1.8} />
               <span>Layout</span>
-              <span className="settings-tag-soon">WIP</span>
             </button>
           </aside>
 
@@ -166,7 +174,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                             >
                               <div className="theme-swatches">
                                 <span
-                                  className="theme-swatch-dot is-primary"
+                                  className="theme-swatch-dot"
                                   style={{
                                     backgroundColor: option.colors[2],
                                     boxShadow: `0 0 10px ${option.colors[2]}40`,
@@ -174,7 +182,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                                   title={`Primary accent: ${option.colors[2]}`}
                                 />
                                 <span
-                                  className="theme-swatch-dot is-secondary"
+                                  className="theme-swatch-dot"
                                   style={{
                                     backgroundColor: option.colors[3],
                                     boxShadow: `0 0 8px ${option.colors[3]}30`,
@@ -467,68 +475,98 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
               </div>
             )}
 
-            {/* TAB 3: LAYOUT (PLACEHOLDER) */}
+            {/* TAB 3: LAYOUT */}
             {activeTab === "layout" && (
               <div className="settings-tab-pane">
-                <div className="settings-layout-placeholder">
-                  <div className="layout-placeholder-badge">
-                    <LayoutTemplate size={14} strokeWidth={2} />
-                    <span>Under Construction</span>
+                <div className="settings-pane-intro">
+                  <div className="settings-intro-row">
+                    <div>
+                      <h3>Workspace & Layout</h3>
+                      <p>
+                        Toggle workspace panels and reset sidebar widths to
+                        their default dimensions.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="settings-reset-btn"
+                      onClick={resetLayoutWidths}
+                      title="Reset sidebar widths to default"
+                    >
+                      <RotateCcw size={13} strokeWidth={2} />
+                      <span>Reset Panel Widths</span>
+                    </button>
                   </div>
+                </div>
 
-                  <h3 className="layout-placeholder-title">
-                    Workspace & Layout Settings
-                  </h3>
-                  <p className="layout-placeholder-desc">
-                    Custom layout management is currently in development. You
-                    will soon be able to configure docking positions, tab strip
-                    styles, split presets, and distraction-free writing margins.
-                  </p>
-
-                  <div className="layout-preview-mockup">
-                    <div className="layout-mock-item is-disabled">
-                      <div className="mock-item-left">
-                        <Columns size={16} strokeWidth={1.8} />
-                        <div>
-                          <span className="mock-title">Tab Strip Bar</span>
-                          <span className="mock-subtitle">
-                            Show open file navigation tabs above editor
-                          </span>
-                        </div>
+                <div className="layout-preview-mockup">
+                  <button
+                    type="button"
+                    className="layout-mock-item"
+                    onClick={toggleNavbar}
+                  >
+                    <div className="mock-item-left">
+                      <LayoutTemplate size={16} strokeWidth={1.8} />
+                      <div>
+                        <span className="mock-title">Slim Top Navbar</span>
+                        <span className="mock-subtitle">
+                          Collapse header bar into a single-line folder strip
+                          (Ctrl+Shift+\)
+                        </span>
                       </div>
-                      <span className="mock-pill is-active">Enabled</span>
                     </div>
+                    <span
+                      className={`mock-pill ${isNavbarCollapsed ? "is-active" : ""}`}
+                    >
+                      {isNavbarCollapsed ? "Slim" : "Expanded"}
+                    </span>
+                  </button>
 
-                    <div className="layout-mock-item is-disabled">
-                      <div className="mock-item-left">
-                        <LayoutTemplate size={16} strokeWidth={1.8} />
-                        <div>
-                          <span className="mock-title">
-                            Split View Orientation Preset
-                          </span>
-                          <span className="mock-subtitle">
-                            Default multi-file splitting direction
-                          </span>
-                        </div>
+                  <button
+                    type="button"
+                    className="layout-mock-item"
+                    onClick={toggleSidebar}
+                  >
+                    <div className="mock-item-left">
+                      <Columns size={16} strokeWidth={1.8} />
+                      <div>
+                        <span className="mock-title">Left File Explorer</span>
+                        <span className="mock-subtitle">
+                          Show folder tree and notes sidebar (Ctrl+\)
+                        </span>
                       </div>
-                      <span className="mock-pill">Horizontal</span>
                     </div>
+                    <span
+                      className={`mock-pill ${!isSidebarCollapsed ? "is-active" : ""}`}
+                    >
+                      {isSidebarCollapsed ? "Hidden" : "Visible"}
+                    </span>
+                  </button>
 
-                    <div className="layout-mock-item is-disabled">
-                      <div className="mock-item-left">
-                        <Compass size={16} strokeWidth={1.8} />
-                        <div>
-                          <span className="mock-title">
-                            Distraction-Free Zen Mode
-                          </span>
-                          <span className="mock-subtitle">
-                            Centered content with wide readable margins
-                          </span>
-                        </div>
+                  <button
+                    type="button"
+                    className="layout-mock-item"
+                    onClick={toggleRightSidebar}
+                  >
+                    <div className="mock-item-left">
+                      <Compass size={16} strokeWidth={1.8} />
+                      <div>
+                        <span className="mock-title">
+                          Right Catalog & Outline
+                        </span>
+                        <span className="mock-subtitle">
+                          Show table of contents, tags, and note statistics
+                          (Ctrl+])
+                        </span>
                       </div>
-                      <span className="mock-pill">Coming Soon</span>
                     </div>
-                  </div>
+                    <span
+                      className={`mock-pill ${!isRightSidebarCollapsed ? "is-active" : ""}`}
+                    >
+                      {isRightSidebarCollapsed ? "Hidden" : "Visible"}
+                    </span>
+                  </button>
                 </div>
               </div>
             )}

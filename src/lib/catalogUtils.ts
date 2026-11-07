@@ -1,3 +1,5 @@
+import { EditorView } from "@codemirror/view";
+import { Line } from "@codemirror/state";
 import { ExplorerNode, NoteItem, TopLevelFolder } from "../types";
 
 export interface HeadingItem {
@@ -53,7 +55,6 @@ export interface WorkspaceConnections {
 
 const WORDS_PER_MINUTE = 200;
 const HEADING_HIGHLIGHT_DURATION_MS = 1800;
-const TEXTAREA_LINE_HEIGHT_PX = 24;
 const HEX_COLOR_REGEX = /^[0-9a-fA-F]{3,6}$/;
 const HASHTAG_REGEX = /(?:^|\s)#([a-zA-Z][a-zA-Z0-9_\-\/]*)/g;
 const HEADING_LINE_REGEX = /^(#{1,6})\s+(.+)$/;
@@ -197,12 +198,16 @@ export function extractTags(markdown: string): TagItem[] {
   return mapToSortedTagItems(tagCounts);
 }
 
-export function extractAllWorkspaceTags(folders: TopLevelFolder[]): TagItem[] {
+export function extractAllWorkspaceTags(
+  folders: TopLevelFolder[],
+  activeNoteContents: Record<string, string> = {},
+): TagItem[] {
   const tagCounts = new Map<string, number>();
 
   function scanNode(node: ExplorerNode) {
     if (node.type === "note") {
-      for (const tagItem of extractTags(node.content)) {
+      const content = activeNoteContents[node.id] ?? node.content;
+      for (const tagItem of extractTags(content)) {
         tagCounts.set(
           tagItem.tag,
           (tagCounts.get(tagItem.tag) || 0) + tagItem.count,
@@ -359,6 +364,7 @@ interface IndexedWorkspaceNote {
 
 function indexWorkspaceNotes(
   folders: TopLevelFolder[],
+  activeNoteContents: Record<string, string> = {},
 ): IndexedWorkspaceNote[] {
   const indexed: IndexedWorkspaceNote[] = [];
 
@@ -386,8 +392,9 @@ function indexWorkspaceNotes(
           if (fullPath) matchKeys.add(fullPath);
         }
 
+        const noteContent = activeNoteContents[node.id] ?? node.content;
         const outgoingKeys = new Set<string>();
-        for (const rawLink of extractNoteLinks(node.content)) {
+        for (const rawLink of extractNoteLinks(noteContent)) {
           const normalized = normalizeLinkKey(rawLink);
           if (normalized) {
             outgoingKeys.add(normalized);
@@ -453,6 +460,7 @@ export function resolveWorkspaceConnections(
   folders: TopLevelFolder[],
   activeNoteId: string | null,
   activeContent?: string,
+  activeNoteContents: Record<string, string> = {},
 ): WorkspaceConnections {
   const empty: WorkspaceConnections = {
     linkedNotes: [],
@@ -468,7 +476,7 @@ export function resolveWorkspaceConnections(
     return empty;
   }
 
-  const allNotes = indexWorkspaceNotes(folders);
+  const allNotes = indexWorkspaceNotes(folders, activeNoteContents);
   const activeIndexed = allNotes.find((item) => item.note.id === activeNoteId);
   if (!activeIndexed) {
     return empty;
@@ -545,65 +553,233 @@ export function resolveWorkspaceConnections(
   return empty;
 }
 
-export function scrollToHeading(headingText: string, level: number): boolean {
+const HEADING_SCROLL_TOP_OFFSET_PX = 28;
+let activeScrollRafId: number | null = null;
+
+function normalizeHeadingText(raw: string): string {
+  return raw
+    .replace(/^#+\s*/, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[*_`~]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function triggerHeadingHighlight(el: HTMLElement): void {
+  el.classList.remove("heading-jump-highlight");
+  void el.offsetWidth;
+  el.classList.add("heading-jump-highlight");
+  setTimeout(() => {
+    el.classList.remove("heading-jump-highlight");
+  }, HEADING_HIGHLIGHT_DURATION_MS);
+}
+
+function getRenderedLineElement(
+  view: EditorView,
+  pos: number,
+): HTMLElement | null {
+  const { from, to } = view.viewport;
+  if (pos < from || pos > to) return null;
+  try {
+    const domPos = view.domAtPos(pos);
+    const baseEl =
+      domPos.node instanceof HTMLElement
+        ? domPos.node
+        : domPos.node.parentElement;
+    return baseEl?.closest<HTMLElement>(".cm-line") ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveTargetHeadingLine(
+  view: EditorView,
+  headingText: string,
+  level: number,
+  lineNumber?: number,
+): Line | null {
+  const doc = view.state.doc;
+  const cleanTarget = normalizeHeadingText(headingText);
+
+  if (lineNumber && lineNumber >= 1 && lineNumber <= doc.lines) {
+    const candidate = doc.line(lineNumber);
+    if (normalizeHeadingText(candidate.text) === cleanTarget) {
+      return candidate;
+    }
+  }
+
+  let fallbackMatch: Line | null = null;
+  for (let i = 1; i <= doc.lines; i++) {
+    const line = doc.line(i);
+    const match = line.text.match(HEADING_LINE_REGEX);
+    if (!match) continue;
+    const lineLevel = match[1].length;
+    const normalized = normalizeHeadingText(match[2]);
+    if (lineLevel === level && normalized === cleanTarget) {
+      return line;
+    }
+    if (!fallbackMatch && normalized.includes(cleanTarget)) {
+      fallbackMatch = line;
+    }
+  }
+
+  if (fallbackMatch) return fallbackMatch;
+  if (lineNumber && lineNumber >= 1 && lineNumber <= doc.lines) {
+    return doc.line(lineNumber);
+  }
+  return null;
+}
+
+function computeScrollTargetTop(
+  view: EditorView,
+  scrollContainer: HTMLElement,
+  pos: number,
+): { top: number; renderedLine: HTMLElement | null } {
+  const containerRect = scrollContainer.getBoundingClientRect();
+  const renderedLine = getRenderedLineElement(view, pos);
+  if (renderedLine) {
+    const lineRect = renderedLine.getBoundingClientRect();
+    const top = Math.max(
+      0,
+      scrollContainer.scrollTop +
+        (lineRect.top - containerRect.top) -
+        HEADING_SCROLL_TOP_OFFSET_PX,
+    );
+    return { top, renderedLine };
+  }
+
+  const contentRect = view.contentDOM.getBoundingClientRect();
+  const contentTop =
+    contentRect.top - containerRect.top + scrollContainer.scrollTop;
+  const block = view.lineBlockAt(pos);
+  const top = Math.max(
+    0,
+    contentTop + block.top - HEADING_SCROLL_TOP_OFFSET_PX,
+  );
+  return { top, renderedLine: null };
+}
+
+export function scrollToHeading(
+  headingText: string,
+  level: number,
+  lineNumber?: number,
+): boolean {
   if (typeof document === "undefined") return false;
 
-  const targetTag = `H${level}`;
-  const cleanTarget = headingText.trim().toLowerCase();
+  if (activeScrollRafId !== null) {
+    cancelAnimationFrame(activeScrollRafId);
+    activeScrollRafId = null;
+  }
 
+  const activeScope =
+    document.querySelector<HTMLElement>(".editor-split-col.is-active-pane") ??
+    document.querySelector<HTMLElement>(".editor-pane");
+  if (!activeScope) return false;
+
+  const cmContainer = activeScope.querySelector<
+    HTMLElement & { __cmView?: EditorView }
+  >(".cm-markdown-editor");
+  const view = cmContainer?.__cmView;
+
+  if (view) {
+    const targetLine = resolveTargetHeadingLine(
+      view,
+      headingText,
+      level,
+      lineNumber,
+    );
+    if (targetLine) {
+      const scrollContainer =
+        view.dom.closest<HTMLElement>(".editor-scroll-container") ??
+        view.scrollDOM;
+      const targetPos = targetLine.from;
+      const initial = computeScrollTargetTop(view, scrollContainer, targetPos);
+
+      scrollContainer.scrollTo({
+        top: initial.top,
+        behavior: "smooth",
+      });
+
+      if (initial.renderedLine) {
+        triggerHeadingHighlight(initial.renderedLine);
+        return true;
+      }
+
+      let frames = 0;
+      let lastEstimatedTop = initial.top;
+      const maxFrames = 60;
+
+      const trackVirtualizedLine = () => {
+        frames++;
+        const current = computeScrollTargetTop(
+          view,
+          scrollContainer,
+          targetPos,
+        );
+
+        if (current.renderedLine) {
+          activeScrollRafId = null;
+          if (Math.abs(current.top - lastEstimatedTop) > 6) {
+            scrollContainer.scrollTo({
+              top: current.top,
+              behavior: "smooth",
+            });
+          }
+          triggerHeadingHighlight(current.renderedLine);
+          return;
+        }
+
+        if (
+          frames % 10 === 0 &&
+          Math.abs(current.top - lastEstimatedTop) > 12
+        ) {
+          lastEstimatedTop = current.top;
+          scrollContainer.scrollTo({
+            top: current.top,
+            behavior: "smooth",
+          });
+        }
+
+        if (frames < maxFrames) {
+          activeScrollRafId = requestAnimationFrame(trackVirtualizedLine);
+        } else {
+          activeScrollRafId = null;
+        }
+      };
+
+      activeScrollRafId = requestAnimationFrame(trackVirtualizedLine);
+      return true;
+    }
+  }
+
+  const targetTag = `H${level}`;
+  const cleanTarget = normalizeHeadingText(headingText);
   const elements = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      ".editor-pane h1, .editor-pane h2, .editor-pane h3, .editor-pane h4, .editor-pane h5, .editor-pane h6, .editor-pane .cm-h1, .editor-pane .cm-h2, .editor-pane .cm-h3, .editor-pane .cm-h4, .editor-pane .cm-h5, .editor-pane .cm-h6",
+    activeScope.querySelectorAll<HTMLElement>(
+      "h1, h2, h3, h4, h5, h6, .cm-h1, .cm-h2, .cm-h3, .cm-h4, .cm-h5, .cm-h6, .cm-line",
     ),
   );
 
   const exactMatch = elements.find((el) => {
     const isLevelMatch =
       el.tagName === targetTag || el.classList.contains(`cm-h${level}`);
-    if (!isLevelMatch) return false;
-    const text = el.textContent
-      ?.trim()
-      .toLowerCase()
-      .replace(/^#+\s*/, "");
-    return text === cleanTarget;
+    return (
+      isLevelMatch && normalizeHeadingText(el.textContent ?? "") === cleanTarget
+    );
   });
+
   const foundEl =
     exactMatch ??
-    elements.find((el) => {
-      const text = el.textContent
-        ?.trim()
-        .toLowerCase()
-        .replace(/^#+\s*/, "");
-      return text?.includes(cleanTarget);
-    }) ??
+    elements.find(
+      (el) => normalizeHeadingText(el.textContent ?? "") === cleanTarget,
+    ) ??
     null;
 
   if (foundEl) {
-    foundEl.scrollIntoView({ behavior: "smooth", block: "center" });
-    foundEl.classList.add("heading-jump-highlight");
-    setTimeout(() => {
-      foundEl.classList.remove("heading-jump-highlight");
-    }, HEADING_HIGHLIGHT_DURATION_MS);
+    const lineEl = foundEl.closest<HTMLElement>(".cm-line") ?? foundEl;
+    lineEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    triggerHeadingHighlight(lineEl);
     return true;
-  }
-
-  const textarea =
-    document.querySelector<HTMLTextAreaElement>(".editor-textarea");
-  if (textarea) {
-    const val = textarea.value;
-    const prefix = `${"#".repeat(level)} `;
-    let idx = val.indexOf(prefix + headingText);
-    if (idx === -1) idx = val.indexOf(headingText);
-    if (idx !== -1) {
-      textarea.focus();
-      textarea.setSelectionRange(idx, idx + headingText.length);
-      const linesBefore = val.slice(0, idx).split("\n").length;
-      textarea.scrollTop = Math.max(
-        0,
-        (linesBefore - 3) * TEXTAREA_LINE_HEIGHT_PX,
-      );
-      return true;
-    }
   }
 
   return false;
