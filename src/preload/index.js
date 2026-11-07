@@ -39,4 +39,46 @@ contextBridge.exposeInMainWorld("electronAPI", {
     setTitleBarOverlay: (options) =>
       ipcRenderer.invoke("window:setTitleBarOverlay", options),
   },
+
+  ollama: {
+    listModels: (host) => ipcRenderer.invoke("ollama:list-models", host),
+    searchWeb: (query, options) =>
+      ipcRenderer.invoke("ollama:search-web", { query, ...options }),
+    pullModel: (host, modelName, onProgress) => {
+      const reqId = `pull-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const channel = `ollama:pull-progress:${reqId}`;
+      const listener = (_, progress) => {
+        onProgress(progress);
+        if (
+          progress.status === "success" ||
+          progress.status === "error" ||
+          progress.status === "aborted"
+        ) {
+          ipcRenderer.removeListener(channel, listener);
+        }
+      };
+      ipcRenderer.on(channel, listener);
+      ipcRenderer.send("ollama:pull-start", { reqId, host, modelName });
+      return () => {
+        ipcRenderer.removeListener(channel, listener);
+        ipcRenderer.send("ollama:pull-abort", { reqId });
+      };
+    },
+    chat: (host, { model, messages }, onChunk) => {
+      const reqId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const channel = `ollama:chat-chunk:${reqId}`;
+      const listener = (_, chunk) => {
+        onChunk(chunk);
+        if (chunk.done || chunk.error) {
+          ipcRenderer.removeListener(channel, listener);
+        }
+      };
+      ipcRenderer.on(channel, listener);
+      ipcRenderer.send("ollama:chat-start", { reqId, host, model, messages });
+      return () => {
+        ipcRenderer.removeListener(channel, listener);
+        ipcRenderer.send("ollama:chat-abort", { reqId });
+      };
+    },
+  },
 });
