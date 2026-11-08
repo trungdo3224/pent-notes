@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FolderOpen, FolderPlus, LoaderCircle, X } from "lucide-react";
-import { useEscapeKey } from "../hooks/useDomInteractions";
-import { buildExplorerTreeFromFiles } from "../lib/fileUtils";
-import { fsApi } from "../lib/fsApi";
-import { useNotesStore } from "../store/useNotesStore";
-import { LinkModalTargetMode } from "../types";
+import { useEscapeKey } from "../../hooks/useDomInteractions";
+import { buildExplorerTreeFromFiles } from "../../lib/fileUtils";
+import { fsApi } from "../../lib/fsApi";
+import { useNotesStore } from "../../store/useNotesStore";
+import { LinkModalTargetMode } from "../../types";
 
 export const LinkFolderModal: React.FC = () => {
   const isOpen = useNotesStore((s) => s.isLinkModalOpen);

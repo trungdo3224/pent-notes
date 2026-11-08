@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from "react";
 import {
   ChevronDown,
   Columns2,
@@ -8,24 +8,24 @@ import {
   Rows2,
   Split,
   X,
-} from 'lucide-react';
-import { useClickOutside } from '../hooks/useDomInteractions';
-import { useNotesStore } from '../store/useNotesStore';
-import { SplitDirection } from '../types';
+} from "lucide-react";
+import { useClickOutside } from "../../hooks/useDomInteractions";
+import { useNotesStore } from "../../store/useNotesStore";
+import { SplitDirection } from "../../types";
 
 interface SplitHandleMenuProps {
   paneId?: string;
   className?: string;
   buttonLabel?: string;
-  align?: 'left' | 'right';
+  align?: "left" | "right";
   showCloseActions?: boolean;
 }
 
 export const SplitHandleMenu: React.FC<SplitHandleMenuProps> = ({
   paneId,
-  className = '',
+  className = "",
   buttonLabel,
-  align = 'right',
+  align = "right",
   showCloseActions = true,
 }) => {
   const isSplitViewActive = useNotesStore((s) => s.isSplitViewActive);
@@ -71,7 +71,7 @@ export const SplitHandleMenu: React.FC<SplitHandleMenuProps> = ({
     <div className={`split-handle-wrap ${className}`} ref={menuRef}>
       <button
         type="button"
-        className={`split-handle-btn ${isOpen ? 'is-active' : ''}`}
+        className={`split-handle-btn ${isOpen ? "is-active" : ""}`}
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen((v) => !v);
@@ -81,8 +81,14 @@ export const SplitHandleMenu: React.FC<SplitHandleMenuProps> = ({
         aria-expanded={isOpen}
       >
         <Split size={14} strokeWidth={1.9} className="split-handle-icon" />
-        {buttonLabel && <span className="split-handle-label">{buttonLabel}</span>}
-        <ChevronDown size={11} strokeWidth={2} className="split-handle-chevron" />
+        {buttonLabel && (
+          <span className="split-handle-label">{buttonLabel}</span>
+        )}
+        <ChevronDown
+          size={11}
+          strokeWidth={2}
+          className="split-handle-chevron"
+        />
       </button>
 
       {isOpen && (
@@ -99,7 +105,7 @@ export const SplitHandleMenu: React.FC<SplitHandleMenuProps> = ({
             type="button"
             className="dropdown-menu-item"
             role="menuitem"
-            onClick={() => handleSplit('horizontal')}
+            onClick={() => handleSplit("horizontal")}
           >
             <Columns2 size={14} strokeWidth={1.9} />
             <div className="split-menu-item-text">
@@ -112,12 +118,14 @@ export const SplitHandleMenu: React.FC<SplitHandleMenuProps> = ({
             type="button"
             className="dropdown-menu-item"
             role="menuitem"
-            onClick={() => handleSplit('vertical')}
+            onClick={() => handleSplit("vertical")}
           >
             <Rows2 size={14} strokeWidth={1.9} />
             <div className="split-menu-item-text">
               <span className="split-menu-title">Split Down</span>
-              <span className="split-menu-desc">Add stacked top/bottom view</span>
+              <span className="split-menu-desc">
+                Add stacked top/bottom view
+              </span>
             </div>
           </button>
 
@@ -138,7 +146,10 @@ export const SplitHandleMenu: React.FC<SplitHandleMenuProps> = ({
                 <div className="split-menu-item-text">
                   <span className="split-menu-title">Flip Orientation</span>
                   <span className="split-menu-desc">
-                    Switch to {splitDirection === 'horizontal' ? 'Vertical (Rows)' : 'Horizontal (Columns)'}
+                    Switch to{" "}
+                    {splitDirection === "horizontal"
+                      ? "Vertical (Rows)"
+                      : "Horizontal (Columns)"}
                   </span>
                 </div>
               </button>
@@ -152,7 +163,9 @@ export const SplitHandleMenu: React.FC<SplitHandleMenuProps> = ({
                 <Grid2X2 size={14} strokeWidth={1.9} />
                 <div className="split-menu-item-text">
                   <span className="split-menu-title">Equalize Sizes</span>
-                  <span className="split-menu-desc">Reset all split views evenly</span>
+                  <span className="split-menu-desc">
+                    Reset all split views evenly
+                  </span>
                 </div>
               </button>
 
@@ -182,7 +195,9 @@ export const SplitHandleMenu: React.FC<SplitHandleMenuProps> = ({
                     <Minimize2 size={14} strokeWidth={1.9} />
                     <div className="split-menu-item-text">
                       <span className="split-menu-title">Close Others</span>
-                      <span className="split-menu-desc">Keep only this view</span>
+                      <span className="split-menu-desc">
+                        Keep only this view
+                      </span>
                     </div>
                   </button>
                 </>
@@ -194,4 +209,3 @@ export const SplitHandleMenu: React.FC<SplitHandleMenuProps> = ({
     </div>
   );
 };
-

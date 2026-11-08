@@ -22,25 +22,28 @@ import {
   Split,
   X,
 } from "lucide-react";
-import { useClickOutside } from "../hooks/useDomInteractions";
+import { useClickOutside } from "../../hooks/useDomInteractions";
 import {
   countWords,
   listConnectableNotes,
   resolveWorkspaceConnections,
-} from "../lib/catalogUtils";
+} from "../../lib/catalogUtils";
 import {
   isPdfNote,
   NOTE_FILE_ACCEPT,
   readFileAsDataUrl,
-} from "../lib/fileUtils";
-import { getAllLeaves } from "../lib/paneLayoutTree";
-import { resolveActiveNoteData, useNotesStore } from "../store/useNotesStore";
-import { NoteItem } from "../types";
+} from "../../lib/fileUtils";
+import { getAllLeaves } from "../../lib/paneLayoutTree";
+import {
+  resolveActiveNoteData,
+  useNotesStore,
+} from "../../store/useNotesStore";
+import { NoteItem } from "../../types";
 import { MarkdownEditor } from "./MarkdownEditor";
-import { NoteTabsBar } from "./NoteTabsBar";
-import { PaneSplitTree } from "./PaneSplitTree";
+import { NoteTabsBar } from "../panes/NoteTabsBar";
+import { PaneSplitTree } from "../panes/PaneSplitTree";
 import { PdfViewer } from "./PdfViewer";
-import { SplitHandleMenu } from "./SplitHandleMenu";
+import { SplitHandleMenu } from "../panes/SplitHandleMenu";
 
 export const NoteEditor: React.FC = () => {
   const folders = useNotesStore((s) => s.folders);

@@ -15,10 +15,10 @@ import {
   Type,
   X,
 } from "lucide-react";
-import { useEscapeKey } from "../hooks/useDomInteractions";
-import { MONO_FONT_OPTIONS, SANS_FONT_OPTIONS } from "../lib/fontSettings";
-import { useNotesStore } from "../store/useNotesStore";
-import { ThemeId, themes } from "../themes";
+import { useEscapeKey } from "../../hooks/useDomInteractions";
+import { MONO_FONT_OPTIONS, SANS_FONT_OPTIONS } from "../../lib/fontSettings";
+import { useNotesStore } from "../../store/useNotesStore";
+import { ThemeId, themes } from "../../themes";
 
 interface SettingsModalProps {
   onClose: () => void;

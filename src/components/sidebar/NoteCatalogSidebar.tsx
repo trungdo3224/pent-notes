@@ -17,7 +17,7 @@ import {
   Search,
   Tag,
 } from "lucide-react";
-import { useCopyFeedback } from "../hooks/useDomInteractions";
+import { useCopyFeedback } from "../../hooks/useDomInteractions";
 import {
   buildHeadingTree,
   calculateNoteStats,
@@ -26,14 +26,14 @@ import {
   extractTags,
   HeadingNode,
   scrollToHeading,
-} from "../lib/catalogUtils";
-import { findLeaf } from "../lib/paneLayoutTree";
+} from "../../lib/catalogUtils";
+import { findLeaf } from "../../lib/paneLayoutTree";
 import {
   DEFAULT_RIGHT_SIDEBAR_WIDTH,
   findNoteAndPath,
   resolveActiveNoteData,
   useNotesStore,
-} from "../store/useNotesStore";
+} from "../../store/useNotesStore";
 
 interface NoteCatalogSidebarProps {
   onOpenSearchWithQuery?: (query: string) => void;

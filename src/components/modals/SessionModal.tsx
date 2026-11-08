@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Check,
   Copy,
@@ -13,10 +13,10 @@ import {
   Sparkles,
   Trash2,
   X,
-} from 'lucide-react';
-import { useCopyFeedback, useEscapeKey } from '../hooks/useDomInteractions';
-import { SessionInfo, sessionApi } from '../lib/sessionManager';
-import { useNotesStore } from '../store/useNotesStore';
+} from "lucide-react";
+import { useCopyFeedback, useEscapeKey } from "../../hooks/useDomInteractions";
+import { SessionInfo, sessionApi } from "../../lib/sessionManager";
+import { useNotesStore } from "../../store/useNotesStore";
 
 export const SessionModal: React.FC = () => {
   const isOpen = useNotesStore((s) => s.isSessionModalOpen);
@@ -30,16 +30,16 @@ export const SessionModal: React.FC = () => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftName, setDraftName] = useState(currentSessionName);
   const [copiedLink, copyToClipboard] = useCopyFeedback();
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const loadSessionsList = useCallback(async () => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       const list = await sessionApi.listSessions();
       setSessions(list);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load sessions.');
+      setError(err instanceof Error ? err.message : "Failed to load sessions.");
     } finally {
       setLoading(false);
     }
@@ -64,7 +64,7 @@ export const SessionModal: React.FC = () => {
         await sessionApi.renameSession(currentSessionId, trimmed);
         await loadSessionsList();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to rename.');
+        setError(err instanceof Error ? err.message : "Failed to rename.");
       }
     }
     setIsRenaming(false);
@@ -72,7 +72,7 @@ export const SessionModal: React.FC = () => {
 
   const handleCopyLink = () => {
     const url = new URL(window.location.href);
-    url.searchParams.set('session', currentSessionId);
+    url.searchParams.set("session", currentSessionId);
     copyToClipboard(url.toString());
   };
 
@@ -81,7 +81,9 @@ export const SessionModal: React.FC = () => {
       const newSession = await sessionApi.createSession();
       sessionApi.switchSessionInCurrentTab(newSession.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create session.');
+      setError(
+        err instanceof Error ? err.message : "Failed to create session.",
+      );
     }
   };
 
@@ -89,18 +91,18 @@ export const SessionModal: React.FC = () => {
     try {
       const newSession = await sessionApi.createSession(
         `${currentSessionName} (Copy)`,
-        currentSessionId
+        currentSessionId,
       );
       sessionApi.openSessionInNewTab(newSession.id);
       await loadSessionsList();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to clone session.');
+      setError(err instanceof Error ? err.message : "Failed to clone session.");
     }
   };
 
   const handleDeleteSession = async (id: string, name: string) => {
     if (sessions.length <= 1) {
-      setError('Cannot delete the only remaining session.');
+      setError("Cannot delete the only remaining session.");
       return;
     }
     if (!window.confirm(`Are you sure you want to delete "${name}"?`)) {
@@ -117,7 +119,9 @@ export const SessionModal: React.FC = () => {
       }
       await loadSessionsList();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete session.');
+      setError(
+        err instanceof Error ? err.message : "Failed to delete session.",
+      );
     }
   };
 
@@ -135,7 +139,7 @@ export const SessionModal: React.FC = () => {
         aria-label="Tab session management"
       >
         <div className="modal-heading">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <Layers size={20} className="primary-accent-icon" />
             <h2>Session Management</h2>
           </div>
@@ -150,16 +154,18 @@ export const SessionModal: React.FC = () => {
         </div>
 
         <p className="modal-description" style={{ marginBottom: 14 }}>
-          Workspaces are stored in clean JSON files on disk (<code>data/sessions/*.json</code>).
-          New tabs start in your Default session. You can switch to any existing session or create
-          new ones whenever you need.
+          Workspaces are stored in clean JSON files on disk (
+          <code>data/sessions/*.json</code>). New tabs start in your Default
+          session. You can switch to any existing session or create new ones
+          whenever you need.
         </p>
 
         {/* Current Tab Active Session Card */}
         <div className="current-session-card">
           <div className="current-session-header">
             <span className="current-session-tag">
-              <Radio size={11} className="session-pulse-dot" /> ACTIVE IN THIS TAB
+              <Radio size={11} className="session-pulse-dot" /> ACTIVE IN THIS
+              TAB
             </span>
             <button
               type="button"
@@ -168,13 +174,13 @@ export const SessionModal: React.FC = () => {
               title="Copy link to this session"
             >
               {copiedLink ? <Check size={12} /> : <Copy size={12} />}
-              <span>{copiedLink ? 'Copied URL!' : 'Share URL'}</span>
+              <span>{copiedLink ? "Copied URL!" : "Share URL"}</span>
             </button>
           </div>
 
           <div className="current-session-name-row">
             {isRenaming ? (
-              <div style={{ display: 'flex', gap: 6, flex: 1 }}>
+              <div style={{ display: "flex", gap: 6, flex: 1 }}>
                 <input
                   type="text"
                   className="form-input"
@@ -184,14 +190,14 @@ export const SessionModal: React.FC = () => {
                   autoFocus
                   onBlur={() => void handleCommitRename()}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') void handleCommitRename();
-                    if (e.key === 'Escape') setIsRenaming(false);
+                    if (e.key === "Enter") void handleCommitRename();
+                    if (e.key === "Escape") setIsRenaming(false);
                   }}
                 />
                 <button
                   type="button"
                   className="primary-subtle-btn"
-                  style={{ height: 32, padding: '0 10px' }}
+                  style={{ height: 32, padding: "0 10px" }}
                   onClick={() => void handleCommitRename()}
                 >
                   <Check size={14} />
@@ -245,7 +251,7 @@ export const SessionModal: React.FC = () => {
         </div>
 
         {error && (
-          <div className="form-error" role="alert" style={{ margin: '12px 0' }}>
+          <div className="form-error" role="alert" style={{ margin: "12px 0" }}>
             {error}
           </div>
         )}
@@ -263,7 +269,7 @@ export const SessionModal: React.FC = () => {
               title="Refresh list"
               disabled={loading}
             >
-              <RefreshCw size={13} className={loading ? 'spin' : ''} />
+              <RefreshCw size={13} className={loading ? "spin" : ""} />
             </button>
           </div>
 
@@ -278,22 +284,24 @@ export const SessionModal: React.FC = () => {
                 const isCurrent = sess.id === currentSessionId;
                 const formattedDate = sess.updatedAt
                   ? new Date(sess.updatedAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      month: 'short',
-                      day: 'numeric',
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      month: "short",
+                      day: "numeric",
                     })
-                  : 'Recent';
+                  : "Recent";
 
                 return (
                   <div
                     key={sess.id}
-                    className={`session-card-row ${isCurrent ? 'is-active' : ''}`}
+                    className={`session-card-row ${isCurrent ? "is-active" : ""}`}
                   >
                     <div className="session-card-info">
                       <div className="session-card-top">
                         <span className="session-card-name">{sess.name}</span>
-                        {isCurrent && <span className="session-card-badge">Current</span>}
+                        {isCurrent && (
+                          <span className="session-card-badge">Current</span>
+                        )}
                       </div>
                       <div className="session-card-meta">
                         <span>Updated: {formattedDate}</span>
@@ -309,7 +317,9 @@ export const SessionModal: React.FC = () => {
                         <button
                           type="button"
                           className="subtle-btn is-compact"
-                          onClick={() => sessionApi.switchSessionInCurrentTab(sess.id)}
+                          onClick={() =>
+                            sessionApi.switchSessionInCurrentTab(sess.id)
+                          }
                           title="Switch to this session in this tab"
                         >
                           <FolderOpen size={13} />
@@ -330,7 +340,9 @@ export const SessionModal: React.FC = () => {
                         <button
                           type="button"
                           className="icon-action-btn is-danger"
-                          onClick={() => void handleDeleteSession(sess.id, sess.name)}
+                          onClick={() =>
+                            void handleDeleteSession(sess.id, sess.name)
+                          }
                           title="Delete session"
                         >
                           <Trash2 size={14} />
@@ -345,7 +357,11 @@ export const SessionModal: React.FC = () => {
         </div>
 
         <div className="modal-actions" style={{ marginTop: 18 }}>
-          <button type="button" className="subtle-btn" onClick={closeSessionModal}>
+          <button
+            type="button"
+            className="subtle-btn"
+            onClick={closeSessionModal}
+          >
             Close
           </button>
         </div>

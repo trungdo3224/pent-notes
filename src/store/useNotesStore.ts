@@ -381,8 +381,9 @@ function applyCloseTabs(
   const closedIds = currentOpen.filter((id) => !nextOpen.includes(id));
 
   let nextLayout = state.paneLayout;
-  if (state.paneLayout) {
-    const leaves = getAllLeaves(state.paneLayout);
+  if (nextLayout) {
+    let currentTree: PaneLayoutNode = nextLayout;
+    const leaves = getAllLeaves(currentTree);
     for (const leaf of leaves) {
       if (
         leaf.noteId &&
@@ -392,12 +393,13 @@ function applyCloseTabs(
         if (!closedIds.includes(leaf.noteId)) {
           closedIds.push(leaf.noteId);
         }
-        nextLayout = updateLeafInTree(nextLayout, leaf.id, (l) => ({
+        currentTree = updateLeafInTree(currentTree, leaf.id, (l) => ({
           ...l,
           noteId: null,
         }));
       }
     }
+    nextLayout = currentTree;
   }
 
   if (

@@ -5,14 +5,14 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { FolderExplorer } from "./components/FolderExplorer";
-import { FolderNavbar } from "./components/FolderNavbar";
-import { LinkFolderModal } from "./components/LinkFolderModal";
-import { NoteCatalogSidebar } from "./components/NoteCatalogSidebar";
-import { NoteEditor } from "./components/NoteEditor";
-import { SearchModal } from "./components/SearchModal";
-import { SessionModal } from "./components/SessionModal";
-import { SettingsModal } from "./components/SettingsModal";
+import { FolderNavbar } from "./components/navbar/FolderNavbar";
+import { FolderExplorer } from "./components/sidebar/FolderExplorer";
+import { NoteCatalogSidebar } from "./components/sidebar/NoteCatalogSidebar";
+import { NoteEditor } from "./components/editor/NoteEditor";
+import { LinkFolderModal } from "./components/modals/LinkFolderModal";
+import { SearchModal } from "./components/modals/SearchModal";
+import { SessionModal } from "./components/modals/SessionModal";
+import { SettingsModal } from "./components/modals/SettingsModal";
 import { usePointerDrag } from "./hooks/useDomInteractions";
 import { applyFontSettings } from "./lib/fontSettings";
 import {

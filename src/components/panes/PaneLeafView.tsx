@@ -10,18 +10,18 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useClickOutside } from "../hooks/useDomInteractions";
+import { useClickOutside } from "../../hooks/useDomInteractions";
 import {
   countWords,
   listConnectableNotes,
   resolveWorkspaceConnections,
-} from "../lib/catalogUtils";
-import { isPdfNote } from "../lib/fileUtils";
-import { findNoteAndPath } from "../lib/treeUtils";
-import { useNotesStore } from "../store/useNotesStore";
-import { PaneLeafNode, TopLevelFolder } from "../types";
-import { MarkdownEditor } from "./MarkdownEditor";
-import { PdfViewer } from "./PdfViewer";
+} from "../../lib/catalogUtils";
+import { isPdfNote } from "../../lib/fileUtils";
+import { findNoteAndPath } from "../../lib/treeUtils";
+import { useNotesStore } from "../../store/useNotesStore";
+import { PaneLeafNode, TopLevelFolder } from "../../types";
+import { MarkdownEditor } from "../editor/MarkdownEditor";
+import { PdfViewer } from "../editor/PdfViewer";
 
 interface PaneLeafViewProps {
   leaf: PaneLeafNode;

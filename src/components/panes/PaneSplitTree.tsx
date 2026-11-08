@@ -1,8 +1,13 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { getAllLeaves } from '../lib/paneLayoutTree';
-import { useNotesStore } from '../store/useNotesStore';
-import { PaneBranchNode, PaneLayoutNode, PaneLeafNode, TopLevelFolder } from '../types';
-import { PaneLeafView } from './PaneLeafView';
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { getAllLeaves } from "../../lib/paneLayoutTree";
+import { useNotesStore } from "../../store/useNotesStore";
+import {
+  PaneBranchNode,
+  PaneLayoutNode,
+  PaneLeafNode,
+  TopLevelFolder,
+} from "../../types";
+import { PaneLeafView } from "./PaneLeafView";
 
 interface PaneSplitTreeProps {
   root: PaneLayoutNode;
@@ -18,7 +23,17 @@ export const PaneSplitTree: React.FC<PaneSplitTreeProps> = ({ root }) => {
   const allLeaves = useMemo(() => getAllLeaves(root), [root]);
 
   return (
-    <div className="editor-split-tree-root" style={{ flex: 1, minHeight: 0, display: 'flex', width: '100%', height: '100%', overflow: 'hidden' }}>
+    <div
+      className="editor-split-tree-root"
+      style={{
+        flex: 1,
+        minHeight: 0,
+        display: "flex",
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+      }}
+    >
       <PaneNodeRenderer
         node={root}
         activePaneId={activePaneId}
@@ -51,7 +66,7 @@ const PaneNodeRenderer: React.FC<PaneNodeRendererProps> = ({
   onResizeBranch,
   onResetBranchSizes,
 }) => {
-  if (node.type === 'leaf') {
+  if (node.type === "leaf") {
     const leafIndex = allLeaves.findIndex((l) => l.id === node.id);
     const isActive = activePaneId ? activePaneId === node.id : leafIndex === 0;
 
@@ -109,11 +124,11 @@ const BranchContainer: React.FC<BranchContainerProps> = ({
         flex: 1,
         minHeight: 0,
         minWidth: 0,
-        display: 'flex',
-        width: '100%',
-        height: '100%',
-        position: 'relative',
-        overflow: 'hidden',
+        display: "flex",
+        width: "100%",
+        height: "100%",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
       {branch.children.map((child, idx) => {
@@ -128,8 +143,8 @@ const BranchContainer: React.FC<BranchContainerProps> = ({
                 flexBasis: `${flexPercent}%`,
                 minWidth: 0,
                 minHeight: 0,
-                display: 'flex',
-                overflow: 'hidden',
+                display: "flex",
+                overflow: "hidden",
               }}
             >
               <PaneNodeRenderer
@@ -162,7 +177,7 @@ const BranchContainer: React.FC<BranchContainerProps> = ({
 
 interface BranchDividerProps {
   branchId: string;
-  direction: 'horizontal' | 'vertical';
+  direction: "horizontal" | "vertical";
   index: number;
   containerRef: React.RefObject<HTMLDivElement | null>;
   onResize: (branchId: string, index: number, deltaRatio: number) => void;
@@ -195,7 +210,7 @@ const BranchDivider: React.FC<BranchDividerProps> = ({
 
       const handlePointerMove = (moveEvent: PointerEvent) => {
         const rect = container.getBoundingClientRect();
-        if (direction === 'horizontal') {
+        if (direction === "horizontal") {
           const totalWidth = rect.width;
           if (totalWidth <= 0) return;
           const deltaX = moveEvent.clientX - lastX;
@@ -217,33 +232,32 @@ const BranchDivider: React.FC<BranchDividerProps> = ({
         } catch {
           // pointer capture might already be released
         }
-        window.removeEventListener('pointermove', handlePointerMove);
-        window.removeEventListener('pointerup', handlePointerUp);
-        window.removeEventListener('pointercancel', handlePointerUp);
+        window.removeEventListener("pointermove", handlePointerMove);
+        window.removeEventListener("pointerup", handlePointerUp);
+        window.removeEventListener("pointercancel", handlePointerUp);
       };
 
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-      window.addEventListener('pointercancel', handlePointerUp);
+      window.addEventListener("pointermove", handlePointerMove);
+      window.addEventListener("pointerup", handlePointerUp);
+      window.addEventListener("pointercancel", handlePointerUp);
     },
-    [branchId, direction, index, containerRef, onResize]
+    [branchId, direction, index, containerRef, onResize],
   );
 
   return (
     <div
       role="separator"
-      aria-orientation={direction === 'vertical' ? 'horizontal' : 'vertical'}
+      aria-orientation={direction === "vertical" ? "horizontal" : "vertical"}
       tabIndex={0}
-      className={`split-resizer is-${direction} ${isDragging ? 'is-active' : ''}`}
+      className={`split-resizer is-${direction} ${isDragging ? "is-active" : ""}`}
       onPointerDown={handlePointerDown}
       onDoubleClick={(e) => {
         e.stopPropagation();
         onReset(branchId);
       }}
-      title={`Drag to resize (${direction === 'horizontal' ? 'left/right' : 'up/down'}) • Double-click to reset evenly`}
+      title={`Drag to resize (${direction === "horizontal" ? "left/right" : "up/down"}) • Double-click to reset evenly`}
     >
       <div className="split-resizer-line" />
     </div>
   );
 };
-

@@ -23,9 +23,9 @@ import {
   activeFilePathFacet,
   codeBlockCursorPlugin,
   livePreviewField,
-} from "../lib/codemirror/livePreview";
-import { createImageDropPasteExtension } from "../lib/codemirror/imageDropPaste";
-import { codeHighlightStyle, editorTheme } from "../lib/codemirror/theme";
+} from "../../lib/codemirror/livePreview";
+import { createImageDropPasteExtension } from "../../lib/codemirror/imageDropPaste";
+import { codeHighlightStyle, editorTheme } from "../../lib/codemirror/theme";
 
 interface MarkdownEditorProps {
   value: string;

@@ -35,10 +35,10 @@ import {
 import {
   clampMenuPosition,
   useClickOutside,
-} from "../hooks/useDomInteractions";
-import { resolveWorkspaceConnections } from "../lib/catalogUtils";
-import { isPdfNote, NOTE_FILE_ACCEPT } from "../lib/fileUtils";
-import { findLeaf, getAllLeaves } from "../lib/paneLayoutTree";
+} from "../../hooks/useDomInteractions";
+import { resolveWorkspaceConnections } from "../../lib/catalogUtils";
+import { isPdfNote, NOTE_FILE_ACCEPT } from "../../lib/fileUtils";
+import { findLeaf, getAllLeaves } from "../../lib/paneLayoutTree";
 import {
   collectAllFolderIds,
   DEFAULT_SIDEBAR_WIDTH,
@@ -47,8 +47,8 @@ import {
   resolveActiveNoteData,
   sortExplorerNodes,
   useNotesStore,
-} from "../store/useNotesStore";
-import { ExplorerNode, FolderItem, NoteItem } from "../types";
+} from "../../store/useNotesStore";
+import { ExplorerNode, FolderItem, NoteItem } from "../../types";
 
 const BASE_INDENT_PX = 14;
 const DEPTH_INDENT_STEP_PX = 16;

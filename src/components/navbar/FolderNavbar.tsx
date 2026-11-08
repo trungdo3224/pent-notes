@@ -27,12 +27,15 @@ import {
 import {
   clampMenuPosition,
   useClickOutside,
-} from "../hooks/useDomInteractions";
-import { resolveWorkspaceConnections } from "../lib/catalogUtils";
-import { NOTE_FILE_ACCEPT } from "../lib/fileUtils";
-import { sessionApi } from "../lib/sessionManager";
-import { resolveActiveNoteData, useNotesStore } from "../store/useNotesStore";
-import { TabGroup, TabGroupColorId, TopLevelFolder } from "../types";
+} from "../../hooks/useDomInteractions";
+import { resolveWorkspaceConnections } from "../../lib/catalogUtils";
+import { NOTE_FILE_ACCEPT } from "../../lib/fileUtils";
+import { sessionApi } from "../../lib/sessionManager";
+import {
+  resolveActiveNoteData,
+  useNotesStore,
+} from "../../store/useNotesStore";
+import { TabGroup, TabGroupColorId, TopLevelFolder } from "../../types";
 import { PentLogo } from "./PentLogo";
 
 interface FolderNavbarProps {

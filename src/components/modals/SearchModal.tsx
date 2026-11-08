@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Folder, Search, X } from "lucide-react";
-import { useNotesStore } from "../store/useNotesStore";
-import { ExplorerNode } from "../types";
+import { useNotesStore } from "../../store/useNotesStore";
+import { ExplorerNode } from "../../types";
 
 const SNIPPET_MAX_LENGTH = 140;
 const INITIAL_RESULTS_LIMIT = 20;

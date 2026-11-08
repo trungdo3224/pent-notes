@@ -6,12 +6,12 @@ import React, {
   useState,
 } from "react";
 import { FileText, Plus, X } from "lucide-react";
-import { useClickOutside } from "../hooks/useDomInteractions";
-import { isPdfNote } from "../lib/fileUtils";
-import { getAllLeaves } from "../lib/paneLayoutTree";
-import { findNoteNode } from "../lib/treeUtils";
-import { isNotePendingSave, useNotesStore } from "../store/useNotesStore";
-import { NoteItem } from "../types";
+import { useClickOutside } from "../../hooks/useDomInteractions";
+import { isPdfNote } from "../../lib/fileUtils";
+import { getAllLeaves } from "../../lib/paneLayoutTree";
+import { findNoteNode } from "../../lib/treeUtils";
+import { isNotePendingSave, useNotesStore } from "../../store/useNotesStore";
+import { NoteItem } from "../../types";
 
 interface TabContextMenuState {
   x: number;
