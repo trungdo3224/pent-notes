@@ -14,7 +14,6 @@ import {
   HardDrive,
   Layers,
   Link2,
-  Notebook,
   PanelTopClose,
   PanelTopOpen,
   Pencil,
@@ -34,6 +33,7 @@ import { NOTE_FILE_ACCEPT } from "../lib/fileUtils";
 import { sessionApi } from "../lib/sessionManager";
 import { resolveActiveNoteData, useNotesStore } from "../store/useNotesStore";
 import { TabGroup, TabGroupColorId, TopLevelFolder } from "../types";
+import { PentLogo } from "./PentLogo";
 
 interface FolderNavbarProps {
   onOpenSearch: () => void;
@@ -872,8 +872,8 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
       {!isNavbarCollapsed && (
         <div className="navbar-top-row">
           <div className="navbar-brand">
-            <Notebook size={16} strokeWidth={2} className="navbar-brand-icon" />
-            <span className="navbar-brand-title">Notes</span>
+            <PentLogo size={18} className="navbar-brand-icon" />
+            <span className="navbar-brand-title">PentNotes</span>
 
             {/* Session Selector Pill */}
             <button

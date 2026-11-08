@@ -4,6 +4,22 @@
   "version": "1.1.0",
   "type": "module",
   "main": "./out/main/main.js",
+  "build": {
+    "appId": "com.pentnotes.app",
+    "productName": "PentNotes",
+    "directories": {
+      "buildResources": "resources"
+    },
+    "win": {
+      "icon": "resources/icon.ico"
+    },
+    "mac": {
+      "icon": "resources/icon.png"
+    },
+    "linux": {
+      "icon": "resources/icon.png"
+    }
+  },
   "scripts": {
     "dev": "vite",
     "dev:electron": "electron-vite dev",

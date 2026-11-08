@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background squircle gradient -->
+    <linearGradient id="bgGrad" x1="10%" y1="5%" x2="90%" y2="95%">
+      <stop offset="0%" stop-color="#1e2638" />
+      <stop offset="50%" stop-color="#111622" />
+      <stop offset="100%" stop-color="#090d15" />
+    </linearGradient>
+
+    <!-- Squircle border gradient -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.45" />
+      <stop offset="40%" stop-color="#34d399" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#1e293b" stop-opacity="0.2" />
+    </linearGradient>
+
+    <!-- Subtle ambient backlight -->
+    <radialGradient id="ambientGlow" cx="50%" cy="48%" r="48%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.22" />
+      <stop offset="50%" stop-color="#10b981" stop-opacity="0.10" />
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Nib facets -->
+    <linearGradient id="leftFacet" x1="116" y1="210" x2="256" y2="412" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="35%" stop-color="#10b981" />
+      <stop offset="80%" stop-color="#059669" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+
+    <linearGradient id="rightFacet" x1="396" y1="210" x2="256" y2="412" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="35%" stop-color="#06b6d4" />
+      <stop offset="80%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+
+    <linearGradient id="crownFacet" x1="156" y1="116" x2="356" y2="176" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6ee7b7" />
+      <stop offset="50%" stop-color="#2dd4bf" />
+      <stop offset="100%" stop-color="#38bdf8" />
+    </linearGradient>
+
+    <linearGradient id="coreFacetLeft" x1="256" y1="176" x2="190" y2="290" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a7f3d0" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#34d399" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#059669" stop-opacity="0.25" />
+    </linearGradient>
+
+    <linearGradient id="coreFacetRight" x1="256" y1="176" x2="322" y2="290" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.25" />
+    </linearGradient>
+
+    <!-- Core glowing breather halo -->
+    <radialGradient id="breatherHalo" cx="256" cy="256" r="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95" />
+      <stop offset="45%" stop-color="#67e8f9" stop-opacity="0.75" />
+      <stop offset="75%" stop-color="#10b981" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Glow drop filter -->
+    <filter id="subtleShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.55" />
+    </filter>
+  </defs>
+
+  <!-- Squircle Base Canvas -->
+  <rect x="32" y="32" width="448" height="448" rx="104" fill="url(#bgGrad)" stroke="url(#borderGrad)" stroke-width="3" filter="url(#subtleShadow)" />
+
+  <!-- Ambient Light Pulse -->
+  <circle cx="256" cy="256" r="180" fill="url(#ambientGlow)" />
+
+  <!-- Outer Pentagon Pen Nib Shape (with shadow) -->
+  <!-- Vertices: TopLeft(156, 116), TopRight(356, 116), RightWing(396, 210), Tip(256, 412), LeftWing(116, 210) -->
+
+  <!-- Left Outer Facet -->
+  <path d="M 156 116 L 256 176 L 256 256 L 256 412 L 116 210 Z" fill="url(#leftFacet)" />
+
+  <!-- Right Outer Facet -->
+  <path d="M 356 116 L 256 176 L 256 256 L 256 412 L 396 210 Z" fill="url(#rightFacet)" />
+
+  <!-- Crown Top Facet -->
+  <polygon points="156,116 356,116 256,176" fill="url(#crownFacet)" />
+
+  <!-- Inner Shading Facets (adds 3D folding crystal depth) -->
+  <polygon points="156,116 256,176 198,256 116,210" fill="url(#coreFacetLeft)" />
+  <polygon points="356,116 256,176 314,256 396,210" fill="url(#coreFacetRight)" />
+
+  <!-- High-tech Breather Glow -->
+  <circle cx="256" cy="256" r="32" fill="url(#breatherHalo)" />
+
+  <!-- Breather Diamond Hole (cutout showing deep obsidian base) -->
+  <polygon points="256,236 270,256 256,276 242,256" fill="#0c111a" stroke="#67e8f9" stroke-width="2.5" />
+
+  <!-- Precision Nib Slit (from breather to tip) -->
+  <line x1="256" y1="276" x2="256" y2="412" stroke="#090d15" stroke-width="4.5" stroke-linecap="round" />
+  <line x1="256" y1="276" x2="256" y2="412" stroke="#67e8f9" stroke-width="1.5" stroke-linecap="round" opacity="0.6" />
+
+  <!-- Radiant Edge Highlights (Ridge reflections) -->
+  <!-- Left ridge -->
+  <line x1="116" y1="210" x2="256" y2="412" stroke="#a7f3d0" stroke-width="2" stroke-linecap="round" opacity="0.45" />
+  <!-- Right ridge -->
+  <line x1="396" y1="210" x2="256" y2="412" stroke="#bae6fd" stroke-width="2" stroke-linecap="round" opacity="0.45" />
+  <!-- Top crown highlight -->
+  <line x1="156" y1="116" x2="356" y2="116" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.6" />
+
+  <!-- Stylized Note Lines / Floating Wings (dynamic notebook motif) -->
+  <!-- Upper note accent lines behind or around shoulders -->
+  <path d="M 176 96 L 336 96" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" opacity="0.35" />
+  <path d="M 216 80 L 296 80" stroke="#34d399" stroke-width="2.5" stroke-linecap="round" opacity="0.25" />
+</svg>

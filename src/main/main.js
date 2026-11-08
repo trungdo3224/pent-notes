@@ -1,5 +1,6 @@
 import { app, BrowserWindow, protocol, net, ipcMain, shell } from "electron";
 import { join } from "path";
+import { existsSync } from "fs";
 import { pathToFileURL } from "url";
 import * as fsService from "./services/fsService.js";
 import * as sessionService from "./services/sessionService.js";
@@ -96,9 +97,32 @@ function registerIpcHandlers() {
   });
 }
 
+function getAppIconPath() {
+  const isWin = process.platform === "win32";
+  const iconName = isWin ? "icon.ico" : "icon.png";
+  const candidates = [
+    join(__dirname, "../../resources", iconName),
+    join(__dirname, "../../resources/icon.png"),
+    join(app.getAppPath(), "resources", iconName),
+    join(app.getAppPath(), "resources/icon.png"),
+    join(process.resourcesPath, "resources", iconName),
+    join(process.resourcesPath, iconName),
+    join(process.resourcesPath, "icon.png"),
+    join(__dirname, "../renderer/icon.png"),
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
 function createWindow() {
   const isWindows = process.platform === "win32";
   const isMac = process.platform === "darwin";
+  const appIcon = getAppIconPath();
 
   const mainWindow = new BrowserWindow({
     width: 1280,
@@ -106,6 +130,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     title: "PentNotes",
+    ...(appIcon ? { icon: appIcon } : {}),
     autoHideMenuBar: true,
     ...(isWindows || isMac
       ? {
@@ -177,6 +202,10 @@ app.commandLine.appendSwitch("disable-breakpad");
 app.commandLine.appendSwitch("disable-component-update");
 
 app.whenReady().then(() => {
+  if (process.platform === "win32") {
+    app.setAppUserModelId("com.pentnotes.app");
+  }
+
   // Register custom protocol for local raw files (PDFs, images)
   protocol.handle("pent-file", (request) => {
     try {
