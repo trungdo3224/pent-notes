@@ -123,6 +123,15 @@ function hasPendingDiskOperations(): boolean {
   return contentSaveTimers.size > 0 || titleRenameTimers.size > 0;
 }
 
+export function isNotePendingSave(
+  noteId: string,
+  filePath?: string | null,
+): boolean {
+  if (titleRenameTimers.has(noteId)) return true;
+  if (filePath && contentSaveTimers.has(filePath)) return true;
+  return false;
+}
+
 function areNodeTreesEqual(a: ExplorerNode[], b: ExplorerNode[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
@@ -264,6 +273,10 @@ export interface NotesState {
     subfolderPath: string,
   ) => Promise<void>;
   closeNoteTab: (noteId: string, folderId?: string) => void;
+  closeOtherNoteTabs: (noteId: string, folderId?: string) => void;
+  closeNotesToTheRight: (noteId: string, folderId?: string) => void;
+  closeSavedNoteTabs: (folderId?: string) => void;
+  closeAllNoteTabs: (folderId?: string) => void;
   navigateToNote: (topFolderId: string, noteId: string) => void;
   toggleNoteLink: (activeNoteId: string, targetNoteId: string) => Promise<void>;
   createNote: (parentFolderId: string | null) => Promise<string | null>;
@@ -355,6 +368,81 @@ export interface NotesState {
 function getSelectedTopFolder(state: NotesState): TopLevelFolder | null {
   if (!state.selectedFolderId) return null;
   return state.folders.find((f) => f.id === state.selectedFolderId) ?? null;
+}
+
+function applyCloseTabs(
+  state: NotesState,
+  targetFolderId: string,
+  filterFn: (noteId: string, index: number, all: string[]) => boolean,
+  preferredSelectedId?: string | null,
+): Partial<NotesState> {
+  const currentOpen = state.openNotesByFolder[targetFolderId] || [];
+  const nextOpen = currentOpen.filter(filterFn);
+  const closedIds = currentOpen.filter((id) => !nextOpen.includes(id));
+
+  let nextLayout = state.paneLayout;
+  if (state.paneLayout) {
+    const leaves = getAllLeaves(state.paneLayout);
+    for (const leaf of leaves) {
+      if (
+        leaf.noteId &&
+        (closedIds.includes(leaf.noteId) ||
+          !filterFn(leaf.noteId, -1, currentOpen))
+      ) {
+        if (!closedIds.includes(leaf.noteId)) {
+          closedIds.push(leaf.noteId);
+        }
+        nextLayout = updateLeafInTree(nextLayout, leaf.id, (l) => ({
+          ...l,
+          noteId: null,
+        }));
+      }
+    }
+  }
+
+  if (
+    nextOpen.length === currentOpen.length &&
+    nextLayout === state.paneLayout
+  ) {
+    return {};
+  }
+
+  let nextSelected = state.selectedNoteByFolder[targetFolderId];
+
+  if (nextOpen.length === 0) {
+    nextSelected = null;
+  } else if (!nextSelected || closedIds.includes(nextSelected)) {
+    if (preferredSelectedId && nextOpen.includes(preferredSelectedId)) {
+      nextSelected = preferredSelectedId;
+    } else {
+      const lastClosedIdx = nextSelected
+        ? currentOpen.indexOf(nextSelected)
+        : 0;
+      if (lastClosedIdx >= nextOpen.length) {
+        nextSelected = nextOpen[nextOpen.length - 1];
+      } else {
+        nextSelected = nextOpen[lastClosedIdx] ?? nextOpen[0];
+      }
+    }
+  }
+
+  const nextContents = { ...state.activeNoteContents };
+  for (const id of closedIds) {
+    delete nextContents[id];
+  }
+
+  return {
+    activeNoteContents: nextContents,
+    paneLayout: nextLayout,
+    openNotesByFolder: {
+      ...state.openNotesByFolder,
+      [targetFolderId]: nextOpen,
+    },
+    selectedNoteByFolder: {
+      ...state.selectedNoteByFolder,
+      [targetFolderId]: nextSelected,
+    },
+  };
 }
 
 export const useNotesStore = create<NotesState>()(
@@ -833,37 +921,56 @@ export const useNotesStore = create<NotesState>()(
         set((state) => {
           const targetFolderId = folderId || state.selectedFolderId;
           if (!targetFolderId) return state;
+          return applyCloseTabs(state, targetFolderId, (id) => id !== noteId);
+        }),
 
+      closeOtherNoteTabs: (noteId, folderId) =>
+        set((state) => {
+          const targetFolderId = folderId || state.selectedFolderId;
+          if (!targetFolderId) return state;
+          return applyCloseTabs(
+            state,
+            targetFolderId,
+            (id) => id === noteId,
+            noteId,
+          );
+        }),
+
+      closeNotesToTheRight: (noteId, folderId) =>
+        set((state) => {
+          const targetFolderId = folderId || state.selectedFolderId;
+          if (!targetFolderId) return state;
           const currentOpen = state.openNotesByFolder[targetFolderId] || [];
-          const nextOpen = currentOpen.filter((id) => id !== noteId);
+          const anchorIdx = currentOpen.indexOf(noteId);
+          if (anchorIdx === -1) return state;
+          return applyCloseTabs(
+            state,
+            targetFolderId,
+            (_id, idx) => idx <= anchorIdx,
+            noteId,
+          );
+        }),
 
-          let nextSelected = state.selectedNoteByFolder[targetFolderId];
-          if (nextSelected === noteId) {
-            const closedIdx = currentOpen.indexOf(noteId);
-            if (nextOpen.length === 0) {
-              nextSelected = null;
-            } else if (closedIdx >= nextOpen.length) {
-              nextSelected = nextOpen[nextOpen.length - 1];
-            } else {
-              nextSelected = nextOpen[closedIdx];
-            }
-          }
+      closeSavedNoteTabs: (folderId) =>
+        set((state) => {
+          const targetFolderId = folderId || state.selectedFolderId;
+          if (!targetFolderId) return state;
+          const targetFolder = state.folders.find(
+            (f) => f.id === targetFolderId,
+          );
+          return applyCloseTabs(state, targetFolderId, (id) => {
+            const noteNode = targetFolder
+              ? findNoteNode(targetFolder.items, id)
+              : null;
+            return isNotePendingSave(id, noteNode?.filePath);
+          });
+        }),
 
-          // RFC-042 Pillar 1: De-reference content for immediate GC
-          const nextContents = { ...state.activeNoteContents };
-          delete nextContents[noteId];
-
-          return {
-            activeNoteContents: nextContents,
-            openNotesByFolder: {
-              ...state.openNotesByFolder,
-              [targetFolderId]: nextOpen,
-            },
-            selectedNoteByFolder: {
-              ...state.selectedNoteByFolder,
-              [targetFolderId]: nextSelected,
-            },
-          };
+      closeAllNoteTabs: (folderId) =>
+        set((state) => {
+          const targetFolderId = folderId || state.selectedFolderId;
+          if (!targetFolderId) return state;
+          return applyCloseTabs(state, targetFolderId, () => false);
         }),
 
       navigateToNote: (topFolderId, noteId) =>
@@ -1866,6 +1973,11 @@ export const useNotesStore = create<NotesState>()(
         }
 
         const leaves = getAllLeaves(nextLayout);
+        const currentOpen = fId ? (state.openNotesByFolder[fId] ?? []) : [];
+        const nextOpen =
+          fId && nId && !currentOpen.includes(nId)
+            ? [...currentOpen, nId]
+            : currentOpen;
 
         set({
           paneLayout: nextLayout,
@@ -1873,6 +1985,12 @@ export const useNotesStore = create<NotesState>()(
           isSplitViewActive: leaves.length > 1,
           splitDirection:
             nextLayout.type === "branch" ? nextLayout.direction : direction,
+          openNotesByFolder: fId
+            ? {
+                ...state.openNotesByFolder,
+                [fId]: nextOpen,
+              }
+            : state.openNotesByFolder,
         });
       },
 
@@ -2099,9 +2217,17 @@ export const useNotesStore = create<NotesState>()(
             noteId,
           }),
         );
+        const currentOpen = state.openNotesByFolder[folderId] ?? [];
+        const nextOpen = currentOpen.includes(noteId)
+          ? currentOpen
+          : [...currentOpen, noteId];
         set({
           paneLayout: updatedLayout,
           activePaneId: paneId,
+          openNotesByFolder: {
+            ...state.openNotesByFolder,
+            [folderId]: nextOpen,
+          },
         });
       },
 
