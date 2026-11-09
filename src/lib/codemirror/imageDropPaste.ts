@@ -83,7 +83,10 @@ async function processImageFile(
           base64,
         );
         if (res?.ok && res.relativePath) {
-          return `![${alt}](${res.relativePath})\n`;
+          const formattedPath = res.relativePath.includes(" ")
+            ? `<${res.relativePath}>`
+            : res.relativePath;
+          return `![${alt}](${formattedPath})\n`;
         }
       } catch (err) {
         console.warn(

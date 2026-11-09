@@ -68,8 +68,82 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
   ".svg": "image/svg+xml",
+  ".bmp": "image/bmp",
+  ".ico": "image/x-icon",
+  ".avif": "image/avif",
 };
+
+const ATTACHMENT_SUBDIRS = ["images", "assets", "attachments"];
+
+async function isExistingFile(candidatePath: string): Promise<boolean> {
+  try {
+    const stat = await fs.stat(candidatePath);
+    return stat.isFile();
+  } catch {
+    return false;
+  }
+}
+
+async function isExistingDirectory(candidatePath: string): Promise<boolean> {
+  try {
+    const stat = await fs.stat(candidatePath);
+    return stat.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function resolveLocalMediaPath(rawPath: string): Promise<string | null> {
+  const candidates = [rawPath];
+  try {
+    const decoded = decodeURIComponent(rawPath);
+    if (decoded !== rawPath) candidates.push(decoded);
+  } catch {
+    // Ignore malformed URI sequences
+  }
+
+  for (const candidate of candidates) {
+    const resolved = path.resolve(candidate);
+    if (await isExistingFile(resolved)) {
+      return resolved;
+    }
+  }
+
+  const primaryResolved = path.resolve(candidates[candidates.length - 1]);
+  const fileName = path.basename(primaryResolved);
+  if (!fileName) return null;
+
+  let currentDir = path.dirname(primaryResolved);
+  while (currentDir && !(await isExistingDirectory(currentDir))) {
+    const parent = path.dirname(currentDir);
+    if (parent === currentDir) return null;
+    currentDir = parent;
+  }
+
+  let searchDir = currentDir;
+  for (let depth = 0; depth < 3 && searchDir; depth++) {
+    const directCandidate = path.join(searchDir, fileName);
+    if (await isExistingFile(directCandidate)) {
+      return directCandidate;
+    }
+
+    for (const subDir of ATTACHMENT_SUBDIRS) {
+      const subCandidate = path.join(searchDir, subDir, fileName);
+      if (await isExistingFile(subCandidate)) {
+        return subCandidate;
+      }
+    }
+
+    const parent = path.dirname(searchDir);
+    if (parent === searchDir) break;
+    searchDir = parent;
+  }
+
+  return null;
+}
 
 const DATA_DIR = path.resolve("data");
 const STATE_FILE = path.join(DATA_DIR, "workspace.json");
@@ -770,9 +844,8 @@ function localBackendPlugin(): Plugin {
           res.end("Missing file path.");
           return;
         }
-        const resolved = path.resolve(targetPath);
-        const stat = await fs.stat(resolved);
-        if (!stat.isFile()) {
+        const resolved = await resolveLocalMediaPath(targetPath);
+        if (!resolved) {
           res.statusCode = 404;
           res.end("File not found.");
           return;

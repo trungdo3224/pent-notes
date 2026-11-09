@@ -10,7 +10,9 @@ import { syntaxTree } from "@codemirror/language";
 import { EditorState, Facet, Range, StateField } from "@codemirror/state";
 import { TableWidget } from "./tableWidget";
 import {
+  findLineImageMatches,
   ImageWidget,
+  ParsedImageMarkdown,
   parseImageMarkdown,
   resolveImageUrl,
 } from "./imageWidget";
@@ -157,8 +159,54 @@ function isCursorOnLine(state: EditorState, pos: number): boolean {
 
 const emptyReplace = Decoration.replace({});
 
+interface SpanRange {
+  from: number;
+  to: number;
+}
+
+function overlapsAnyRange(
+  from: number,
+  to: number,
+  ranges: SpanRange[],
+): boolean {
+  for (const r of ranges) {
+    if (from < r.to && to > r.from) return true;
+  }
+  return false;
+}
+
+function appendImageDecoration(
+  decorations: Range<Decoration>[],
+  state: EditorState,
+  from: number,
+  to: number,
+  parsed: ParsedImageMarkdown,
+  activeFilePath?: string,
+): void {
+  const line = state.doc.lineAt(from);
+  const isBlock = line.text.trim() === parsed.raw.trim();
+  const resolvedUrl = resolveImageUrl(parsed.url, activeFilePath);
+  decorations.push(
+    Decoration.replace({
+      widget: new ImageWidget(
+        parsed.raw,
+        parsed.url,
+        resolvedUrl,
+        parsed.alt,
+        parsed.title,
+        parsed.width,
+        parsed.height,
+        from,
+        to,
+        isBlock,
+      ),
+    }).range(from, to),
+  );
+}
+
 function buildDecorations(state: EditorState): DecorationSet {
   const decorations: Range<Decoration>[] = [];
+  const excludedRanges: SpanRange[] = [];
   const activeFilePath = state.facet(activeFilePathFacet);
 
   syntaxTree(state)
@@ -170,6 +218,7 @@ function buildDecorations(state: EditorState): DecorationSet {
       if (name === "Table") {
         const lineFrom = state.doc.lineAt(from).from;
         const lineTo = state.doc.lineAt(to).to;
+        excludedRanges.push({ from: lineFrom, to: lineTo });
         const rawText = state.sliceDoc(lineFrom, lineTo);
         decorations.push(
           Decoration.replace({
@@ -268,6 +317,7 @@ function buildDecorations(state: EditorState): DecorationSet {
 
       // 6. InlineCode (`code`)
       if (name === "InlineCode") {
+        excludedRanges.push({ from, to });
         const cursorInside = isCursorInRange(state, from, to);
         if (!cursorInside && to - from > 2) {
           decorations.push(emptyReplace.range(from, from + 1));
@@ -318,29 +368,19 @@ function buildDecorations(state: EditorState): DecorationSet {
 
       // 8. Images: ![alt](url) or ![alt|width](url)
       if (name === "Image") {
+        excludedRanges.push({ from, to });
         const cursorInside = isCursorInRange(state, from, to);
         if (!cursorInside) {
           const rawText = state.sliceDoc(from, to);
           const parsed = parseImageMarkdown(rawText);
           if (parsed && parsed.url) {
-            const line = state.doc.lineAt(from);
-            const isBlock = line.text.trim() === rawText.trim();
-            const resolvedUrl = resolveImageUrl(parsed.url, activeFilePath);
-            decorations.push(
-              Decoration.replace({
-                widget: new ImageWidget(
-                  rawText,
-                  parsed.url,
-                  resolvedUrl,
-                  parsed.alt,
-                  parsed.title,
-                  parsed.width,
-                  parsed.height,
-                  from,
-                  to,
-                  isBlock,
-                ),
-              }).range(from, to),
+            appendImageDecoration(
+              decorations,
+              state,
+              from,
+              to,
+              parsed,
+              activeFilePath,
             );
           }
         }
@@ -387,6 +427,7 @@ function buildDecorations(state: EditorState): DecorationSet {
       if (name === "FencedCode") {
         const startLine = state.doc.lineAt(from);
         const endLine = state.doc.lineAt(to);
+        excludedRanges.push({ from: startLine.from, to: endLine.to });
         for (let l = startLine.number; l <= endLine.number; l++) {
           const line = state.doc.line(l);
           let cls = "cm-codeblock-line";
@@ -409,6 +450,11 @@ function buildDecorations(state: EditorState): DecorationSet {
         return true;
       }
 
+      if (name === "CodeBlock") {
+        excludedRanges.push({ from, to });
+        return false;
+      }
+
       if (name === "CodeMark" && to > from) {
         decorations.push(
           Decoration.mark({ class: "cm-codeblock-fence" }).range(from, to),
@@ -424,6 +470,31 @@ function buildDecorations(state: EditorState): DecorationSet {
       }
     });
 
+  // 13. Obsidian WikiLink image embeds (![[image.png]]), HTML <img> tags, and markdown images with unencoded spaces
+  for (let lineNum = 1; lineNum <= state.doc.lines; lineNum++) {
+    const line = state.doc.line(lineNum);
+    if (!line.text.includes("![") && !/<img\b/i.test(line.text)) continue;
+
+    const matches = findLineImageMatches(line.text);
+    for (const match of matches) {
+      const from = line.from + match.fromOffset;
+      const to = line.from + match.toOffset;
+      if (overlapsAnyRange(from, to, excludedRanges)) continue;
+
+      excludedRanges.push({ from, to });
+      if (!isCursorInRange(state, from, to)) {
+        appendImageDecoration(
+          decorations,
+          state,
+          from,
+          to,
+          match.parsed,
+          activeFilePath,
+        );
+      }
+    }
+  }
+
   return Decoration.set(decorations, true);
 }
 
@@ -432,7 +503,13 @@ export const livePreviewField = StateField.define<DecorationSet>({
     return buildDecorations(state);
   },
   update(decorations, tr) {
-    if (tr.docChanged || tr.selection) {
+    if (
+      tr.docChanged ||
+      tr.selection ||
+      tr.startState.facet(activeFilePathFacet) !==
+        tr.state.facet(activeFilePathFacet) ||
+      syntaxTree(tr.startState) !== syntaxTree(tr.state)
+    ) {
       return buildDecorations(tr.state);
     }
     return decorations.map(tr.changes);

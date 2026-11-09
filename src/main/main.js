@@ -207,14 +207,18 @@ app.whenReady().then(() => {
   }
 
   // Register custom protocol for local raw files (PDFs, images)
-  protocol.handle("pent-file", (request) => {
+  protocol.handle("pent-file", async (request) => {
     try {
       const parsedUrl = new URL(request.url);
       const filePath = parsedUrl.searchParams.get("path");
       if (!filePath) {
         return new Response("Missing file path", { status: 400 });
       }
-      return net.fetch(pathToFileURL(filePath).toString());
+      const resolvedPath = await fsService.resolveLocalMediaPath(filePath);
+      if (!resolvedPath) {
+        return new Response("File not found", { status: 404 });
+      }
+      return net.fetch(pathToFileURL(resolvedPath).toString());
     } catch (err) {
       return new Response(
         err instanceof Error ? err.message : "Failed to load file",
