@@ -64,12 +64,17 @@ class CheckboxWidget extends WidgetType {
 }
 
 class CodeBlockCopyWidget extends WidgetType {
-  constructor(readonly codeText: string) {
+  constructor(
+    readonly codeText: string,
+    readonly langLabel: string,
+  ) {
     super();
   }
 
   eq(other: CodeBlockCopyWidget): boolean {
-    return other.codeText === this.codeText;
+    return (
+      other.codeText === this.codeText && other.langLabel === this.langLabel
+    );
   }
 
   ignoreEvent(): boolean {
@@ -87,10 +92,10 @@ class CodeBlockCopyWidget extends WidgetType {
     btn.title = "Copy code to clipboard";
     btn.setAttribute("aria-label", "Copy code");
 
-    const copySvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>`;
-    const checkSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    const labelText = this.langLabel || "Copy";
+    const checkSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
 
-    btn.innerHTML = `${copySvg}<span>Copy</span>`;
+    btn.innerHTML = `<span>${labelText}</span>`;
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -103,12 +108,12 @@ class CodeBlockCopyWidget extends WidgetType {
         navigator.clipboard
           .writeText(textToCopy)
           .then(() => {
-            btn.innerHTML = `${checkSvg}<span>Copied!</span>`;
+            btn.innerHTML = `${checkSvg}<span>Copied</span>`;
             btn.classList.add("is-copied");
             setTimeout(() => {
-              btn.innerHTML = `${copySvg}<span>Copy</span>`;
+              btn.innerHTML = `<span>${labelText}</span>`;
               btn.classList.remove("is-copied");
-            }, 2000);
+            }, 1800);
           })
           .catch((err) => {
             console.error("Failed to copy code block:", err);
@@ -423,16 +428,47 @@ function buildDecorations(state: EditorState): DecorationSet {
         );
       }
 
+      // 11b. HorizontalRule (---, ***, ___)
+      if (name === "HorizontalRule") {
+        const line = state.doc.lineAt(from);
+        if (!isCursorOnLine(state, from)) {
+          decorations.push(
+            Decoration.line({ class: "cm-hr-line" }).range(line.from),
+          );
+          if (to > from) {
+            decorations.push(emptyReplace.range(from, to));
+          }
+        }
+        return false;
+      }
+
       // 12. Fenced Code Blocks: Continuous terminal block with Copy button
       if (name === "FencedCode") {
         const startLine = state.doc.lineAt(from);
         const endLine = state.doc.lineAt(to);
+        const cursorInside = isCursorInRange(state, from, to);
         excludedRanges.push({ from: startLine.from, to: endLine.to });
+
+        const rawInfo = startLine.text
+          .replace(/^\s*(?:`{3,}|~{3,})\s*/, "")
+          .trim();
+        const langLabel = rawInfo
+          ? rawInfo.charAt(0).toUpperCase() + rawInfo.slice(1)
+          : "";
+
         for (let l = startLine.number; l <= endLine.number; l++) {
           const line = state.doc.line(l);
           let cls = "cm-codeblock-line";
-          if (l === startLine.number) cls += " cm-codeblock-first";
-          if (l === endLine.number) cls += " cm-codeblock-last";
+          if (l === startLine.number) {
+            cls += " cm-codeblock-first";
+            if (!cursorInside) cls += " cm-codeblock-fence-collapsed";
+          }
+          if (l === endLine.number) {
+            cls += " cm-codeblock-last";
+            if (!cursorInside && endLine.number > startLine.number) {
+              cls += " cm-codeblock-fence-collapsed";
+            }
+          }
           decorations.push(Decoration.line({ class: cls }).range(line.from));
         }
 
@@ -443,10 +479,20 @@ function buildDecorations(state: EditorState): DecorationSet {
         );
         decorations.push(
           Decoration.widget({
-            widget: new CodeBlockCopyWidget(codeText),
+            widget: new CodeBlockCopyWidget(codeText, langLabel),
             side: 1,
           }).range(startLine.to),
         );
+
+        if (!cursorInside) {
+          if (startLine.to > startLine.from) {
+            decorations.push(emptyReplace.range(startLine.from, startLine.to));
+          }
+          if (endLine.number > startLine.number && endLine.to > endLine.from) {
+            decorations.push(emptyReplace.range(endLine.from, endLine.to));
+          }
+          return false;
+        }
         return true;
       }
 
