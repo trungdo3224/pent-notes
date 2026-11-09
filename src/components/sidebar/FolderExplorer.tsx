@@ -23,6 +23,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  FolderSync,
   FolderUp,
   Image as ImageIcon,
   Link2,
@@ -110,6 +111,7 @@ export const FolderExplorer: React.FC = () => {
   const clearPendingRenameNode = useNotesStore((s) => s.clearPendingRenameNode);
   const importNotesFiles = useNotesStore((s) => s.importNotesFiles);
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
+  const unlinkFolderFromDisk = useNotesStore((s) => s.unlinkFolderFromDisk);
   const toggleSubfolderCollapse = useNotesStore(
     (s) => s.toggleSubfolderCollapse,
   );
@@ -702,7 +704,7 @@ export const FolderExplorer: React.FC = () => {
             <span>{folder.name}</span>
           </div>
 
-          <div className="explorer-header-actions" ref={folderMenuRef}>
+          <div className="explorer-header-actions">
             {/* Collapse / Expand all folders in explorer */}
             <button
               type="button"
@@ -732,15 +734,85 @@ export const FolderExplorer: React.FC = () => {
             </button>
 
             {/* List/Menu button for extended folder options */}
-            <button
-              type="button"
-              className={`explorer-menu-btn ${isFolderMenuOpen ? "is-active" : ""}`}
-              title="Folder options"
-              aria-label="Folder options"
-              onClick={() => setIsFolderMenuOpen((v) => !v)}
-            >
-              <List size={17} strokeWidth={1.8} />
-            </button>
+            <div className="explorer-menu-wrap" ref={folderMenuRef}>
+              <button
+                type="button"
+                className={`explorer-menu-btn ${isFolderMenuOpen ? "is-active" : ""}`}
+                title="Folder options"
+                aria-label="Folder options"
+                onClick={() => setIsFolderMenuOpen((v) => !v)}
+              >
+                <List size={17} strokeWidth={1.8} />
+              </button>
+
+              {isFolderMenuOpen && (
+                <div className="explorer-dropdown-menu">
+                  <div className="dropdown-section-title">
+                    SORT NOTES & FOLDERS
+                  </div>
+
+                  <button
+                    type="button"
+                    className={`dropdown-menu-item ${sortOrder === "name-asc" ? "is-selected-sort" : ""}`}
+                    onClick={() => {
+                      setSortOrder("name-asc");
+                      closeFolderMenu();
+                    }}
+                  >
+                    <ArrowDown01 size={15} strokeWidth={1.8} />
+                    <span style={{ flex: 1 }}>Numeric / A → Z</span>
+                    {sortOrder === "name-asc" && (
+                      <Check size={14} className="sort-check-icon" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`dropdown-menu-item ${sortOrder === "name-desc" ? "is-selected-sort" : ""}`}
+                    onClick={() => {
+                      setSortOrder("name-desc");
+                      closeFolderMenu();
+                    }}
+                  >
+                    <ArrowUp10 size={15} strokeWidth={1.8} />
+                    <span style={{ flex: 1 }}>Numeric / Z → A</span>
+                    {sortOrder === "name-desc" && (
+                      <Check size={14} className="sort-check-icon" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`dropdown-menu-item ${sortOrder === "date-desc" ? "is-selected-sort" : ""}`}
+                    onClick={() => {
+                      setSortOrder("date-desc");
+                      closeFolderMenu();
+                    }}
+                  >
+                    <Calendar size={15} strokeWidth={1.8} />
+                    <span style={{ flex: 1 }}>Newest modified</span>
+                    {sortOrder === "date-desc" && (
+                      <Check size={14} className="sort-check-icon" />
+                    )}
+                  </button>
+
+                  <div className="dropdown-menu-divider" />
+
+                  <button
+                    type="button"
+                    className="dropdown-menu-item is-danger"
+                    onClick={() => {
+                      closeFolderMenu();
+                      deleteTopFolder(folder.id);
+                    }}
+                  >
+                    <Trash2 size={15} strokeWidth={1.8} />
+                    <span>Delete folder</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
               className="explorer-menu-btn"
@@ -751,98 +823,6 @@ export const FolderExplorer: React.FC = () => {
             >
               <PanelLeftClose size={15} strokeWidth={1.8} />
             </button>
-
-            {isFolderMenuOpen && (
-              <div className="explorer-dropdown-menu">
-                <button
-                  type="button"
-                  className="dropdown-menu-item"
-                  onClick={() => {
-                    closeFolderMenu();
-                    noteFileInputRef.current?.click();
-                  }}
-                >
-                  <FileUp size={15} strokeWidth={1.8} />
-                  <span>Import notes</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="dropdown-menu-item"
-                  onClick={() => {
-                    closeFolderMenu();
-                    openLinkModal("subfolder");
-                  }}
-                >
-                  <FolderUp size={15} strokeWidth={1.8} />
-                  <span>Import subfolder...</span>
-                </button>
-
-                <div className="dropdown-menu-divider" />
-                <div className="dropdown-section-title">
-                  SORT NOTES & FOLDERS
-                </div>
-
-                <button
-                  type="button"
-                  className={`dropdown-menu-item ${sortOrder === "name-asc" ? "is-selected-sort" : ""}`}
-                  onClick={() => {
-                    setSortOrder("name-asc");
-                    closeFolderMenu();
-                  }}
-                >
-                  <ArrowDown01 size={15} strokeWidth={1.8} />
-                  <span style={{ flex: 1 }}>Numeric / A → Z</span>
-                  {sortOrder === "name-asc" && (
-                    <Check size={14} className="sort-check-icon" />
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  className={`dropdown-menu-item ${sortOrder === "name-desc" ? "is-selected-sort" : ""}`}
-                  onClick={() => {
-                    setSortOrder("name-desc");
-                    closeFolderMenu();
-                  }}
-                >
-                  <ArrowUp10 size={15} strokeWidth={1.8} />
-                  <span style={{ flex: 1 }}>Numeric / Z → A</span>
-                  {sortOrder === "name-desc" && (
-                    <Check size={14} className="sort-check-icon" />
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  className={`dropdown-menu-item ${sortOrder === "date-desc" ? "is-selected-sort" : ""}`}
-                  onClick={() => {
-                    setSortOrder("date-desc");
-                    closeFolderMenu();
-                  }}
-                >
-                  <Calendar size={15} strokeWidth={1.8} />
-                  <span style={{ flex: 1 }}>Newest modified</span>
-                  {sortOrder === "date-desc" && (
-                    <Check size={14} className="sort-check-icon" />
-                  )}
-                </button>
-
-                <div className="dropdown-menu-divider" />
-
-                <button
-                  type="button"
-                  className="dropdown-menu-item is-danger"
-                  onClick={() => {
-                    closeFolderMenu();
-                    deleteTopFolder(folder.id);
-                  }}
-                >
-                  <Trash2 size={15} strokeWidth={1.8} />
-                  <span>Delete folder</span>
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

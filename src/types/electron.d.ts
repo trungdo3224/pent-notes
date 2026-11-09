@@ -69,6 +69,23 @@ export interface ElectronAPI {
       height?: number;
     }) => Promise<boolean>;
   };
+  ollama?: {
+    listModels: (host?: string) => Promise<any[]>;
+    searchWeb?: (
+      query: string,
+      options?: { apiKey?: string; maxResults?: number },
+    ) => Promise<Array<{ title: string; url: string; snippet: string }>>;
+    pullModel: (
+      host: string,
+      modelName: string,
+      onProgress: (progress: any) => void,
+    ) => () => void;
+    chat: (
+      host: string,
+      payload: { model: string; messages: any[] },
+      onChunk: (chunk: any) => void,
+    ) => () => void;
+  };
 }
 
 declare global {

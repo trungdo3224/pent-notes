@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
+  MessageSquareText,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
@@ -34,6 +35,8 @@ import {
   resolveActiveNoteData,
   useNotesStore,
 } from "../../store/useNotesStore";
+
+import { OllamaChatbox } from "../OllamaChatbox";
 
 interface NoteCatalogSidebarProps {
   onOpenSearchWithQuery?: (query: string) => void;
@@ -308,7 +311,7 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
       <div className="catalog-header">
         <button
           type="button"
-          className="catalog-close-btn"
+          className="catalog-btn"
           onClick={toggleRightSidebar}
           title="Collapse catalog sidebar (Ctrl+])"
           aria-label="Collapse catalog"
@@ -360,11 +363,27 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
           <Info size={13} strokeWidth={1.8} />
           <span>Info</span>
         </button>
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "chat"}
+          className={`catalog-tab-btn ${activeTab === "chat" ? "is-active" : ""}`}
+          onClick={() => setRightSidebarTab("chat")}
+          title="LLM Assistant"
+        >
+          <MessageSquareText size={13} strokeWidth={1.8} />
+          <span>Chat</span>
+        </button>
       </div>
 
       {/* Content Area */}
-      <div className="catalog-content">
-        {!note ? (
+      <div
+        className={`catalog-content ${activeTab === "chat" ? "is-chat-tab" : ""}`}
+      >
+        {activeTab === "chat" ? (
+          <OllamaChatbox note={note} noteContent={noteContent} />
+        ) : !note ? (
           <div className="catalog-empty-state">
             <BookOpen
               size={24}

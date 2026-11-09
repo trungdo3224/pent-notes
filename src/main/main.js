@@ -5,6 +5,7 @@ import { pathToFileURL } from "url";
 import * as fsService from "./services/fsService.js";
 import * as sessionService from "./services/sessionService.js";
 import * as dialogService from "./services/dialogService.js";
+import * as ollamaService from "./services/ollamaService.js";
 
 // Register custom protocol privilege before app is ready
 protocol.registerSchemesAsPrivileged([
@@ -94,6 +95,75 @@ function registerIpcHandlers() {
       }
     }
     return false;
+  });
+
+  // Ollama AI Assistant handlers
+  const activeOllamaPulls = new Map();
+  const activeOllamaChats = new Map();
+
+  ipcMain.handle("ollama:list-models", async (_, host) => {
+    return await ollamaService.listModels(host);
+  });
+
+  ipcMain.handle(
+    "ollama:search-web",
+    async (_, { query, apiKey, maxResults } = {}) => {
+      return await ollamaService.searchWeb(query, { apiKey, maxResults });
+    },
+  );
+
+  ipcMain.on("ollama:pull-start", (event, { reqId, host, modelName }) => {
+    if (activeOllamaPulls.has(reqId)) {
+      activeOllamaPulls.get(reqId)();
+    }
+    const abort = ollamaService.pullModel(host, modelName, (progress) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(`ollama:pull-progress:${reqId}`, progress);
+      }
+      if (
+        progress.status === "success" ||
+        progress.status === "error" ||
+        progress.status === "aborted"
+      ) {
+        activeOllamaPulls.delete(reqId);
+      }
+    });
+    activeOllamaPulls.set(reqId, abort);
+  });
+
+  ipcMain.on("ollama:pull-abort", (_, { reqId }) => {
+    const abort = activeOllamaPulls.get(reqId);
+    if (abort) {
+      abort();
+      activeOllamaPulls.delete(reqId);
+    }
+  });
+
+  ipcMain.on("ollama:chat-start", (event, { reqId, host, model, messages }) => {
+    if (activeOllamaChats.has(reqId)) {
+      activeOllamaChats.get(reqId)();
+    }
+    const abort = ollamaService.chatStream(
+      host,
+      { model, messages },
+      (chunk) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send(`ollama:chat-chunk:${reqId}`, chunk);
+        }
+        if (chunk.done || chunk.error) {
+          activeOllamaChats.delete(reqId);
+        }
+      },
+    );
+    activeOllamaChats.set(reqId, abort);
+  });
+
+  ipcMain.on("ollama:chat-abort", (_, { reqId }) => {
+    const abort = activeOllamaChats.get(reqId);
+    if (abort) {
+      abort();
+      activeOllamaChats.delete(reqId);
+    }
   });
 }
 

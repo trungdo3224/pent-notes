@@ -63,4 +63,4 @@ export type SortOrder = "name-asc" | "name-desc" | "date-desc" | "date-asc";
 
 export type LinkModalTargetMode = "new-tab" | "subfolder" | "current-tab";
 
-export type CatalogTab = "outline" | "tags" | "info";
+export type CatalogTab = "outline" | "tags" | "info" | "chat";

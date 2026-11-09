@@ -460,6 +460,7 @@ export const useNotesStore = create<NotesState>()(
       isSidebarCollapsed: false,
       isNavbarCollapsed: false,
       isRightSidebarCollapsed: false,
+      isChatBoxOpen: false,
       sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       rightSidebarWidth: DEFAULT_RIGHT_SIDEBAR_WIDTH,
       rightSidebarTab: "outline",
