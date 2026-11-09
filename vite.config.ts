@@ -11,7 +11,7 @@ interface ImportedNote {
   content: string;
   updatedAt: string;
   filePath?: string;
-  fileType?: "markdown" | "pdf";
+  fileType?: "markdown" | "pdf" | "image";
 }
 
 interface ImportedFolder {
@@ -48,7 +48,9 @@ interface StoredTreeItem {
   items?: StoredTreeItem[];
 }
 
-const NOTE_EXT_REGEX = /\.(md|markdown|mdx|txt|pdf)$/i;
+const NOTE_EXT_REGEX =
+  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
 
 const IGNORED_NAMES = new Set([
   "node_modules",
@@ -419,6 +421,7 @@ async function readDirectoryShallow(dirPath: string): Promise<ImportedNode[]> {
       });
     } else if (entry.isFile() && NOTE_EXT_REGEX.test(entry.name)) {
       const isPdf = entry.name.toLowerCase().endsWith(".pdf");
+      const isImage = !isPdf && IMAGE_EXT_REGEX.test(entry.name);
       try {
         const stat = await fs.stat(fullPath);
         notes.push({
@@ -428,7 +431,7 @@ async function readDirectoryShallow(dirPath: string): Promise<ImportedNode[]> {
           content: "",
           updatedAt: stat.mtime.toISOString().slice(0, 10),
           filePath: fullPath,
-          fileType: isPdf ? "pdf" : "markdown",
+          fileType: isPdf ? "pdf" : isImage ? "image" : "markdown",
         });
       } catch {
         // Skip unreadable files

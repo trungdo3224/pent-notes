@@ -784,6 +784,8 @@ export const useNotesStore = create<NotesState>()(
           : null;
         if (
           targetNote?.filePath &&
+          targetNote.fileType !== "pdf" &&
+          targetNote.fileType !== "image" &&
           state.activeNoteContents[noteId] === undefined
         ) {
           void get().loadNoteContent(noteId, targetNote.filePath);

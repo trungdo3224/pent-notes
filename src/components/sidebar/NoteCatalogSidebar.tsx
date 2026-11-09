@@ -104,11 +104,13 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
     if (
       note?.id &&
       note?.filePath &&
+      note.fileType !== "pdf" &&
+      note.fileType !== "image" &&
       activeNoteContents[note.id] === undefined
     ) {
       void loadNoteContent(note.id, note.filePath);
     }
-  }, [note?.id, note?.filePath, activeNoteContents, loadNoteContent]);
+  }, [note, activeNoteContents, loadNoteContent]);
 
   const noteContent = note?.filePath
     ? (activeNoteContents[note.id] ?? "")

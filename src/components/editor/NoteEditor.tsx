@@ -14,6 +14,7 @@ import {
   Folder,
   FolderUp,
   HardDrive,
+  Image as ImageIcon,
   Link2,
   PanelLeftOpen,
   PanelRightOpen,
@@ -29,6 +30,7 @@ import {
   resolveWorkspaceConnections,
 } from "../../lib/catalogUtils";
 import {
+  isImageNote,
   isPdfNote,
   NOTE_FILE_ACCEPT,
   readFileAsDataUrl,
@@ -39,6 +41,7 @@ import {
   useNotesStore,
 } from "../../store/useNotesStore";
 import { NoteItem } from "../../types";
+import { ImageViewer } from "./ImageViewer";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { NoteTabsBar } from "../panes/NoteTabsBar";
 import { PaneSplitTree } from "../panes/PaneSplitTree";
@@ -113,11 +116,13 @@ export const NoteEditor: React.FC = () => {
     if (
       note?.id &&
       note?.filePath &&
+      !isPdfNote(note) &&
+      !isImageNote(note) &&
       activeNoteContents[note.id] === undefined
     ) {
       void loadNoteContent(note.id, note.filePath);
     }
-  }, [note?.id, note?.filePath, activeNoteContents, loadNoteContent]);
+  }, [note, activeNoteContents, loadNoteContent]);
 
   const totalPanes = useMemo(
     () => (paneLayout ? getAllLeaves(paneLayout).length : 1),
@@ -311,6 +316,7 @@ export const NoteEditor: React.FC = () => {
 
   const renderNoteContent = (targetNote: NoteItem, isPrimaryTitle = false) => {
     const isPdf = isPdfNote(targetNote);
+    const isImage = !isPdf && isImageNote(targetNote);
 
     if (isPdf) {
       return (
@@ -319,6 +325,18 @@ export const NoteEditor: React.FC = () => {
             title={targetNote.title}
             filePath={targetNote.filePath}
             pdfData={targetNote.pdfData}
+          />
+        </div>
+      );
+    }
+
+    if (isImage) {
+      return (
+        <div className="editor-pdf-full">
+          <ImageViewer
+            title={targetNote.title}
+            filePath={targetNote.filePath}
+            imageData={targetNote.imageData}
           />
         </div>
       );
@@ -401,6 +419,7 @@ export const NoteEditor: React.FC = () => {
 
   const primaryWords = note ? countWords(noteContent) : 0;
   const isPrimaryPdf = note ? isPdfNote(note) : false;
+  const isPrimaryImage = note && !isPrimaryPdf ? isImageNote(note) : false;
 
   return (
     <main className="editor-pane">
@@ -444,6 +463,11 @@ export const NoteEditor: React.FC = () => {
                   <FileText size={12} className="pdf-badge-icon" />
                   <span>PDF Document</span>
                 </span>
+              ) : isPrimaryImage ? (
+                <span className="editor-image-badge" title="Image viewer">
+                  <ImageIcon size={12} className="image-badge-icon" />
+                  <span>Image</span>
+                </span>
               ) : note.filePath ? (
                 <span
                   className="editor-disk-badge"
@@ -453,9 +477,11 @@ export const NoteEditor: React.FC = () => {
                 </span>
               ) : null}
 
-              <span className="editor-meta">
-                {primaryWords} {primaryWords === 1 ? "word" : "words"}
-              </span>
+              {!isPrimaryPdf && !isPrimaryImage && (
+                <span className="editor-meta">
+                  {primaryWords} {primaryWords === 1 ? "word" : "words"}
+                </span>
+              )}
             </>
           )}
 
@@ -493,7 +519,7 @@ export const NoteEditor: React.FC = () => {
 
               {isLinkPickerOpen && (
                 <div className="editor-link-popover">
-                  {!isPrimaryPdf && (
+                  {!isPrimaryPdf && !isPrimaryImage && (
                     <>
                       <button
                         type="button"

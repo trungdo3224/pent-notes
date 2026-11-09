@@ -8,12 +8,17 @@ import React, {
 import { FolderNavbar } from "./components/navbar/FolderNavbar";
 import { FolderExplorer } from "./components/sidebar/FolderExplorer";
 import { NoteCatalogSidebar } from "./components/sidebar/NoteCatalogSidebar";
+import { ImageViewer } from "./components/editor/ImageViewer";
 import { NoteEditor } from "./components/editor/NoteEditor";
 import { LinkFolderModal } from "./components/modals/LinkFolderModal";
 import { SearchModal } from "./components/modals/SearchModal";
 import { SessionModal } from "./components/modals/SessionModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
-import { usePointerDrag } from "./hooks/useDomInteractions";
+import { useEscapeKey, usePointerDrag } from "./hooks/useDomInteractions";
+import {
+  ImageViewerEventDetail,
+  OPEN_IMAGE_VIEWER_EVENT,
+} from "./lib/codemirror/imageWidget";
 import { applyFontSettings } from "./lib/fontSettings";
 import {
   DEFAULT_RIGHT_SIDEBAR_WIDTH,
@@ -47,7 +52,25 @@ export const App: React.FC = () => {
   const [searchInitialQuery, setSearchInitialQuery] = useState("");
   const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
   const [isDraggingRightSidebar, setIsDraggingRightSidebar] = useState(false);
+  const [viewerImage, setViewerImage] = useState<ImageViewerEventDetail | null>(
+    null,
+  );
   const workspaceRef = useRef<HTMLDivElement>(null);
+
+  const closeImageViewer = useCallback(() => setViewerImage(null), []);
+  useEscapeKey(Boolean(viewerImage), closeImageViewer);
+
+  useEffect(() => {
+    const handleOpenViewer = (e: Event) => {
+      const customEvent = e as CustomEvent<ImageViewerEventDetail>;
+      if (customEvent.detail?.src) {
+        setViewerImage(customEvent.detail);
+      }
+    };
+    window.addEventListener(OPEN_IMAGE_VIEWER_EVENT, handleOpenViewer);
+    return () =>
+      window.removeEventListener(OPEN_IMAGE_VIEWER_EVENT, handleOpenViewer);
+  }, []);
 
   useEffect(() => {
     applyTheme(theme);
@@ -228,6 +251,28 @@ export const App: React.FC = () => {
       <SessionModal />
 
       {isSettingsModalOpen && <SettingsModal onClose={closeSettingsModal} />}
+
+      {viewerImage && (
+        <div
+          className="modal-backdrop image-viewer-modal-backdrop"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeImageViewer();
+          }}
+        >
+          <div
+            className="image-viewer-modal-frame"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Image viewer"
+          >
+            <ImageViewer
+              title={viewerImage.title}
+              imageUrl={viewerImage.src}
+              onClose={closeImageViewer}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

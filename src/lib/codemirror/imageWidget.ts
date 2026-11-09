@@ -290,6 +290,23 @@ export function resolveImageUrl(url: string, activeFilePath?: string): string {
   return trimmed;
 }
 
+export interface ImageViewerEventDetail {
+  src: string;
+  title: string;
+}
+
+export const OPEN_IMAGE_VIEWER_EVENT = "pentnotes:open-image-viewer";
+
+export function dispatchOpenImageViewer(detail: ImageViewerEventDetail): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent<ImageViewerEventDetail>(OPEN_IMAGE_VIEWER_EVENT, {
+        detail,
+      }),
+    );
+  }
+}
+
 export class ImageWidget extends WidgetType {
   constructor(
     readonly rawText: string,
@@ -349,9 +366,37 @@ export class ImageWidget extends WidgetType {
       img.style.height = hVal;
     }
 
+    const openViewer = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dispatchOpenImageViewer({
+        src: this.resolvedUrl,
+        title: this.alt || this.title || this.url,
+      });
+    };
+
+    img.addEventListener("click", openViewer);
+
     // Floating action toolbar on hover
     const toolbar = document.createElement("div");
     toolbar.className = "cm-image-toolbar";
+
+    // View in separated image viewer button
+    const viewBtn = document.createElement("button");
+    viewBtn.type = "button";
+    viewBtn.className = "cm-image-btn cm-image-view-btn";
+    viewBtn.title = "Open in image viewer";
+    viewBtn.setAttribute("aria-label", "Open in image viewer");
+    viewBtn.innerHTML = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 3 21 3 21 9"/>
+        <polyline points="9 21 3 21 3 15"/>
+        <line x1="21" y1="3" x2="14" y2="10"/>
+        <line x1="3" y1="21" x2="10" y2="14"/>
+      </svg>
+      <span>View</span>
+    `;
+    viewBtn.addEventListener("click", openViewer);
 
     // Edit button
     const editBtn = document.createElement("button");
@@ -398,6 +443,7 @@ export class ImageWidget extends WidgetType {
       }
     });
 
+    toolbar.appendChild(viewBtn);
     toolbar.appendChild(editBtn);
     toolbar.appendChild(copyBtn);
 

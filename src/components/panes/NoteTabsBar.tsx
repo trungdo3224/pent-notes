@@ -5,9 +5,9 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { FileText, Plus, X } from "lucide-react";
+import { FileText, Image as ImageIcon, Plus, X } from "lucide-react";
 import { useClickOutside } from "../../hooks/useDomInteractions";
-import { isPdfNote } from "../../lib/fileUtils";
+import { isImageNote, isPdfNote } from "../../lib/fileUtils";
 import { getAllLeaves } from "../../lib/paneLayoutTree";
 import { findNoteNode } from "../../lib/treeUtils";
 import { isNotePendingSave, useNotesStore } from "../../store/useNotesStore";
@@ -238,6 +238,7 @@ export const NoteTabsBar: React.FC = () => {
         {openNotes.map((note) => {
           const isActive = note.id === currentActiveNoteId;
           const isPdf = isPdfNote(note);
+          const isImage = !isPdf && isImageNote(note);
           const isContextOpen = contextMenu?.noteId === note.id;
           const paneNums = paneNumbersByNoteId.get(note.id);
           const paneBadge =
@@ -261,6 +262,11 @@ export const NoteTabsBar: React.FC = () => {
               <div className="note-tab-icon">
                 {isPdf ? (
                   <span className="note-tab-pdf-badge">PDF</span>
+                ) : isImage ? (
+                  <ImageIcon
+                    size={13}
+                    className="note-tab-file-icon is-image-icon"
+                  />
                 ) : (
                   <FileText size={13} className="note-tab-file-icon" />
                 )}

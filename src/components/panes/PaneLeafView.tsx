@@ -16,10 +16,11 @@ import {
   listConnectableNotes,
   resolveWorkspaceConnections,
 } from "../../lib/catalogUtils";
-import { isPdfNote } from "../../lib/fileUtils";
+import { isImageNote, isPdfNote } from "../../lib/fileUtils";
 import { findNoteAndPath } from "../../lib/treeUtils";
 import { useNotesStore } from "../../store/useNotesStore";
 import { PaneLeafNode, TopLevelFolder } from "../../types";
+import { ImageViewer } from "../editor/ImageViewer";
 import { MarkdownEditor } from "../editor/MarkdownEditor";
 import { PdfViewer } from "../editor/PdfViewer";
 
@@ -100,11 +101,13 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
     if (
       note?.id &&
       note?.filePath &&
+      !isPdfNote(note) &&
+      !isImageNote(note) &&
       activeNoteContents[note.id] === undefined
     ) {
       void loadNoteContent(note.id, note.filePath);
     }
-  }, [note?.id, note?.filePath, activeNoteContents, loadNoteContent]);
+  }, [note, activeNoteContents, loadNoteContent]);
 
   // Connected notes for this note
   const connections = useMemo(
@@ -121,6 +124,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
   );
 
   const isPdf = note ? isPdfNote(note) : false;
+  const isImage = note && !isPdf ? isImageNote(note) : false;
   const words = note ? countWords(noteContent) : 0;
 
   return (
@@ -260,13 +264,17 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
             <>
               {isPdf ? (
                 <span className="editor-pdf-badge">PDF</span>
+              ) : isImage ? (
+                <span className="editor-image-badge">IMG</span>
               ) : note.filePath ? (
                 <span className="editor-disk-badge" title={note.filePath}>
                   <HardDrive size={11} />
                 </span>
               ) : null}
 
-              <span className="editor-meta">{words}w</span>
+              {!isPdf && !isImage && (
+                <span className="editor-meta">{words}w</span>
+              )}
             </>
           )}
 
@@ -298,6 +306,14 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
               title={note.title}
               filePath={note.filePath}
               pdfData={note.pdfData}
+            />
+          </div>
+        ) : isImage ? (
+          <div className="editor-pdf-full">
+            <ImageViewer
+              title={note.title}
+              filePath={note.filePath}
+              imageData={note.imageData}
             />
           </div>
         ) : (
