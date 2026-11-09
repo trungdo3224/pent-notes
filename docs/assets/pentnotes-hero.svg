@@ -1,0 +1,347 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="100%" height="100%">
+  <defs>
+    <style>
+      .bg { fill: #0d1117; }
+      .window-bg { fill: #141821; }
+      .sidebar-bg { fill: #161b25; }
+      .surface { fill: #1b212d; }
+      .surface-alt { fill: #222938; }
+      .border { stroke: #283142; stroke-width: 1; }
+      .border-light { stroke: #364258; stroke-width: 1; }
+      .text-title { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; font-weight: 600; fill: #f8fafc; }
+      .text-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; fill: #d1d9e6; }
+      .text-muted { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; fill: #8b9bb4; }
+      .text-mono { font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", monospace; font-size: 11.5px; fill: #cbd5e1; }
+      .accent-cyan { fill: #00e5ff; }
+      .accent-pink { fill: #f43f5e; }
+      .accent-emerald { fill: #10b981; }
+      .accent-amber { fill: #f59e0b; }
+      .accent-purple { fill: #c084fc; }
+    </style>
+    
+    <linearGradient id="headerGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#141821" />
+      <stop offset="100%" stop-color="#1b212d" />
+    </linearGradient>
+
+    <linearGradient id="accentGlow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#00e5ff" stop-opacity="0.0" />
+    </linearGradient>
+
+    <filter id="winShadow" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="28" flood-color="#000000" flood-opacity="0.65" />
+    </filter>
+
+    <clipPath id="windowClip">
+      <rect x="40" y="30" width="1200" height="740" rx="10" />
+    </clipPath>
+  </defs>
+
+  <!-- Canvas Background -->
+  <rect width="1280" height="800" class="bg" />
+
+  <!-- Background decorative ambient mesh -->
+  <circle cx="200" cy="180" r="260" fill="#00e5ff" opacity="0.04" />
+  <circle cx="1080" cy="620" r="320" fill="#f43f5e" opacity="0.03" />
+  <circle cx="640" cy="400" r="400" fill="#10b981" opacity="0.02" />
+
+  <!-- Main Window Container -->
+  <g filter="url(#winShadow)">
+    <rect x="40" y="30" width="1200" height="740" rx="10" class="window-bg border" />
+    
+    <g clip-path="url(#windowClip)">
+      <!-- 1. Top Navbar / Header (y: 30 to 76, height: 46) -->
+      <rect x="40" y="30" width="1200" height="46" fill="url(#headerGrad)" class="border" />
+      
+      <!-- Traffic Light / Window buttons -->
+      <circle cx="64" cy="53" r="5.5" fill="#f43f5e" />
+      <circle cx="82" cy="53" r="5.5" fill="#f59e0b" />
+      <circle cx="100" cy="53" r="5.5" fill="#10b981" />
+
+      <!-- App Logo / Title -->
+      <g transform="translate(126, 43)">
+        <polygon points="10,0 20,7 16,19 4,19 0,7" fill="#00e5ff" opacity="0.9" />
+        <text x="28" y="14" class="text-title" font-size="14">PentNotes</text>
+      </g>
+
+      <!-- Folder Tabs in Navbar -->
+      <g transform="translate(260, 37)">
+        <!-- Active Tab -->
+        <rect x="0" y="0" width="125" height="32" rx="6" class="surface border" />
+        <circle cx="16" cy="16" r="3.5" fill="#00e5ff" />
+        <text x="28" y="20" class="text-title" font-size="12">Engineering</text>
+        <path d="M 112 12 L 118 18 M 118 12 L 112 18" stroke="#8b9bb4" stroke-width="1.2" />
+
+        <!-- Tab 2 -->
+        <rect x="132" y="0" width="115" height="32" rx="6" fill="#161b25" opacity="0.8" />
+        <circle cx="148" cy="16" r="3.5" fill="#8b9bb4" />
+        <text x="160" y="20" class="text-muted" font-size="12">Research</text>
+
+        <!-- Tab 3 -->
+        <rect x="254" y="0" width="110" height="32" rx="6" fill="#161b25" opacity="0.8" />
+        <circle cx="270" cy="16" r="3.5" fill="#8b9bb4" />
+        <text x="282" y="20" class="text-muted" font-size="12">Journal</text>
+
+        <!-- Plus button -->
+        <rect x="372" y="4" width="24" height="24" rx="5" class="surface border" />
+        <text x="380" y="20" class="text-muted" font-weight="bold">+</text>
+      </g>
+
+      <!-- Navbar Right Action Items -->
+      <g transform="translate(930, 41)">
+        <!-- Global Search Bar -->
+        <rect x="0" y="0" width="180" height="26" rx="6" class="surface border" />
+        <path d="M 12 13 A 4 4 0 1 1 16 17 L 20 21" stroke="#8b9bb4" stroke-width="1.5" fill="none" />
+        <text x="26" y="17" class="text-muted" font-size="11">Search notes... (Ctrl+P)</text>
+        
+        <!-- Action Buttons -->
+        <rect x="190" y="0" width="26" height="26" rx="6" class="surface border" />
+        <path d="M 198 13 L 208 13 M 203 8 L 203 18" stroke="#d1d9e6" stroke-width="1.5" />
+
+        <rect x="224" y="0" width="26" height="26" rx="6" class="surface border" />
+        <circle cx="237" cy="13" r="5" stroke="#d1d9e6" stroke-width="1.5" fill="none" />
+      </g>
+
+      <!-- 2. Left Sidebar (Folder Explorer, x: 40 to 250, width: 210) -->
+      <g transform="translate(40, 76)">
+        <rect width="210" height="694" class="sidebar-bg border" />
+        
+        <!-- Sidebar Header -->
+        <text x="16" y="24" class="text-muted" font-weight="600" font-size="10" letter-spacing="1">EXPLORER</text>
+        <path d="M 185 18 L 195 18 M 190 13 L 190 23" stroke="#8b9bb4" stroke-width="1.2" />
+
+        <!-- Tree Item: Folder 1 -->
+        <g transform="translate(14, 40)">
+          <path d="M 4 8 L 8 12 L 4 16" fill="none" stroke="#8b9bb4" stroke-width="1.2" />
+          <path d="M 16 7 L 22 7 L 24 9 L 32 9 L 32 17 L 16 17 Z" fill="#38bdf8" opacity="0.8" />
+          <text x="38" y="15" class="text-title" font-size="12">Backend Architecture</text>
+        </g>
+
+        <!-- Nested Notes -->
+        <g transform="translate(30, 68)">
+          <rect x="-8" y="-4" width="176" height="26" rx="4" class="surface border" />
+          <rect x="-8" y="-4" width="3" height="26" fill="#00e5ff" rx="1.5" />
+          <path d="M 4 4 L 12 4 L 14 6 L 14 16 L 4 16 Z" fill="none" stroke="#00e5ff" stroke-width="1.2" />
+          <text x="20" y="14" class="text-title" font-size="11.5" fill="#00e5ff">EventBus-Design.md</text>
+        </g>
+
+        <g transform="translate(30, 98)">
+          <path d="M 4 4 L 12 4 L 14 6 L 14 16 L 4 16 Z" fill="none" stroke="#8b9bb4" stroke-width="1.2" />
+          <text x="20" y="14" class="text-body" font-size="11.5">Database-Sharding.md</text>
+        </g>
+
+        <g transform="translate(30, 126)">
+          <path d="M 4 4 L 12 4 L 14 6 L 14 16 L 4 16 Z" fill="none" stroke="#8b9bb4" stroke-width="1.2" />
+          <text x="20" y="14" class="text-body" font-size="11.5">Cache-Invalidation.md</text>
+        </g>
+
+        <!-- Tree Item: Folder 2 -->
+        <g transform="translate(14, 160)">
+          <path d="M 4 8 L 8 12 L 4 16" fill="none" stroke="#8b9bb4" stroke-width="1.2" />
+          <path d="M 16 7 L 22 7 L 24 9 L 32 9 L 32 17 L 16 17 Z" fill="#38bdf8" opacity="0.8" />
+          <text x="38" y="15" class="text-title" font-size="12">Specifications</text>
+        </g>
+
+        <g transform="translate(30, 188)">
+          <path d="M 4 4 L 12 4 L 14 6 L 14 16 L 4 16 Z" fill="none" stroke="#f43f5e" stroke-width="1.2" />
+          <text x="20" y="14" class="text-body" font-size="11.5">API-Contracts-v2.pdf</text>
+        </g>
+
+        <!-- Tree Item: Folder 3 -->
+        <g transform="translate(14, 222)">
+          <path d="M 4 8 L 8 12 L 4 16" fill="none" stroke="#8b9bb4" stroke-width="1.2" />
+          <path d="M 16 7 L 22 7 L 24 9 L 32 9 L 32 17 L 16 17 Z" fill="#38bdf8" opacity="0.8" />
+          <text x="38" y="15" class="text-title" font-size="12">Daily Logs</text>
+        </g>
+
+        <g transform="translate(30, 250)">
+          <path d="M 4 4 L 12 4 L 14 6 L 14 16 L 4 16 Z" fill="none" stroke="#8b9bb4" stroke-width="1.2" />
+          <text x="20" y="14" class="text-body" font-size="11.5">2026-11-09-sync.md</text>
+        </g>
+
+        <!-- Storage status footer -->
+        <g transform="translate(16, 640)">
+          <rect width="178" height="36" rx="6" class="surface border" />
+          <circle cx="18" cy="18" r="4" fill="#10b981" />
+          <text x="30" y="16" class="text-title" font-size="11">Synced with Disk</text>
+          <text x="30" y="27" class="text-muted" font-size="9.5">Local-first repository</text>
+        </g>
+      </g>
+
+      <!-- 3. Center Workspace: Split Panes (x: 250 to 950, width: 700) -->
+      
+      <!-- Center Split Left Pane (Markdown Editor, x: 250, width: 360) -->
+      <g transform="translate(250, 76)">
+        <!-- Tab Bar for Left Pane -->
+        <rect width="360" height="34" class="sidebar-bg border" />
+        <rect x="0" y="0" width="160" height="34" class="window-bg border" />
+        <text x="16" y="21" class="text-title" font-size="11.5" fill="#00e5ff">EventBus-Design.md</text>
+        <circle cx="140" cy="17" r="2.5" fill="#00e5ff" />
+
+        <!-- Pane Action Buttons (Split horizontal/vertical) -->
+        <g transform="translate(315, 8)">
+          <rect width="36" height="18" rx="4" class="surface border" />
+          <path d="M 7 9 L 29 9 M 18 5 L 18 13" stroke="#8b9bb4" stroke-width="1" />
+        </g>
+
+        <!-- Markdown Document Content -->
+        <g transform="translate(24, 52)">
+          <text x="0" y="20" class="text-title" font-size="20" fill="#f8fafc"># Event-Driven Architecture</text>
+          
+          <rect x="0" y="32" width="68" height="18" rx="9" fill="#1e2638" stroke="#283142" />
+          <text x="8" y="44" class="text-muted" font-size="10" fill="#38bdf8">#distributed</text>
+          
+          <rect x="74" y="32" width="62" height="18" rx="9" fill="#1e2638" stroke="#283142" />
+          <text x="82" y="44" class="text-muted" font-size="10" fill="#c084fc">#eventbus</text>
+
+          <text x="0" y="78" class="text-body" font-size="12.5" fill="#cbd5e1">The local event bus facilitates decoupled communication</text>
+          <text x="0" y="98" class="text-body" font-size="12.5" fill="#cbd5e1">between nodes with high throughput guarantees:</text>
+
+          <text x="12" y="126" class="text-body" font-size="12" fill="#d1d9e6">• Zero-copy memory pooling for active buffers</text>
+          <text x="12" y="146" class="text-body" font-size="12" fill="#d1d9e6">• Strict message order preservation across partitions</text>
+          <text x="12" y="166" class="text-body" font-size="12" fill="#d1d9e6">• Integrated [[Database-Sharding]] replication strategy</text>
+
+          <!-- Code Block Preview -->
+          <g transform="translate(0, 190)">
+            <rect width="315" height="140" rx="6" fill="#12161f" stroke="#283142" />
+            
+            <!-- Code Block Header -->
+            <rect width="315" height="24" rx="6" fill="#181e29" />
+            <text x="12" y="16" class="text-muted" font-size="10.5">typescript</text>
+            
+            <!-- Syntax highlighted code -->
+            <text x="14" y="46" class="text-mono"><tspan fill="#f43f5e">interface</tspan> <tspan fill="#00e5ff">MessageEnvelope</tspan>&lt;<tspan fill="#f59e0b">T</tspan>&gt; {</text>
+            <text x="28" y="66" class="text-mono">topic: <tspan fill="#10b981">string</tspan>;</text>
+            <text x="28" y="86" class="text-mono">payload: <tspan fill="#f59e0b">T</tspan>;</text>
+            <text x="28" y="106" class="text-mono">timestamp: <tspan fill="#10b981">number</tspan>;</text>
+            <text x="14" y="126" class="text-mono">}</text>
+          </g>
+
+          <text x="0" y="360" class="text-title" font-size="15" fill="#f8fafc">## Performance Benchmarks</text>
+          <text x="0" y="385" class="text-body" font-size="12" fill="#cbd5e1">Latency benchmarks achieve &lt; 1.2ms p99 at 100k msg/sec.</text>
+        </g>
+      </g>
+
+      <!-- Pane Resizer / Divider -->
+      <line x1="610" y1="76" x2="610" y2="770" stroke="#283142" stroke-width="1.5" />
+
+      <!-- Center Split Right Pane (PDF / Connected Note, x: 610, width: 340) -->
+      <g transform="translate(611, 76)">
+        <!-- Tab Bar for Right Pane -->
+        <rect width="339" height="34" class="sidebar-bg border" />
+        <rect x="0" y="0" width="160" height="34" class="window-bg border" />
+        <path d="M 14 12 L 20 12 L 22 14 L 22 22 L 14 22 Z" fill="none" stroke="#f43f5e" stroke-width="1.2" />
+        <text x="28" y="21" class="text-title" font-size="11.5">API-Contracts-v2.pdf</text>
+
+        <!-- PDF Reader Document Surface -->
+        <g transform="translate(18, 48)">
+          <rect width="303" height="420" rx="4" class="surface border" />
+          
+          <!-- Mock PDF Document Page -->
+          <rect x="15" y="15" width="273" height="390" fill="#161b25" rx="3" stroke="#283142" />
+          <text x="30" y="42" class="text-title" font-size="13" fill="#38bdf8">SYSTEM SPECIFICATION V2</text>
+          <line x1="30" y1="52" x2="260" y2="52" stroke="#364258" stroke-width="1" />
+
+          <text x="30" y="74" class="text-muted" font-size="10.5">Section 4.1: Inter-Node Wire Protocol</text>
+          
+          <!-- Diagram in PDF -->
+          <g transform="translate(30, 90)">
+            <rect width="230" height="90" rx="4" fill="#1b212d" stroke="#283142" />
+            <rect x="12" y="25" width="55" height="40" rx="3" fill="#222938" stroke="#00e5ff" />
+            <text x="21" y="48" class="text-title" font-size="9" fill="#00e5ff">Node A</text>
+
+            <path d="M 67 45 L 140 45" stroke="#00e5ff" stroke-width="1.5" stroke-dasharray="3,3" />
+            <polygon points="140,42 146,45 140,48" fill="#00e5ff" />
+            
+            <rect x="146" y="25" width="55" height="40" rx="3" fill="#222938" stroke="#10b981" />
+            <text x="155" y="48" class="text-title" font-size="9" fill="#10b981">Node B</text>
+          </g>
+
+          <text x="30" y="210" class="text-body" font-size="11" fill="#cbd5e1">Binary frames are framed using variable-length</text>
+          <text x="30" y="228" class="text-body" font-size="11" fill="#cbd5e1">LEB128 integers followed by SHA-256 payload checksums.</text>
+          
+          <rect x="30" y="250" width="230" height="20" rx="3" fill="#222938" />
+          <text x="38" y="264" class="text-mono" font-size="10">GET /api/v2/cluster/topology</text>
+        </g>
+      </g>
+
+      <!-- 4. Right Sidebar: Inspector & Ollama AI Chat (x: 950 to 1240, width: 290) -->
+      <g transform="translate(950, 76)">
+        <rect width="290" height="694" class="sidebar-bg border" />
+        
+        <!-- Tab selector: Notes | Graph | Info | AI Chat -->
+        <rect width="290" height="34" class="surface-alt border" />
+        <text x="16" y="22" class="text-muted" font-size="11">Notes</text>
+        <text x="64" y="22" class="text-muted" font-size="11">Graph</text>
+        <text x="114" y="22" class="text-muted" font-size="11">Info</text>
+        
+        <!-- Active Tab: AI Chat -->
+        <rect x="156" y="4" width="70" height="26" rx="5" class="surface border" />
+        <circle cx="168" cy="17" r="3" fill="#00e5ff" />
+        <text x="176" y="22" class="text-title" font-size="11" fill="#00e5ff">AI Chat</text>
+
+        <!-- Ollama Model Header -->
+        <g transform="translate(14, 46)">
+          <rect width="262" height="30" rx="6" class="surface border" />
+          <text x="10" y="19" class="text-title" font-size="11">Model:</text>
+          <rect x="52" y="5" width="115" height="20" rx="4" fill="#222938" />
+          <text x="58" y="19" class="text-title" font-size="10.5" fill="#38bdf8">llama3.2:latest</text>
+          <circle cx="240" cy="15" r="4" fill="#10b981" />
+        </g>
+
+        <!-- Chat Conversation Messages -->
+        <g transform="translate(14, 90)">
+          <!-- User Prompt -->
+          <g transform="translate(30, 0)">
+            <rect width="232" height="48" rx="8" fill="#1b212d" stroke="#283142" />
+            <text x="12" y="19" class="text-title" font-size="11">Can you analyze the bottleneck</text>
+            <text x="12" y="35" class="text-title" font-size="11">in this EventBus design?</text>
+          </g>
+
+          <!-- Assistant Response -->
+          <g transform="translate(0, 60)">
+            <rect width="262" height="150" rx="8" fill="#161e2b" stroke="#00e5ff" stroke-opacity="0.3" />
+            
+            <circle cx="16" cy="18" r="7" fill="#00e5ff" opacity="0.2" />
+            <text x="13" y="22" class="text-title" font-size="10" fill="#00e5ff">AI</text>
+            <text x="32" y="21" class="text-title" font-size="11" fill="#00e5ff">Ollama Assistant</text>
+
+            <text x="14" y="46" class="text-body" font-size="11.5">Based on <tspan fill="#38bdf8">EventBus-Design.md</tspan>:</text>
+            <text x="14" y="68" class="text-body" font-size="11.5">• Contention may arise during</text>
+            <text x="22" y="86" class="text-body" font-size="11.5">high fan-out if message buffers</text>
+            <text x="22" y="104" class="text-body" font-size="11.5">are shared synchronously.</text>
+            <text x="14" y="130" class="text-body" font-size="11.5" fill="#10b981">✓ Recommendation: Add ring buffers.</text>
+          </g>
+        </g>
+
+        <!-- Chat Input Area with Controls -->
+        <g transform="translate(14, 580)">
+          <rect width="262" height="96" rx="8" class="surface border" />
+          
+          <text x="12" y="24" class="text-muted" font-size="11.5">Ask anything about your notes...</text>
+          
+          <line x1="0" y1="56" x2="262" y2="56" stroke="#283142" stroke-width="1" />
+
+          <!-- Toggles: Web Search & Context -->
+          <g transform="translate(10, 66)">
+            <!-- Context toggle -->
+            <rect width="70" height="20" rx="4" fill="#222938" stroke="#10b981" stroke-width="1" />
+            <circle cx="18" cy="10" r="3" fill="#10b981" />
+            <text x="26" y="14" class="text-muted" font-size="9" fill="#10b981">Context ON</text>
+
+            <!-- Web search toggle -->
+            <rect x="76" width="68" height="20" rx="4" fill="#222938" stroke="#38bdf8" stroke-width="1" />
+            <circle cx="86" cy="10" r="3" fill="#38bdf8" />
+            <text x="94" y="14" class="text-muted" font-size="9" fill="#38bdf8">Web Search</text>
+
+            <!-- Send button -->
+            <rect x="216" width="26" height="20" rx="4" fill="#00e5ff" />
+            <polygon points="226,6 235,10 226,14" fill="#141821" />
+          </g>
+        </g>
+      </g>
+      
+    </g>
+  </g>
+</svg>
