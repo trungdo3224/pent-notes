@@ -1,7 +1,10 @@
 import { ExplorerNode, FolderItem, NoteItem } from "../types";
 
-export const NOTE_FILE_ACCEPT = ".md,.markdown,.mdx,.txt,.pdf";
-const NOTE_EXT_REGEX = /\.(md|markdown|mdx|txt|pdf)$/i;
+export const NOTE_FILE_ACCEPT =
+  ".md,.markdown,.mdx,.txt,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.ico,.avif";
+const NOTE_EXT_REGEX =
+  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
 
 const IGNORED_DIRECTORY_NAMES = new Set([
   "node_modules",
@@ -51,11 +54,25 @@ function isPdfFileName(fileName?: string): boolean {
   return Boolean(fileName?.toLowerCase().endsWith(".pdf"));
 }
 
+function isImageFileName(fileName?: string): boolean {
+  return Boolean(fileName && IMAGE_EXT_REGEX.test(fileName));
+}
+
 export function isPdfNote(
   note: Pick<NoteItem, "fileType" | "filePath" | "pdfData">,
 ): boolean {
   return Boolean(
     note.fileType === "pdf" || isPdfFileName(note.filePath) || note.pdfData,
+  );
+}
+
+export function isImageNote(
+  note: Pick<NoteItem, "fileType" | "filePath" | "imageData">,
+): boolean {
+  return Boolean(
+    note.fileType === "image" ||
+    isImageFileName(note.filePath) ||
+    note.imageData,
   );
 }
 
@@ -70,16 +87,19 @@ export function readFileAsDataUrl(file: File): Promise<string> {
 
 async function buildNoteItemFromFile(file: File): Promise<NoteItem> {
   const isPdf = isPdfFileName(file.name);
+  const isImage = !isPdf && isImageFileName(file.name);
   const pdfData = isPdf ? await readFileAsDataUrl(file) : undefined;
-  const content = isPdf ? "" : await file.text();
+  const imageData = isImage ? await readFileAsDataUrl(file) : undefined;
+  const content = isPdf || isImage ? "" : await file.text();
 
   return {
     id: createId("note"),
     type: "note",
     title: stripNoteExtension(file.name),
     content,
-    fileType: isPdf ? "pdf" : "markdown",
+    fileType: isPdf ? "pdf" : isImage ? "image" : "markdown",
     pdfData,
+    imageData,
     updatedAt: fileDateString(file),
   };
 }

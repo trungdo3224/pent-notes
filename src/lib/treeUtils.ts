@@ -8,7 +8,10 @@ import {
 import { todayDateString } from "./fileUtils";
 
 export type NoteUpdates = Partial<
-  Pick<NoteItem, "title" | "content" | "filePath" | "fileType" | "pdfData">
+  Pick<
+    NoteItem,
+    "title" | "content" | "filePath" | "fileType" | "pdfData" | "imageData"
+  >
 >;
 
 type FolderUpdates = Partial<
@@ -68,6 +71,15 @@ export function findDefaultNoteId(
   order: SortOrder = "name-asc",
 ): string | null {
   const sorted = sortExplorerNodes(nodes, order);
+  for (const node of sorted) {
+    if (
+      node.type === "note" &&
+      node.fileType !== "pdf" &&
+      node.fileType !== "image"
+    ) {
+      return node.id;
+    }
+  }
   for (const node of sorted) {
     if (node.type === "note") return node.id;
   }

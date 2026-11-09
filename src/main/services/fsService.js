@@ -8,7 +8,9 @@ import path from "node:path";
  * - Strict Watcher / Scanner Ignore List
  */
 
-const NOTE_EXT_REGEX = /\.(md|markdown|mdx|txt|pdf)$/i;
+const NOTE_EXT_REGEX =
+  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
 
 const STRICT_IGNORE_NAMES = new Set([
   "node_modules",
@@ -100,6 +102,7 @@ export async function readDirectoryShallow(dirPath) {
       });
     } else if (entry.isFile() && NOTE_EXT_REGEX.test(entry.name)) {
       const isPdf = entry.name.toLowerCase().endsWith(".pdf");
+      const isImage = !isPdf && IMAGE_EXT_REGEX.test(entry.name);
       try {
         const stat = await fs.stat(fullPath);
         notes.push({
@@ -109,7 +112,7 @@ export async function readDirectoryShallow(dirPath) {
           content: "", // Lazy: Content read on demand via readFile()
           updatedAt: stat.mtime.toISOString().slice(0, 10),
           filePath: fullPath,
-          fileType: isPdf ? "pdf" : "markdown",
+          fileType: isPdf ? "pdf" : isImage ? "image" : "markdown",
         });
       } catch {
         // Skip unreadable files

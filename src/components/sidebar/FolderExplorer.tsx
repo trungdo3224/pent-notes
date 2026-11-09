@@ -24,6 +24,7 @@ import {
   FolderOpen,
   FolderPlus,
   FolderUp,
+  Image as ImageIcon,
   Link2,
   List,
   PanelLeftClose,
@@ -37,7 +38,7 @@ import {
   useClickOutside,
 } from "../../hooks/useDomInteractions";
 import { resolveWorkspaceConnections } from "../../lib/catalogUtils";
-import { isPdfNote, NOTE_FILE_ACCEPT } from "../../lib/fileUtils";
+import { isImageNote, isPdfNote, NOTE_FILE_ACCEPT } from "../../lib/fileUtils";
 import { findLeaf, getAllLeaves } from "../../lib/paneLayoutTree";
 import {
   collectAllFolderIds,
@@ -533,6 +534,7 @@ export const FolderExplorer: React.FC = () => {
     const isContextTarget =
       contextMenu?.kind === "note" && contextMenu.note.id === node.id;
     const isPdf = isPdfNote(node);
+    const isImage = !isPdf && isImageNote(node);
     const noteLevelClass = depth > 0 ? "is-child-note" : "is-root-note";
 
     return (
@@ -565,11 +567,19 @@ export const FolderExplorer: React.FC = () => {
           }
         }}
       >
-        <FileText
-          size={16}
-          strokeWidth={1.75}
-          className={`explorer-item-icon explorer-note-icon ${isPdf ? "is-pdf-icon" : ""}`}
-        />
+        {isImage ? (
+          <ImageIcon
+            size={16}
+            strokeWidth={1.75}
+            className="explorer-item-icon explorer-note-icon is-image-icon"
+          />
+        ) : (
+          <FileText
+            size={16}
+            strokeWidth={1.75}
+            className={`explorer-item-icon explorer-note-icon ${isPdf ? "is-pdf-icon" : ""}`}
+          />
+        )}
         {isEditingNote ? (
           <input
             ref={renameInputRef}
@@ -610,6 +620,11 @@ export const FolderExplorer: React.FC = () => {
         {isPdf && (
           <span className="explorer-pdf-badge" title="PDF Document">
             PDF
+          </span>
+        )}
+        {isImage && (
+          <span className="explorer-img-badge" title="Image File">
+            IMG
           </span>
         )}
         <div className="explorer-row-actions">

@@ -5,8 +5,9 @@ export interface NoteItem {
   content: string;
   updatedAt: string;
   filePath?: string;
-  fileType?: "markdown" | "pdf";
+  fileType?: "markdown" | "pdf" | "image";
   pdfData?: string;
+  imageData?: string;
 }
 
 export interface FolderItem {
