@@ -9,8 +9,10 @@ import path from "node:path";
  */
 
 const NOTE_EXT_REGEX =
-  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif|py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
 const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+const CODE_EXT_REGEX =
+  /\.(py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
 
 const STRICT_IGNORE_NAMES = new Set([
   "node_modules",
@@ -44,7 +46,7 @@ function makeId(prefix) {
 }
 
 function stripExt(name) {
-  return name.replace(NOTE_EXT_REGEX, "").trim() || "Untitled";
+  return name.replace(/\.(md|markdown|mdx|txt)$/i, "").trim() || "Untitled";
 }
 
 function isStrictlyIgnored(name) {
@@ -103,16 +105,23 @@ export async function readDirectoryShallow(dirPath) {
     } else if (entry.isFile() && NOTE_EXT_REGEX.test(entry.name)) {
       const isPdf = entry.name.toLowerCase().endsWith(".pdf");
       const isImage = !isPdf && IMAGE_EXT_REGEX.test(entry.name);
+      const isCode = !isPdf && !isImage && CODE_EXT_REGEX.test(entry.name);
       try {
         const stat = await fs.stat(fullPath);
         notes.push({
           id: makeId("note"),
           type: "note",
-          title: stripExt(entry.name),
+          title: isCode ? entry.name : stripExt(entry.name),
           content: "", // Lazy: Content read on demand via readFile()
           updatedAt: stat.mtime.toISOString().slice(0, 10),
           filePath: fullPath,
-          fileType: isPdf ? "pdf" : isImage ? "image" : "markdown",
+          fileType: isPdf
+            ? "pdf"
+            : isImage
+              ? "image"
+              : isCode
+                ? "code"
+                : "markdown",
         });
       } catch {
         // Skip unreadable files
@@ -169,26 +178,38 @@ export async function writeFile(filePath, content) {
 export async function createFile(parentPath, name, content = "") {
   const rawFileName =
     name && typeof name === "string" ? name.trim() : "Untitled Note";
-  const baseName = stripExt(rawFileName);
   const resolvedParent = path.resolve(parentPath);
   await fs.mkdir(resolvedParent, { recursive: true });
 
-  const targetFile = await resolveUniqueChildPath(
-    resolvedParent,
-    baseName,
-    ".md",
-  );
+  const isCode = CODE_EXT_REGEX.test(rawFileName);
+  let targetFile;
+  let fileType = "markdown";
+  let title = "";
+
+  if (isCode) {
+    const ext = path.extname(rawFileName);
+    const base = path.basename(rawFileName, ext);
+    targetFile = await resolveUniqueChildPath(resolvedParent, base, ext);
+    fileType = "code";
+    title = path.basename(targetFile);
+  } else {
+    const baseName = stripExt(rawFileName);
+    targetFile = await resolveUniqueChildPath(resolvedParent, baseName, ".md");
+    fileType = "markdown";
+    title = stripExt(path.basename(targetFile));
+  }
+
   const initialContent = content || "";
   await fs.writeFile(targetFile, initialContent, "utf-8");
 
   return {
     id: makeId("note"),
     type: "note",
-    title: stripExt(path.basename(targetFile)),
+    title,
     content: initialContent,
     updatedAt: new Date().toISOString().slice(0, 10),
     filePath: targetFile,
-    fileType: "markdown",
+    fileType,
   };
 }
 

@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Code,
   Columns2,
   Copy,
   FilePlus,
@@ -39,7 +40,13 @@ import {
   useClickOutside,
 } from "../../hooks/useDomInteractions";
 import { resolveWorkspaceConnections } from "../../lib/catalogUtils";
-import { isImageNote, isPdfNote, NOTE_FILE_ACCEPT } from "../../lib/fileUtils";
+import {
+  getCodeLanguageLabel,
+  isCodeNote,
+  isImageNote,
+  isPdfNote,
+  NOTE_FILE_ACCEPT,
+} from "../../lib/fileUtils";
 import { findLeaf, getAllLeaves } from "../../lib/paneLayoutTree";
 import {
   collectAllFolderIds,
@@ -102,6 +109,9 @@ export const FolderExplorer: React.FC = () => {
   const toggleNoteLink = useNotesStore((s) => s.toggleNoteLink);
   const setSortOrder = useNotesStore((s) => s.setSortOrder);
   const createNote = useNotesStore((s) => s.createNote);
+  const createCodeFile = useNotesStore((s) => s.createCodeFile);
+  const syncFolderFromDisk = useNotesStore((s) => s.syncFolderFromDisk);
+  const isSyncingFolderId = useNotesStore((s) => s.isSyncingFolderId);
   const duplicateNote = useNotesStore((s) => s.duplicateNote);
   const updateNote = useNotesStore((s) => s.updateNote);
   const createSubfolder = useNotesStore((s) => s.createSubfolder);
@@ -537,6 +547,8 @@ export const FolderExplorer: React.FC = () => {
       contextMenu?.kind === "note" && contextMenu.note.id === node.id;
     const isPdf = isPdfNote(node);
     const isImage = !isPdf && isImageNote(node);
+    const isCode = !isPdf && !isImage && isCodeNote(node);
+    const codeLang = isCode ? getCodeLanguageLabel(node.filePath) : "";
     const noteLevelClass = depth > 0 ? "is-child-note" : "is-root-note";
 
     return (
@@ -574,6 +586,12 @@ export const FolderExplorer: React.FC = () => {
             size={16}
             strokeWidth={1.75}
             className="explorer-item-icon explorer-note-icon is-image-icon"
+          />
+        ) : isCode ? (
+          <Code
+            size={16}
+            strokeWidth={1.75}
+            className="explorer-item-icon explorer-note-icon is-code-icon"
           />
         ) : (
           <FileText
@@ -627,6 +645,14 @@ export const FolderExplorer: React.FC = () => {
         {isImage && (
           <span className="explorer-img-badge" title="Image File">
             IMG
+          </span>
+        )}
+        {isCode && (
+          <span
+            className="explorer-code-badge"
+            title={`Code File (${codeLang})`}
+          >
+            {codeLang.slice(0, 4)}
           </span>
         )}
         <div className="explorer-row-actions">
@@ -732,6 +758,24 @@ export const FolderExplorer: React.FC = () => {
                 <ChevronsDownUp size={17} strokeWidth={1.8} />
               )}
             </button>
+
+            {/* Sync / refresh folder from disk */}
+            {folder.localPath && (
+              <button
+                type="button"
+                className={`explorer-menu-btn ${isSyncingFolderId === folder.id ? "is-syncing" : ""}`}
+                title={
+                  isSyncingFolderId === folder.id
+                    ? "Syncing with disk..."
+                    : "Refresh folder from disk"
+                }
+                aria-label="Refresh folder from disk"
+                disabled={Boolean(isSyncingFolderId)}
+                onClick={() => void syncFolderFromDisk(folder.id)}
+              >
+                <FolderSync size={16} strokeWidth={1.8} />
+              </button>
+            )}
 
             {/* List/Menu button for extended folder options */}
             <div className="explorer-menu-wrap" ref={folderMenuRef}>
@@ -949,6 +993,20 @@ export const FolderExplorer: React.FC = () => {
                 onClick={() => {
                   const targetParentId = contextMenu.parentFolderId;
                   closeContextMenu();
+                  void createCodeFile(targetParentId);
+                }}
+              >
+                <Code size={14} strokeWidth={1.8} />
+                <span>New code file</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetParentId = contextMenu.parentFolderId;
+                  closeContextMenu();
                   void createSubfolder(targetParentId);
                 }}
               >
@@ -1071,6 +1129,20 @@ export const FolderExplorer: React.FC = () => {
                 onClick={() => {
                   const targetId = contextMenu.subfolder.id;
                   closeContextMenu();
+                  void createCodeFile(targetId);
+                }}
+              >
+                <Code size={14} strokeWidth={1.8} />
+                <span>New code file</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  const targetId = contextMenu.subfolder.id;
+                  closeContextMenu();
                   void createSubfolder(targetId);
                 }}
               >
@@ -1130,6 +1202,19 @@ export const FolderExplorer: React.FC = () => {
               >
                 <FilePlus size={14} strokeWidth={1.8} />
                 <span>New note</span>
+              </button>
+
+              <button
+                type="button"
+                className="dropdown-menu-item"
+                role="menuitem"
+                onClick={() => {
+                  closeContextMenu();
+                  void createCodeFile(null);
+                }}
+              >
+                <Code size={14} strokeWidth={1.8} />
+                <span>New code file</span>
               </button>
 
               <button

@@ -1,10 +1,44 @@
 import { ExplorerNode, FolderItem, NoteItem } from "../types";
 
 export const NOTE_FILE_ACCEPT =
-  ".md,.markdown,.mdx,.txt,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.ico,.avif";
+  ".md,.markdown,.mdx,.txt,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.ico,.avif," +
+  ".py,.js,.jsx,.ts,.tsx,.sh,.bash,.zsh,.sql,.rs,.go,.c,.cpp,.h,.hpp,.java,.kt,.php,.rb,.lua,.json,.yaml,.yml,.toml,.xml,.css,.scss,.html";
 const NOTE_EXT_REGEX =
-  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif|py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
 const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+const CODE_EXT_REGEX =
+  /\.(py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
+
+export const CODE_EXTENSIONS = new Set([
+  "py",
+  "js",
+  "jsx",
+  "ts",
+  "tsx",
+  "sh",
+  "bash",
+  "zsh",
+  "sql",
+  "rs",
+  "go",
+  "c",
+  "cpp",
+  "h",
+  "hpp",
+  "java",
+  "kt",
+  "php",
+  "rb",
+  "lua",
+  "json",
+  "yaml",
+  "yml",
+  "toml",
+  "xml",
+  "css",
+  "scss",
+  "html",
+]);
 
 const IGNORED_DIRECTORY_NAMES = new Set([
   "node_modules",
@@ -39,7 +73,7 @@ function fileDateString(file: File): string {
 }
 
 function stripNoteExtension(fileName: string): string {
-  return fileName.replace(NOTE_EXT_REGEX, "").trim() || "Untitled";
+  return fileName.replace(/\.(md|markdown|mdx|txt)$/i, "").trim() || "Untitled";
 }
 
 export function sanitizeFilename(name: string): string {
@@ -56,6 +90,10 @@ function isPdfFileName(fileName?: string): boolean {
 
 function isImageFileName(fileName?: string): boolean {
   return Boolean(fileName && IMAGE_EXT_REGEX.test(fileName));
+}
+
+export function isCodeFileName(fileName?: string): boolean {
+  return Boolean(fileName && CODE_EXT_REGEX.test(fileName));
 }
 
 export function isPdfNote(
@@ -76,6 +114,71 @@ export function isImageNote(
   );
 }
 
+export function isCodeNote(
+  note: Pick<NoteItem, "fileType" | "filePath">,
+): boolean {
+  return Boolean(note.fileType === "code" || isCodeFileName(note.filePath));
+}
+
+export function getCodeLanguageLabel(filePath?: string): string {
+  if (!filePath) return "CODE";
+  const match = filePath.match(/\.([a-z0-9_-]+)$/i);
+  if (!match) return "CODE";
+  const ext = match[1].toLowerCase();
+  switch (ext) {
+    case "py":
+      return "PYTHON";
+    case "js":
+    case "jsx":
+      return "JAVASCRIPT";
+    case "ts":
+    case "tsx":
+      return "TYPESCRIPT";
+    case "sh":
+    case "bash":
+    case "zsh":
+      return "SHELL";
+    case "sql":
+      return "SQL";
+    case "rs":
+      return "RUST";
+    case "go":
+      return "GO";
+    case "c":
+      return "C";
+    case "cpp":
+    case "hpp":
+    case "h":
+      return "C++";
+    case "java":
+      return "JAVA";
+    case "kt":
+      return "KOTLIN";
+    case "php":
+      return "PHP";
+    case "rb":
+      return "RUBY";
+    case "lua":
+      return "LUA";
+    case "json":
+      return "JSON";
+    case "yaml":
+    case "yml":
+      return "YAML";
+    case "toml":
+      return "TOML";
+    case "xml":
+      return "XML";
+    case "css":
+    case "scss":
+      return "CSS";
+    case "html":
+      return "HTML";
+    default:
+      return ext.toUpperCase();
+  }
+}
+
 export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -88,6 +191,7 @@ export function readFileAsDataUrl(file: File): Promise<string> {
 async function buildNoteItemFromFile(file: File): Promise<NoteItem> {
   const isPdf = isPdfFileName(file.name);
   const isImage = !isPdf && isImageFileName(file.name);
+  const isCode = !isPdf && !isImage && isCodeFileName(file.name);
   const pdfData = isPdf ? await readFileAsDataUrl(file) : undefined;
   const imageData = isImage ? await readFileAsDataUrl(file) : undefined;
   const content = isPdf || isImage ? "" : await file.text();
@@ -95,9 +199,9 @@ async function buildNoteItemFromFile(file: File): Promise<NoteItem> {
   return {
     id: createId("note"),
     type: "note",
-    title: stripNoteExtension(file.name),
+    title: isCode ? file.name : stripNoteExtension(file.name),
     content,
-    fileType: isPdf ? "pdf" : isImage ? "image" : "markdown",
+    fileType: isPdf ? "pdf" : isImage ? "image" : isCode ? "code" : "markdown",
     pdfData,
     imageData,
     updatedAt: fileDateString(file),

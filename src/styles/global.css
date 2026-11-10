@@ -436,12 +436,8 @@ textarea {
   border-bottom: 1px solid var(--border-tab);
   position: relative;
   background-color: color-mix(in srgb, var(--paper) 92%, var(--sidebar));
-  background-image:
-    radial-gradient(ellipse at 50% 0%, var(--glow), transparent 75%),
-    var(--noise-layer);
-  background-size:
-    100% 100%,
-    160px 160px;
+  background-image: var(--noise-layer);
+  background-size: 160px 160px;
 }
 
 .navbar-tabs.is-slim {
@@ -1044,20 +1040,14 @@ textarea {
 
 .folder-tab.is-selected {
   background-color: color-mix(in srgb, var(--forest) 14%, var(--bg-tab));
-  background-image:
-    radial-gradient(
-      ellipse at 50% 0%,
-      color-mix(in srgb, var(--forest) 22%, transparent),
-      transparent 80%
-    ),
-    var(--noise-layer);
-  background-size:
-    100% 100%,
-    160px 160px;
+  background-image: var(--noise-layer);
+  background-size: 160px 160px;
   border: 1.5px solid var(--forest);
-  box-shadow:
-    0 0 14px var(--glow),
-    inset 0 0 10px color-mix(in srgb, var(--forest) 8%, transparent);
+  box-shadow: none;
+}
+
+.folder-tab.is-selected:hover {
+  box-shadow: none;
 }
 
 .folder-tab.is-linked-folder:not(.is-selected) {
@@ -1066,22 +1056,11 @@ textarea {
     var(--link-highlight, #c084fc) 14%,
     var(--bg-tab)
   );
-  background-image:
-    radial-gradient(
-      ellipse at 50% 0%,
-      color-mix(in srgb, var(--link-highlight, #c084fc) 20%, transparent),
-      transparent 80%
-    ),
-    var(--noise-layer);
-  background-size:
-    100% 100%,
-    160px 160px;
+  background-image: var(--noise-layer);
+  background-size: 160px 160px;
   border: 1.5px solid
     color-mix(in srgb, var(--link-highlight, #c084fc) 72%, var(--border-tab));
-  box-shadow:
-    0 0 12px color-mix(in srgb, var(--link-highlight, #c084fc) 22%, transparent),
-    inset 0 0 8px
-      color-mix(in srgb, var(--link-highlight, #c084fc) 8%, transparent);
+  box-shadow: none;
 }
 
 .folder-tab.is-linked-folder:not(.is-selected):hover {
@@ -1409,6 +1388,11 @@ textarea {
   opacity: 0.4;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+.explorer-menu-btn.is-syncing svg {
+  animation: spin 1s linear infinite;
+  color: var(--accent);
 }
 
 /* Explorer Dropdown Menu */
@@ -6759,6 +6743,64 @@ body.is-col-resizing * {
   font-size: 11.5px;
   font-weight: 600;
   border: 1px solid color-mix(in srgb, #38bdf8 28%, transparent);
+}
+
+/* ==========================================================================
+   CODE EDITOR STYLES
+   ========================================================================== */
+
+.editor-code-full {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-editor, #0c1017);
+}
+
+.code-editor-wrapper {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.explorer-code-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, #a855f7 18%, transparent);
+  color: #c084fc;
+  border: 1px solid color-mix(in srgb, #a855f7 32%, transparent);
+  margin-left: 6px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.explorer-note-icon.is-code-icon,
+.note-tab-file-icon.is-code-icon {
+  color: #c084fc !important;
+}
+
+.editor-code-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: color-mix(in srgb, #a855f7 14%, transparent);
+  color: #c084fc;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, #a855f7 28%, transparent);
+}
+
+.code-badge-icon {
+  color: #c084fc;
+  flex-shrink: 0;
 }
 
 /* ==========================================================================

@@ -11,7 +11,7 @@ interface ImportedNote {
   content: string;
   updatedAt: string;
   filePath?: string;
-  fileType?: "markdown" | "pdf" | "image";
+  fileType?: "markdown" | "pdf" | "image" | "code";
 }
 
 interface ImportedFolder {
@@ -49,8 +49,10 @@ interface StoredTreeItem {
 }
 
 const NOTE_EXT_REGEX =
-  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif|py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
 const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+const CODE_EXT_REGEX =
+  /\.(py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
 
 const IGNORED_NAMES = new Set([
   "node_modules",
@@ -355,7 +357,7 @@ function makeId(prefix: string): string {
 }
 
 function stripExt(name: string): string {
-  return name.replace(NOTE_EXT_REGEX, "").trim() || "Untitled";
+  return name.replace(/\.(md|markdown|mdx|txt)$/i, "").trim() || "Untitled";
 }
 
 async function readBody(req: IncomingMessage): Promise<string> {
@@ -422,16 +424,23 @@ async function readDirectoryShallow(dirPath: string): Promise<ImportedNode[]> {
     } else if (entry.isFile() && NOTE_EXT_REGEX.test(entry.name)) {
       const isPdf = entry.name.toLowerCase().endsWith(".pdf");
       const isImage = !isPdf && IMAGE_EXT_REGEX.test(entry.name);
+      const isCode = !isPdf && !isImage && CODE_EXT_REGEX.test(entry.name);
       try {
         const stat = await fs.stat(fullPath);
         notes.push({
           id: makeId("note"),
           type: "note",
-          title: stripExt(entry.name),
+          title: isCode ? entry.name : stripExt(entry.name),
           content: "",
           updatedAt: stat.mtime.toISOString().slice(0, 10),
           filePath: fullPath,
-          fileType: isPdf ? "pdf" : isImage ? "image" : "markdown",
+          fileType: isPdf
+            ? "pdf"
+            : isImage
+              ? "image"
+              : isCode
+                ? "code"
+                : "markdown",
         });
       } catch {
         // Skip unreadable files
@@ -720,15 +729,31 @@ function localBackendPlugin(): Plugin {
         }
         const rawFileName =
           typeof body.name === "string" ? body.name.trim() : "Untitled Note";
-        const baseName = stripExt(rawFileName);
+        const isCode = CODE_EXT_REGEX.test(rawFileName);
         const resolvedParent = path.resolve(parentPath);
         await fs.mkdir(resolvedParent, { recursive: true });
 
-        const targetFile = await resolveUniqueChildPath(
-          resolvedParent,
-          baseName,
-          ".md",
-        );
+        let targetFile: string;
+        let fileType: "markdown" | "code" = "markdown";
+        let title = "";
+
+        if (isCode) {
+          const ext = path.extname(rawFileName);
+          const base = path.basename(rawFileName, ext);
+          targetFile = await resolveUniqueChildPath(resolvedParent, base, ext);
+          fileType = "code";
+          title = path.basename(targetFile);
+        } else {
+          const baseName = stripExt(rawFileName);
+          targetFile = await resolveUniqueChildPath(
+            resolvedParent,
+            baseName,
+            ".md",
+          );
+          fileType = "markdown";
+          title = stripExt(path.basename(targetFile));
+        }
+
         const initialContent =
           typeof body.content === "string" ? body.content : "";
         await fs.writeFile(targetFile, initialContent, "utf-8");
@@ -736,10 +761,11 @@ function localBackendPlugin(): Plugin {
         const createdNote: ImportedNote = {
           id: makeId("note"),
           type: "note",
-          title: stripExt(path.basename(targetFile)),
+          title,
           content: initialContent,
           updatedAt: new Date().toISOString().slice(0, 10),
           filePath: targetFile,
+          fileType,
         };
         sendJson(res, 200, { ok: true, note: createdNote });
       } catch (err) {

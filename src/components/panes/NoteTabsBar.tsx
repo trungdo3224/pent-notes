@@ -5,9 +5,14 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { FileText, Image as ImageIcon, Plus, X } from "lucide-react";
+import { Code, FileText, Image as ImageIcon, Plus, X } from "lucide-react";
 import { useClickOutside } from "../../hooks/useDomInteractions";
-import { isImageNote, isPdfNote } from "../../lib/fileUtils";
+import {
+  getCodeLanguageLabel,
+  isCodeNote,
+  isImageNote,
+  isPdfNote,
+} from "../../lib/fileUtils";
 import { getAllLeaves } from "../../lib/paneLayoutTree";
 import { findNoteNode } from "../../lib/treeUtils";
 import { isNotePendingSave, useNotesStore } from "../../store/useNotesStore";
@@ -36,6 +41,7 @@ export const NoteTabsBar: React.FC = () => {
   const closeAllNoteTabs = useNotesStore((s) => s.closeAllNoteTabs);
   const splitPane = useNotesStore((s) => s.splitPane);
   const createNote = useNotesStore((s) => s.createNote);
+  const createCodeFile = useNotesStore((s) => s.createCodeFile);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -215,6 +221,10 @@ export const NoteTabsBar: React.FC = () => {
     await createNote(null);
   };
 
+  const handleCreateCode = async () => {
+    await createCodeFile(null);
+  };
+
   if (!activeFolder || openNotes.length === 0) {
     return null;
   }
@@ -239,6 +249,7 @@ export const NoteTabsBar: React.FC = () => {
           const isActive = note.id === currentActiveNoteId;
           const isPdf = isPdfNote(note);
           const isImage = !isPdf && isImageNote(note);
+          const isCode = !isPdf && !isImage && isCodeNote(note);
           const isContextOpen = contextMenu?.noteId === note.id;
           const paneNums = paneNumbersByNoteId.get(note.id);
           const paneBadge =
@@ -267,6 +278,8 @@ export const NoteTabsBar: React.FC = () => {
                     size={13}
                     className="note-tab-file-icon is-image-icon"
                   />
+                ) : isCode ? (
+                  <Code size={13} className="note-tab-file-icon is-code-icon" />
                 ) : (
                   <FileText size={13} className="note-tab-file-icon" />
                 )}
@@ -306,6 +319,16 @@ export const NoteTabsBar: React.FC = () => {
           aria-label="New Note"
         >
           <Plus size={14} strokeWidth={2} />
+        </button>
+
+        <button
+          type="button"
+          className="note-tab-new-btn"
+          onClick={handleCreateCode}
+          title="New Code File"
+          aria-label="New Code File"
+        >
+          <Code size={13} strokeWidth={2} />
         </button>
       </div>
 

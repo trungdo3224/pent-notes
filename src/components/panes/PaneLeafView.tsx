@@ -3,6 +3,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Code,
   FileText,
   Folder,
   HardDrive,
@@ -16,10 +17,16 @@ import {
   listConnectableNotes,
   resolveWorkspaceConnections,
 } from "../../lib/catalogUtils";
-import { isImageNote, isPdfNote } from "../../lib/fileUtils";
+import {
+  getCodeLanguageLabel,
+  isCodeNote,
+  isImageNote,
+  isPdfNote,
+} from "../../lib/fileUtils";
 import { findNoteAndPath } from "../../lib/treeUtils";
 import { useNotesStore } from "../../store/useNotesStore";
 import { PaneLeafNode, TopLevelFolder } from "../../types";
+import { CodeEditor } from "../editor/CodeEditor";
 import { ImageViewer } from "../editor/ImageViewer";
 import { MarkdownEditor } from "../editor/MarkdownEditor";
 import { PdfViewer } from "../editor/PdfViewer";
@@ -125,6 +132,8 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
 
   const isPdf = note ? isPdfNote(note) : false;
   const isImage = note && !isPdf ? isImageNote(note) : false;
+  const isCode = note && !isPdf && !isImage ? isCodeNote(note) : false;
+  const codeLang = isCode ? getCodeLanguageLabel(note?.filePath) : "";
   const words = note ? countWords(noteContent) : 0;
 
   return (
@@ -266,6 +275,11 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                 <span className="editor-pdf-badge">PDF</span>
               ) : isImage ? (
                 <span className="editor-image-badge">IMG</span>
+              ) : isCode ? (
+                <span className="editor-code-badge" title={note.filePath}>
+                  <Code size={11} />
+                  <span>{codeLang}</span>
+                </span>
               ) : note.filePath ? (
                 <span className="editor-disk-badge" title={note.filePath}>
                   <HardDrive size={11} />
@@ -273,7 +287,9 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
               ) : null}
 
               {!isPdf && !isImage && (
-                <span className="editor-meta">{words}w</span>
+                <span className="editor-meta">
+                  {isCode ? `${noteContent.split("\n").length}L` : `${words}w`}
+                </span>
               )}
             </>
           )}
@@ -315,6 +331,21 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
               filePath={note.filePath}
               imageData={note.imageData}
             />
+          </div>
+        ) : isCode ? (
+          <div className="editor-code-full">
+            {Boolean(
+              note.filePath && activeNoteContents[note.id] === undefined,
+            ) ? (
+              <div className="editor-loading-placeholder" />
+            ) : (
+              <CodeEditor
+                key={`code-editor-${leaf.id}-${note.id}`}
+                value={noteContent}
+                onChange={(val) => updateNote(note.id, { content: val })}
+                filePath={note.filePath}
+              />
+            )}
           </div>
         ) : (
           <div className="editor-scroll-container">

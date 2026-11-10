@@ -9,6 +9,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Code,
   FileText,
   FileUp,
   Folder,
@@ -30,6 +31,8 @@ import {
   resolveWorkspaceConnections,
 } from "../../lib/catalogUtils";
 import {
+  getCodeLanguageLabel,
+  isCodeNote,
   isImageNote,
   isPdfNote,
   NOTE_FILE_ACCEPT,
@@ -41,6 +44,7 @@ import {
   useNotesStore,
 } from "../../store/useNotesStore";
 import { NoteItem } from "../../types";
+import { CodeEditor } from "./CodeEditor";
 import { ImageViewer } from "./ImageViewer";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { NoteTabsBar } from "../panes/NoteTabsBar";
@@ -317,6 +321,7 @@ export const NoteEditor: React.FC = () => {
   const renderNoteContent = (targetNote: NoteItem, isPrimaryTitle = false) => {
     const isPdf = isPdfNote(targetNote);
     const isImage = !isPdf && isImageNote(targetNote);
+    const isCode = !isPdf && !isImage && isCodeNote(targetNote);
 
     if (isPdf) {
       return (
@@ -338,6 +343,26 @@ export const NoteEditor: React.FC = () => {
             filePath={targetNote.filePath}
             imageData={targetNote.imageData}
           />
+        </div>
+      );
+    }
+
+    if (isCode) {
+      const isContentLoading = Boolean(
+        targetNote.filePath && activeNoteContents[targetNote.id] === undefined,
+      );
+      return (
+        <div className="editor-code-full">
+          {isContentLoading ? (
+            <div className="editor-loading-placeholder" />
+          ) : (
+            <CodeEditor
+              key={`code-editor-${targetNote.id}`}
+              value={noteContent}
+              onChange={(val) => updateNote(targetNote.id, { content: val })}
+              filePath={targetNote.filePath}
+            />
+          )}
         </div>
       );
     }
@@ -420,6 +445,11 @@ export const NoteEditor: React.FC = () => {
   const primaryWords = note ? countWords(noteContent) : 0;
   const isPrimaryPdf = note ? isPdfNote(note) : false;
   const isPrimaryImage = note && !isPrimaryPdf ? isImageNote(note) : false;
+  const isPrimaryCode =
+    note && !isPrimaryPdf && !isPrimaryImage ? isCodeNote(note) : false;
+  const primaryCodeLang = isPrimaryCode
+    ? getCodeLanguageLabel(note?.filePath)
+    : "";
 
   return (
     <main className="editor-pane">
@@ -468,6 +498,14 @@ export const NoteEditor: React.FC = () => {
                   <ImageIcon size={12} className="image-badge-icon" />
                   <span>Image</span>
                 </span>
+              ) : isPrimaryCode ? (
+                <span
+                  className="editor-code-badge"
+                  title={`Code file: ${note.filePath || ""}`}
+                >
+                  <Code size={12} className="code-badge-icon" />
+                  <span>{primaryCodeLang}</span>
+                </span>
               ) : note.filePath ? (
                 <span
                   className="editor-disk-badge"
@@ -479,7 +517,9 @@ export const NoteEditor: React.FC = () => {
 
               {!isPrimaryPdf && !isPrimaryImage && (
                 <span className="editor-meta">
-                  {primaryWords} {primaryWords === 1 ? "word" : "words"}
+                  {isPrimaryCode
+                    ? `${noteContent.split("\n").length} lines`
+                    : `${primaryWords} ${primaryWords === 1 ? "word" : "words"}`}
                 </span>
               )}
             </>

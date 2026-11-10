@@ -8,6 +8,7 @@ import {
 import {
   buildNoteItemsFromFiles,
   createId,
+  isCodeFileName,
   sanitizeFilename,
   todayDateString,
 } from "../lib/fileUtils";
@@ -280,6 +281,10 @@ export interface NotesState {
   navigateToNote: (topFolderId: string, noteId: string) => void;
   toggleNoteLink: (activeNoteId: string, targetNoteId: string) => Promise<void>;
   createNote: (parentFolderId: string | null) => Promise<string | null>;
+  createCodeFile: (
+    parentFolderId: string | null,
+    customFileName?: string,
+  ) => Promise<string | null>;
   duplicateNote: (
     noteId: string,
     parentFolderId: string | null,
@@ -1240,6 +1245,79 @@ export const useNotesStore = create<NotesState>()(
         return newNote.id;
       },
 
+      createCodeFile: async (parentFolderId, customFileName) => {
+        const state = get();
+        const currentFolder = getSelectedTopFolder(state);
+        if (!currentFolder) return null;
+
+        const rawFileName = customFileName?.trim() || "script.py";
+        const newNote: NoteItem = {
+          id: createId("note"),
+          type: "note",
+          title: rawFileName,
+          content: "",
+          fileType: "code",
+          updatedAt: todayDateString(),
+        };
+
+        const nextCollapsed = parentFolderId
+          ? state.collapsedSubfolderIds.filter((id) => id !== parentFolderId)
+          : state.collapsedSubfolderIds;
+
+        set((s) => ({
+          activeNoteContents: {
+            ...s.activeNoteContents,
+            [newNote.id]: "",
+          },
+          folders: mapFolderById(s.folders, s.selectedFolderId, (folder) => ({
+            ...folder,
+            items: insertIntoTree(folder.items, parentFolderId, newNote),
+          })),
+          selectedNoteByFolder: {
+            ...s.selectedNoteByFolder,
+            [currentFolder.id]: newNote.id,
+          },
+          openNotesByFolder: {
+            ...s.openNotesByFolder,
+            [currentFolder.id]: [
+              ...(s.openNotesByFolder[currentFolder.id] || []),
+              newNote.id,
+            ],
+          },
+          collapsedSubfolderIds: nextCollapsed,
+          shouldFocusNoteTitle: true,
+        }));
+
+        const parentPath = resolveParentDiskPath(currentFolder, parentFolderId);
+        if (parentPath) {
+          try {
+            const diskNote = await fsApi.createFile(
+              parentPath,
+              rawFileName,
+              "",
+            );
+            set((s) => ({
+              folders: mapFolderById(
+                s.folders,
+                s.selectedFolderId,
+                (folder) => ({
+                  ...folder,
+                  items: updateNoteInTree(folder.items, newNote.id, {
+                    title: diskNote.title,
+                    filePath: diskNote.filePath,
+                    fileType: "code",
+                  }),
+                }),
+              ),
+            }));
+          } catch (err) {
+            console.error("Failed to create code file on disk:", err);
+          }
+        }
+
+        return newNote.id;
+      },
+
       duplicateNote: async (noteId, parentFolderId) => {
         const state = get();
         const currentFolder = getSelectedTopFolder(state);
@@ -1288,9 +1366,17 @@ export const useNotesStore = create<NotesState>()(
           },
         }));
 
-        if (parentPath && sourceNote.fileType !== "pdf") {
+        if (
+          parentPath &&
+          sourceNote.fileType !== "pdf" &&
+          sourceNote.fileType !== "image"
+        ) {
           try {
-            const filename = `${sanitizeFilename(copyTitle)}.md`;
+            const oldExt = sourceNote.filePath?.includes(".")
+              ? sourceNote.filePath.slice(sourceNote.filePath.lastIndexOf("."))
+              : ".md";
+            const ext = sourceNote.fileType === "code" ? oldExt : ".md";
+            const filename = `${sanitizeFilename(copyTitle)}${ext}`;
             const diskNote = await fsApi.createFile(
               parentPath,
               filename,
@@ -1457,6 +1543,12 @@ export const useNotesStore = create<NotesState>()(
 
         const targetFolderId = containingFolder.id;
         const targetNote = findNoteNode(containingFolder.items, noteId);
+        const detectedFileType =
+          updates.title && isCodeFileName(updates.title)
+            ? "code"
+            : updates.title && updates.title.toLowerCase().endsWith(".md")
+              ? "markdown"
+              : undefined;
 
         set((s) => ({
           activeNoteContents:
@@ -1467,6 +1559,7 @@ export const useNotesStore = create<NotesState>()(
             ...folder,
             items: updateNoteInTree(folder.items, noteId, {
               ...updates,
+              ...(detectedFileType ? { fileType: detectedFileType } : {}),
               content: "", // RFC-042: tree node does not hold raw file body
             }),
           })),
@@ -1504,7 +1597,31 @@ export const useNotesStore = create<NotesState>()(
             try {
               const dir = getDirname(currentFilePath);
               const cleanName = sanitizeFilename(updates.title!.trim());
-              const newPath = joinPath(dir, `${cleanName}.md`);
+              const oldExt = currentFilePath.includes(".")
+                ? currentFilePath.slice(currentFilePath.lastIndexOf("."))
+                : ".md";
+              let newFileName = cleanName;
+              let nextFileType = targetNote.fileType;
+
+              if (isCodeFileName(cleanName)) {
+                newFileName = cleanName;
+                nextFileType = "code";
+              } else if (cleanName.toLowerCase().endsWith(".md")) {
+                newFileName = cleanName;
+                nextFileType = "markdown";
+              } else if (
+                targetNote.fileType === "code" ||
+                targetNote.fileType === "pdf" ||
+                targetNote.fileType === "image"
+              ) {
+                if (!/\.[a-z0-9_-]+$/i.test(cleanName)) {
+                  newFileName = `${cleanName}${oldExt}`;
+                }
+              } else {
+                newFileName = `${cleanName}.md`;
+                nextFileType = "markdown";
+              }
+              const newPath = joinPath(dir, newFileName);
               if (newPath !== currentFilePath) {
                 const actualPath = await fsApi.renamePath(
                   currentFilePath,
@@ -1518,6 +1635,7 @@ export const useNotesStore = create<NotesState>()(
                       ...folder,
                       items: updateNoteInTree(folder.items, noteId, {
                         filePath: actualPath,
+                        fileType: nextFileType,
                       }),
                     }),
                   ),

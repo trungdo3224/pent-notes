@@ -5,7 +5,7 @@ export interface NoteItem {
   content: string;
   updatedAt: string;
   filePath?: string;
-  fileType?: "markdown" | "pdf" | "image";
+  fileType?: "markdown" | "pdf" | "image" | "code";
   pdfData?: string;
   imageData?: string;
 }
