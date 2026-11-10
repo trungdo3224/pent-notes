@@ -436,8 +436,12 @@ textarea {
   border-bottom: 1px solid var(--border-tab);
   position: relative;
   background-color: color-mix(in srgb, var(--paper) 92%, var(--sidebar));
-  background-image: var(--noise-layer);
-  background-size: 160px 160px;
+  background-image:
+    radial-gradient(ellipse at 50% 0%, var(--glow), transparent 75%),
+    var(--noise-layer);
+  background-size:
+    100% 100%,
+    160px 160px;
 }
 
 .navbar-tabs.is-slim {
@@ -1040,14 +1044,10 @@ textarea {
 
 .folder-tab.is-selected {
   background-color: color-mix(in srgb, var(--forest) 14%, var(--bg-tab));
-  background-image: var(--noise-layer);
-  background-size: 160px 160px;
   border: 1.5px solid var(--forest);
-  box-shadow: none;
-}
-
-.folder-tab.is-selected:hover {
-  box-shadow: none;
+  box-shadow:
+    0 0 14px var(--glow),
+    inset 0 0 10px color-mix(in srgb, var(--forest) 8%, transparent);
 }
 
 .folder-tab.is-linked-folder:not(.is-selected) {
@@ -1056,11 +1056,22 @@ textarea {
     var(--link-highlight, #c084fc) 14%,
     var(--bg-tab)
   );
-  background-image: var(--noise-layer);
-  background-size: 160px 160px;
+  background-image:
+    radial-gradient(
+      ellipse at 50% 0%,
+      color-mix(in srgb, var(--link-highlight, #c084fc) 20%, transparent),
+      transparent 80%
+    ),
+    var(--noise-layer);
+  background-size:
+    100% 100%,
+    160px 160px;
   border: 1.5px solid
     color-mix(in srgb, var(--link-highlight, #c084fc) 72%, var(--border-tab));
-  box-shadow: none;
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--link-highlight, #c084fc) 22%, transparent),
+    inset 0 0 8px
+      color-mix(in srgb, var(--link-highlight, #c084fc) 8%, transparent);
 }
 
 .folder-tab.is-linked-folder:not(.is-selected):hover {
