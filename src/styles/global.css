@@ -30,13 +30,13 @@
 
   --danger: #eb6b6b;
 
-  --caret: var(--forest, #00e5ff);
-  --selection-bg: color-mix(in srgb, var(--forest, #00e5ff) 36%, transparent);
+  --caret: var(--forest, #d97736);
+  --selection-bg: color-mix(in srgb, var(--forest, #d97736) 36%, transparent);
   --selection-text: var(--selection-text, #ffffff);
 
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica,
-    Arial, sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   --font-mono:
     "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
   --editor-font-size: 16px;

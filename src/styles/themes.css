@@ -1,228 +1,201 @@
 /* ==========================================================================
-   MINIMALIST THEME SYSTEM
-   Shared soft dark & dimmed light base surfaces with purposeful accent tokens.
+   WARM MINIMALIST THEME SYSTEM (Calm Design)
+   2 Dark themes (Warm Espresso, Deep Slate) & 1 Light theme (Warm Linen).
+   Designed for focus, high legibility, and organic warmth.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   1. SHARED DARK BASE (Soft Slate Charcoal — lighter than pitch black)
+   1. WARM ESPRESSO (Dark - Default)
+   Roasted coffee charcoal, warm caramel amber, calming and grounded.
    -------------------------------------------------------------------------- */
 :root,
-:root[data-theme="midnight"],
-:root[data-theme="evergreen"],
-:root[data-theme="ember"] {
+:root[data-theme="espresso"] {
   color-scheme: dark;
 
   /* Base Surfaces */
-  --paper: #141821;
-  --sidebar: #161b25;
-  --surface: #1b212d;
-  --surface-muted: #222938;
-  --hover: #242c3d;
-  --selected: #2a3447;
+  --paper: #191614;
+  --sidebar: #1d1917;
+  --surface: #241f1c;
+  --surface-muted: #2b2521;
+  --hover: #332c27;
+  --selected: #3c342e;
 
   /* Typography & Borders */
-  --ink: #f8fafc;
-  --heading: #f1f5f9;
-  --text: #d1d9e6;
-  --muted: #8b9bb4;
-  --line: #283142;
-  --line-strong: #364258;
+  --ink: #f7f1eb;
+  --heading: #f3ece4;
+  --text: #d8cec3;
+  --muted: #94887d;
+  --line: #2e2723;
+  --line-strong: #403630;
+
+  /* Accents */
+  --forest: #d97736;
+  --primary-hover: #e68545;
+  --button-text: #191614;
+  --accent: #e5a962;
+  --secondary: #c27a4e;
+  --folder-contrast: #d97736;
+  --caret: #e08844;
+  --link-highlight: #e5a962;
 
   /* Code Syntax Base */
-  --code-bg: #12161f;
-  --code-header: #181e29;
-  --code-border: #283142;
-  --code-text: #e2e8f0;
-  --code-comment: #94a3b8;
-  --inline-code-bg: #1e2638;
-  --inline-code-border: #2e3a52;
-  --inline-code-text: #38bdf8;
+  --code-bg: #141210;
+  --code-header: #1c1815;
+  --code-border: #2c2521;
+  --code-text: #ece4db;
+  --code-comment: #8c8075;
+  --code-caret: #e08844;
+  --code-keyword: #e08844;
+  --code-string: #8cb88b;
+  --code-title: #e5a962;
+  --inline-code-bg: #28221d;
+  --inline-code-border: #3d342c;
+  --inline-code-text: #e5a962;
 
-  /* Shared Link Highlight */
-  --link-highlight: #c084fc;
+  /* Selection */
+  --selection-bg: rgba(217, 119, 54, 0.32);
   --selection-text: #ffffff;
-  --code-caret: #00e5ff;
 
   /* Subtle Scrollbars */
-  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.24);
+  --scrollbar-thumb: rgba(247, 241, 235, 0.14);
+  --scrollbar-thumb-hover: rgba(247, 241, 235, 0.26);
 
   /* System */
-  --warning-bg: #2b2116;
+  --warning-bg: #2e2216;
   --warning-text: #fcd34d;
-  --warning-border: #63431d;
-  --toast-bg: #222938;
-  --toast-text: #f8fafc;
-  --overlay: #090c12bf;
-  --shadow: #00000070;
-}
-
-/* Default Dark Accent: Cyber Cyan (midnight) */
-:root,
-:root[data-theme="midnight"] {
-  --forest: #00e5ff;
-  --primary-hover: #38bdf8;
-  --button-text: #05101a;
-  --accent: #f43f5e;
-  --secondary: #f43f5e;
-  --folder-contrast: #f97316;
-  --caret: #00e5ff;
-  --code-caret: #00e5ff;
-  --selection-bg: rgba(0, 229, 255, 0.34);
-  --code-keyword: #38bdf8;
-  --code-string: #4ade80;
-  --code-title: #00e5ff;
-  --inline-code-bg: #1e2638;
-  --inline-code-border: #2e3a52;
-  --inline-code-text: #38bdf8;
-}
-
-/* Dark Accent: Terminal Green (evergreen) */
-:root[data-theme="evergreen"] {
-  --forest: #10b981;
-  --primary-hover: #34d399;
-  --button-text: #041a12;
-  --accent: #06b6d4;
-  --secondary: #06b6d4;
-  --folder-contrast: #f97316;
-  --caret: #10b981;
-  --code-caret: #34d399;
-  --selection-bg: rgba(16, 185, 129, 0.36);
-  --code-keyword: #34d399;
-  --code-string: #a3e635;
-  --code-title: #10b981;
-  --inline-code-bg: #162923;
-  --inline-code-border: #1f3d34;
-  --inline-code-text: #34d399;
-}
-
-/* Dark Accent: Flame Ember (ember) */
-:root[data-theme="ember"] {
-  --forest: #f97316;
-  --primary-hover: #fb923c;
-  --button-text: #1f0b03;
-  --accent: #f43f5e;
-  --secondary: #f43f5e;
-  --folder-contrast: #00e5ff;
-  --caret: #f97316;
-  --code-caret: #fb923c;
-  --selection-bg: rgba(249, 115, 22, 0.38);
-  --code-keyword: #fb923c;
-  --code-string: #34d399;
-  --code-title: #f97316;
-  --inline-code-bg: #2c201c;
-  --inline-code-border: #443028;
-  --inline-code-text: #fb923c;
+  --warning-border: #63471e;
+  --toast-bg: #2b2521;
+  --toast-text: #f7f1eb;
+  --overlay: #0e0c0bbf;
+  --shadow: #00000075;
 }
 
 /* --------------------------------------------------------------------------
-   2. SHARED LIGHT BASE (Dimmed Soft Alabaster — reduced white glare)
+   2. DEEP SLATE (Dark)
+   Graphite stone, river slate, and tranquil sage pine.
    -------------------------------------------------------------------------- */
-:root[data-theme="parchment"],
-:root[data-theme="glacier"],
-:root[data-theme="rosewood"] {
+:root[data-theme="slate"] {
+  color-scheme: dark;
+
+  /* Base Surfaces */
+  --paper: #15181b;
+  --sidebar: #191c20;
+  --surface: #20242a;
+  --surface-muted: #272c33;
+  --hover: #2f353e;
+  --selected: #38404a;
+
+  /* Typography & Borders */
+  --ink: #f0f4f8;
+  --heading: #e6edf4;
+  --text: #cbd5e1;
+  --muted: #828d9c;
+  --line: #2b313a;
+  --line-strong: #3c4450;
+
+  /* Accents */
+  --forest: #4ea685;
+  --primary-hover: #5eb896;
+  --button-text: #0d1a15;
+  --accent: #60a5fa;
+  --secondary: #68b598;
+  --folder-contrast: #4ea685;
+  --caret: #4ea685;
+  --link-highlight: #72bfa0;
+
+  /* Code Syntax Base */
+  --code-bg: #121417;
+  --code-header: #171b1f;
+  --code-border: #282e36;
+  --code-text: #e2e8f0;
+  --code-comment: #788596;
+  --code-caret: #4ea685;
+  --code-keyword: #68b598;
+  --code-string: #d6a858;
+  --code-title: #62bca0;
+  --inline-code-bg: #20272e;
+  --inline-code-border: #303c47;
+  --inline-code-text: #62bca0;
+
+  /* Selection */
+  --selection-bg: rgba(78, 166, 133, 0.32);
+  --selection-text: #ffffff;
+
+  /* Subtle Scrollbars */
+  --scrollbar-thumb: rgba(240, 244, 248, 0.14);
+  --scrollbar-thumb-hover: rgba(240, 244, 248, 0.26);
+
+  /* System */
+  --warning-bg: #2c2518;
+  --warning-text: #fcd34d;
+  --warning-border: #5e4a22;
+  --toast-bg: #272c33;
+  --toast-text: #f0f4f8;
+  --overlay: #0b0d0fbf;
+  --shadow: #00000075;
+}
+
+/* --------------------------------------------------------------------------
+   3. WARM LINEN (Light)
+   Unbleached oat paper, terracotta, deep espresso ink. Zero glare.
+   -------------------------------------------------------------------------- */
+:root[data-theme="linen"] {
   color-scheme: light;
 
   /* Base Surfaces */
-  --paper: #e4e9f0;
-  --sidebar: #e8edf4;
-  --surface: #f1f4f8;
-  --surface-muted: #e2e8f0;
-  --hover: #dce3ec;
-  --selected: #d2dbe7;
+  --paper: #f7f4ee;
+  --sidebar: #f1ede5;
+  --surface: #fbf9f5;
+  --surface-muted: #ece6dc;
+  --hover: #e5ded2;
+  --selected: #ddd4c5;
 
   /* Typography & Borders */
-  --ink: #0f172a;
-  --heading: #0f172a;
-  --text: #2b394e;
-  --muted: #5b6b82;
-  --line: #d4dce7;
-  --line-strong: #bcc7d6;
+  --ink: #231f1c;
+  --heading: #231f1c;
+  --text: #3f3933;
+  --muted: #787067;
+  --line: #e0d9ce;
+  --line-strong: #cec4b5;
+
+  /* Accents */
+  --forest: #b85d38;
+  --primary-hover: #a14e2b;
+  --button-text: #ffffff;
+  --accent: #3d6b56;
+  --secondary: #3d6b56;
+  --folder-contrast: #b85d38;
+  --caret: #b85d38;
+  --link-highlight: #944929;
 
   /* Code Syntax Base */
-  --code-bg: #e8ecf2;
-  --code-header: #dde3eb;
-  --code-border: #cbd5e1;
-  --code-text: #0f172a;
-  --code-comment: #64748b;
-  --inline-code-bg: rgba(15, 23, 42, 0.07);
-  --inline-code-border: rgba(15, 23, 42, 0.16);
-  --inline-code-text: #0f172a;
+  --code-bg: #f0ece3;
+  --code-header: #e7e1d5;
+  --code-border: #d8d0c2;
+  --code-text: #2a2521;
+  --code-comment: #7a7064;
+  --code-caret: #b85d38;
+  --code-keyword: #a8502d;
+  --code-string: #3f6b4d;
+  --code-title: #a8502d;
+  --inline-code-bg: rgba(184, 93, 56, 0.08);
+  --inline-code-border: rgba(184, 93, 56, 0.22);
+  --inline-code-text: #944929;
 
-  /* Shared Button Text */
-  --button-text: #ffffff;
-  --code-caret: #0284c7;
+  /* Selection */
+  --selection-bg: rgba(184, 93, 56, 0.22);
+  --selection-text: #231f1c;
 
   /* Subtle Scrollbars */
-  --scrollbar-thumb: rgba(15, 23, 42, 0.12);
-  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.24);
+  --scrollbar-thumb: rgba(35, 31, 28, 0.15);
+  --scrollbar-thumb-hover: rgba(35, 31, 28, 0.28);
 
   /* System */
   --warning-bg: #fef3c7;
   --warning-text: #92400e;
   --warning-border: #fde68a;
-  --toast-bg: #0f172a;
-  --toast-text: #f8fafc;
-  --overlay: #0f172a45;
-  --shadow: #0f172a18;
-}
-
-/* Light Accent: Solar Amber (parchment) */
-:root[data-theme="parchment"] {
-  --forest: #ea580c;
-  --primary-hover: #c2410c;
-  --accent: #0284c7;
-  --secondary: #0284c7;
-  --folder-contrast: #0284c7;
-  --link-highlight: #7c3aed;
-  --caret: #ea580c;
-  --code-caret: #ea580c;
-  --selection-bg: rgba(234, 88, 12, 0.26);
-  --selection-text: #0f172a;
-  --code-keyword: #0284c7;
-  --code-string: #16a34a;
-  --code-title: #ea580c;
-  --inline-code-bg: rgba(234, 88, 12, 0.08);
-  --inline-code-border: rgba(234, 88, 12, 0.24);
-  --inline-code-text: #c2410c;
-}
-
-/* Light Accent: Glacier Blue (glacier) */
-:root[data-theme="glacier"] {
-  --forest: #0284c7;
-  --primary-hover: #0369a1;
-  --accent: #0d9488;
-  --secondary: #0d9488;
-  --folder-contrast: #ea580c;
-  --link-highlight: #7c3aed;
-  --caret: #0284c7;
-  --code-caret: #0284c7;
-  --selection-bg: rgba(2, 132, 199, 0.26);
-  --selection-text: #082f49;
-  --code-keyword: #0369a1;
-  --code-string: #0d9488;
-  --code-title: #0284c7;
-  --inline-code-bg: rgba(2, 132, 199, 0.08);
-  --inline-code-border: rgba(2, 132, 199, 0.24);
-  --inline-code-text: #0369a1;
-}
-
-/* Light Accent: Prism Berry (rosewood) */
-:root[data-theme="rosewood"] {
-  --forest: #be185d;
-  --primary-hover: #9d174d;
-  --accent: #6366f1;
-  --secondary: #6366f1;
-  --folder-contrast: #0d9488;
-  --link-highlight: #0284c7;
-  --caret: #be185d;
-  --code-caret: #be185d;
-  --selection-bg: rgba(190, 24, 93, 0.24);
-  --selection-text: #4c0519;
-  --code-keyword: #4338ca;
-  --code-string: #be185d;
-  --code-title: #be185d;
-  --inline-code-bg: rgba(190, 24, 93, 0.08);
-  --inline-code-border: rgba(190, 24, 93, 0.24);
-  --inline-code-text: #9d174d;
+  --toast-bg: #231f1c;
+  --toast-text: #f7f4ee;
+  --overlay: #231f1c40;
+  --shadow: #231f1c16;
 }

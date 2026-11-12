@@ -139,8 +139,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
                 <div className="settings-pane-intro">
                   <h3>Color Atmosphere</h3>
                   <p>
-                    Minimalist, high-readability workspaces with vibrant theme
-                    color accents.
+                    Calm design with warm minimalism, soothing tones, and
+                    refined accents.
                   </p>
                 </div>
 
