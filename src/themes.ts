@@ -2,62 +2,53 @@ const THEME_STORAGE_KEY = "pentnotes.theme.v1";
 
 export const themes = [
   {
-    id: "midnight",
-    name: "Cyber Cyan",
+    id: "espresso",
+    name: "Warm Espresso",
     mode: "dark",
-    description: "Electric cyan and neon rose on soft slate charcoal.",
-    colors: ["#141821", "#1b212d", "#00e5ff", "#f43f5e"],
+    description: "Roasted coffee charcoal with warm caramel amber tones.",
+    colors: ["#191614", "#241f1c", "#d97736", "#8cb88b"],
   },
   {
-    id: "evergreen",
-    name: "Terminal Green",
+    id: "slate",
+    name: "Deep Slate",
     mode: "dark",
-    description: "Crisp hacker emerald and mint on soft slate charcoal.",
-    colors: ["#141821", "#1b212d", "#10b981", "#06b6d4"],
+    description: "Graphite stone with serene sage pine accents.",
+    colors: ["#15181b", "#20242a", "#4ea685", "#d6a858"],
   },
   {
-    id: "ember",
-    name: "Flame Ember",
-    mode: "dark",
-    description: "Warm flame orange and coral rose on soft slate charcoal.",
-    colors: ["#141821", "#1b212d", "#f97316", "#f43f5e"],
-  },
-  {
-    id: "parchment",
-    name: "Solar Amber",
+    id: "linen",
+    name: "Warm Linen",
     mode: "light",
-    description: "Solar amber and deep cobalt on dimmed soft alabaster.",
-    colors: ["#e4e9f0", "#f1f4f8", "#ea580c", "#0284c7"],
-  },
-  {
-    id: "glacier",
-    name: "Glacier Blue",
-    mode: "light",
-    description: "Oceanic sapphire and teal on dimmed soft alabaster.",
-    colors: ["#e4e9f0", "#f1f4f8", "#0284c7", "#0d9488"],
-  },
-  {
-    id: "rosewood",
-    name: "Prism Berry",
-    mode: "light",
-    description: "Vivid berry fuchsia and violet on dimmed soft alabaster.",
-    colors: ["#e4e9f0", "#f1f4f8", "#be185d", "#6366f1"],
+    description: "Unbleached oat paper with soft terracotta accents.",
+    colors: ["#f7f4ee", "#fbf9f5", "#b85d38", "#3d6b56"],
   },
 ] as const;
 
 export type ThemeId = (typeof themes)[number]["id"];
 
+const LEGACY_THEME_MAP: Record<string, ThemeId> = {
+  midnight: "espresso",
+  ember: "espresso",
+  evergreen: "slate",
+  parchment: "linen",
+  glacier: "linen",
+  rosewood: "linen",
+};
+
 export function initialTheme(): ThemeId {
   try {
     const raw = localStorage.getItem(THEME_STORAGE_KEY);
     if (raw) {
+      if (raw in LEGACY_THEME_MAP) {
+        return LEGACY_THEME_MAP[raw];
+      }
       const found = themes.find((t) => t.id === raw);
       if (found) return found.id;
     }
   } catch {
     // Ignore storage read errors
   }
-  return "midnight";
+  return "espresso";
 }
 
 export function applyTheme(id: ThemeId): void {
@@ -65,17 +56,19 @@ export function applyTheme(id: ThemeId): void {
   document.documentElement.dataset.theme = theme.id;
   document.documentElement.style.colorScheme = theme.mode;
 
-  if (typeof window !== "undefined") {
-    if (window.electronAPI) {
-      document.documentElement.classList.add("app-is-electron");
-      const isDark = theme.mode === "dark";
-      const bgColor = isDark ? "#161b25" : "#f1f4f8";
-      const symbolColor = isDark ? "#f8fafc" : "#0f172a";
-      void window.electronAPI.window?.setTitleBarOverlay?.({
-        color: bgColor,
-        symbolColor: symbolColor,
-      });
-    }
+  if (typeof window !== "undefined" && window.electronAPI) {
+    document.documentElement.classList.add("app-is-electron");
+    const isDark = theme.mode === "dark";
+    const bgColor = isDark
+      ? theme.id === "espresso"
+        ? "#191614"
+        : "#15181b"
+      : "#f7f4ee";
+    const symbolColor = isDark ? "#f7f1eb" : "#231f1c";
+    void window.electronAPI.window?.setTitleBarOverlay?.({
+      color: bgColor,
+      symbolColor,
+    });
   }
 }
 

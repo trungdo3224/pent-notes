@@ -1,0 +1,25 @@
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .animate-in {
+    animation-duration: 150ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    animation-fill-mode: forwards;
+  }
+
+  .fade-in-0 {
+    opacity: 0;
+    animation-name: enter;
+  }
+
+  .zoom-in-95 {
+    --tw-enter-scale: 0.95;
+    animation-name: enter;
+  }
+
+  .slide-in-from-top-2 {
+    --tw-enter-translate-y: -0.5rem;
+    animation-name: enter;
+  }
+}
