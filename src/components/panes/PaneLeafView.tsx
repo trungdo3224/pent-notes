@@ -133,7 +133,9 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
   const isPdf = note ? isPdfNote(note) : false;
   const isImage = note && !isPdf ? isImageNote(note) : false;
   const isCode = note && !isPdf && !isImage ? isCodeNote(note) : false;
-  const codeLang = isCode ? getCodeLanguageLabel(note?.filePath) : "";
+  const codeLang = isCode
+    ? getCodeLanguageLabel(note?.filePath || note?.title)
+    : "";
   const words = note ? countWords(noteContent) : 0;
 
   return (
@@ -343,7 +345,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                 key={`code-editor-${leaf.id}-${note.id}`}
                 value={noteContent}
                 onChange={(val) => updateNote(note.id, { content: val })}
-                filePath={note.filePath}
+                filePath={note.filePath || note.title}
               />
             )}
           </div>
@@ -368,7 +370,7 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
                   key={`editor-${leaf.id}-${note.id}`}
                   value={noteContent}
                   onChange={(val) => updateNote(note.id, { content: val })}
-                  filePath={note.filePath}
+                  filePath={note.filePath || note.title}
                 />
               )}
 

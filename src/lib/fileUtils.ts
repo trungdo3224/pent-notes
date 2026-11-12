@@ -2,12 +2,14 @@ import { ExplorerNode, FolderItem, NoteItem } from "../types";
 
 export const NOTE_FILE_ACCEPT =
   ".md,.markdown,.mdx,.txt,.pdf,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.ico,.avif," +
-  ".py,.js,.jsx,.ts,.tsx,.sh,.bash,.zsh,.sql,.rs,.go,.c,.cpp,.h,.hpp,.java,.kt,.php,.rb,.lua,.json,.yaml,.yml,.toml,.xml,.css,.scss,.html";
+  ".py,.js,.jsx,.ts,.tsx,.sh,.bash,.zsh,.ps1,.bat,.cmd,.sql,.rs,.go,.c,.cpp,.h,.hpp,.cs," +
+  ".java,.kt,.php,.rb,.lua,.json,.yaml,.yml,.toml,.xml,.css,.scss,.html," +
+  ".ini,.conf,.cfg,.env,.properties,.vue,.svelte,.astro,.swift,.dart,.r";
 const NOTE_EXT_REGEX =
-  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif|py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
+  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif|py|jsx?|tsx?|sh|bash|zsh|ps1|bat|cmd|sql|rs|go|c|cpp|h|hpp|cs|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html|ini|conf|cfg|env|properties|vue|svelte|astro|swift|dart|r)$/i;
 const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
 const CODE_EXT_REGEX =
-  /\.(py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
+  /\.(py|jsx?|tsx?|sh|bash|zsh|ps1|bat|cmd|sql|rs|go|c|cpp|h|hpp|cs|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html|ini|conf|cfg|env|properties|vue|svelte|astro|swift|dart|r)$/i;
 
 export const CODE_EXTENSIONS = new Set([
   "py",
@@ -18,6 +20,9 @@ export const CODE_EXTENSIONS = new Set([
   "sh",
   "bash",
   "zsh",
+  "ps1",
+  "bat",
+  "cmd",
   "sql",
   "rs",
   "go",
@@ -25,6 +30,7 @@ export const CODE_EXTENSIONS = new Set([
   "cpp",
   "h",
   "hpp",
+  "cs",
   "java",
   "kt",
   "php",
@@ -38,6 +44,17 @@ export const CODE_EXTENSIONS = new Set([
   "css",
   "scss",
   "html",
+  "ini",
+  "conf",
+  "cfg",
+  "env",
+  "properties",
+  "vue",
+  "svelte",
+  "astro",
+  "swift",
+  "dart",
+  "r",
 ]);
 
 const IGNORED_DIRECTORY_NAMES = new Set([
@@ -97,32 +114,44 @@ export function isCodeFileName(fileName?: string): boolean {
 }
 
 export function isPdfNote(
-  note: Pick<NoteItem, "fileType" | "filePath" | "pdfData">,
+  note: Pick<NoteItem, "fileType" | "filePath" | "pdfData"> & {
+    title?: string;
+  },
 ): boolean {
   return Boolean(
-    note.fileType === "pdf" || isPdfFileName(note.filePath) || note.pdfData,
+    note.fileType === "pdf" ||
+    isPdfFileName(note.filePath) ||
+    isPdfFileName(note.title) ||
+    note.pdfData,
   );
 }
 
 export function isImageNote(
-  note: Pick<NoteItem, "fileType" | "filePath" | "imageData">,
+  note: Pick<NoteItem, "fileType" | "filePath" | "imageData"> & {
+    title?: string;
+  },
 ): boolean {
   return Boolean(
     note.fileType === "image" ||
     isImageFileName(note.filePath) ||
+    isImageFileName(note.title) ||
     note.imageData,
   );
 }
 
 export function isCodeNote(
-  note: Pick<NoteItem, "fileType" | "filePath">,
+  note: Pick<NoteItem, "fileType" | "filePath"> & { title?: string },
 ): boolean {
-  return Boolean(note.fileType === "code" || isCodeFileName(note.filePath));
+  return Boolean(
+    note.fileType === "code" ||
+    isCodeFileName(note.filePath) ||
+    isCodeFileName(note.title),
+  );
 }
 
-export function getCodeLanguageLabel(filePath?: string): string {
-  if (!filePath) return "CODE";
-  const match = filePath.match(/\.([a-z0-9_-]+)$/i);
+export function getCodeLanguageLabel(filePathOrTitle?: string): string {
+  if (!filePathOrTitle) return "CODE";
+  const match = filePathOrTitle.match(/\.([a-z0-9_-]+)$/i);
   if (!match) return "CODE";
   const ext = match[1].toLowerCase();
   switch (ext) {
@@ -138,6 +167,11 @@ export function getCodeLanguageLabel(filePath?: string): string {
     case "bash":
     case "zsh":
       return "SHELL";
+    case "ps1":
+      return "POWERSHELL";
+    case "bat":
+    case "cmd":
+      return "BATCH";
     case "sql":
       return "SQL";
     case "rs":
@@ -150,6 +184,8 @@ export function getCodeLanguageLabel(filePath?: string): string {
     case "hpp":
     case "h":
       return "C++";
+    case "cs":
+      return "C#";
     case "java":
       return "JAVA";
     case "kt":
@@ -174,6 +210,24 @@ export function getCodeLanguageLabel(filePath?: string): string {
       return "CSS";
     case "html":
       return "HTML";
+    case "vue":
+      return "VUE";
+    case "svelte":
+      return "SVELTE";
+    case "astro":
+      return "ASTRO";
+    case "swift":
+      return "SWIFT";
+    case "dart":
+      return "DART";
+    case "r":
+      return "R";
+    case "ini":
+    case "conf":
+    case "cfg":
+    case "env":
+    case "properties":
+      return "CONFIG";
     default:
       return ext.toUpperCase();
   }

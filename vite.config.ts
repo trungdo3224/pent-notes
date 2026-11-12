@@ -49,10 +49,19 @@ interface StoredTreeItem {
 }
 
 const NOTE_EXT_REGEX =
-  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif|py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
+  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif|py|jsx?|tsx?|sh|bash|zsh|ps1|bat|cmd|sql|rs|go|c|cpp|h|hpp|cs|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html|ini|conf|cfg|env|properties|vue|svelte|astro|swift|dart|r)$/i;
 const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
 const CODE_EXT_REGEX =
-  /\.(py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
+  /\.(py|jsx?|tsx?|sh|bash|zsh|ps1|bat|cmd|sql|rs|go|c|cpp|h|hpp|cs|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html|ini|conf|cfg|env|properties|vue|svelte|astro|swift|dart|r)$/i;
+
+const COMMON_DOTFILES = new Set([
+  ".env",
+  ".env.local",
+  ".env.example",
+  ".gitignore",
+  ".bashrc",
+  ".zshrc",
+]);
 
 const IGNORED_NAMES = new Set([
   "node_modules",
@@ -399,7 +408,11 @@ async function readDirectoryShallow(dirPath: string): Promise<ImportedNode[]> {
   const notes: ImportedNote[] = [];
 
   for (const entry of entries) {
-    if (entry.name.startsWith(".") || IGNORED_NAMES.has(entry.name)) {
+    if (
+      (entry.name.startsWith(".") &&
+        !COMMON_DOTFILES.has(entry.name.toLowerCase())) ||
+      IGNORED_NAMES.has(entry.name)
+    ) {
       continue;
     }
     const fullPath = path.join(dirPath, entry.name);
@@ -408,7 +421,10 @@ async function readDirectoryShallow(dirPath: string): Promise<ImportedNode[]> {
       try {
         const subEntries = await fs.readdir(fullPath);
         hasChildren = subEntries.some(
-          (name) => !name.startsWith(".") && !IGNORED_NAMES.has(name),
+          (name) =>
+            (!name.startsWith(".") ||
+              COMMON_DOTFILES.has(name.toLowerCase())) &&
+            !IGNORED_NAMES.has(name),
         );
       } catch {
         hasChildren = false;
@@ -421,12 +437,16 @@ async function readDirectoryShallow(dirPath: string): Promise<ImportedNode[]> {
         children: [],
         folderPath: fullPath,
       });
-    } else if (entry.isFile() && NOTE_EXT_REGEX.test(entry.name)) {
+    } else if (
+      (entry.isFile() || entry.isSymbolicLink()) &&
+      NOTE_EXT_REGEX.test(entry.name)
+    ) {
       const isPdf = entry.name.toLowerCase().endsWith(".pdf");
       const isImage = !isPdf && IMAGE_EXT_REGEX.test(entry.name);
       const isCode = !isPdf && !isImage && CODE_EXT_REGEX.test(entry.name);
       try {
         const stat = await fs.stat(fullPath);
+        if (!stat.isFile()) continue;
         notes.push({
           id: makeId("note"),
           type: "note",

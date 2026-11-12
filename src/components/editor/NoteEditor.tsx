@@ -360,7 +360,7 @@ export const NoteEditor: React.FC = () => {
               key={`code-editor-${targetNote.id}`}
               value={noteContent}
               onChange={(val) => updateNote(targetNote.id, { content: val })}
-              filePath={targetNote.filePath}
+              filePath={targetNote.filePath || targetNote.title}
             />
           )}
         </div>
@@ -448,7 +448,7 @@ export const NoteEditor: React.FC = () => {
   const isPrimaryCode =
     note && !isPrimaryPdf && !isPrimaryImage ? isCodeNote(note) : false;
   const primaryCodeLang = isPrimaryCode
-    ? getCodeLanguageLabel(note?.filePath)
+    ? getCodeLanguageLabel(note?.filePath || note?.title)
     : "";
 
   return (

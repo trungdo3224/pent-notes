@@ -121,7 +121,6 @@ export const FolderExplorer: React.FC = () => {
   const clearPendingRenameNode = useNotesStore((s) => s.clearPendingRenameNode);
   const importNotesFiles = useNotesStore((s) => s.importNotesFiles);
   const openLinkModal = useNotesStore((s) => s.openLinkModal);
-  const unlinkFolderFromDisk = useNotesStore((s) => s.unlinkFolderFromDisk);
   const toggleSubfolderCollapse = useNotesStore(
     (s) => s.toggleSubfolderCollapse,
   );
@@ -548,7 +547,9 @@ export const FolderExplorer: React.FC = () => {
     const isPdf = isPdfNote(node);
     const isImage = !isPdf && isImageNote(node);
     const isCode = !isPdf && !isImage && isCodeNote(node);
-    const codeLang = isCode ? getCodeLanguageLabel(node.filePath) : "";
+    const codeLang = isCode
+      ? getCodeLanguageLabel(node.filePath || node.title)
+      : "";
     const noteLevelClass = depth > 0 ? "is-child-note" : "is-root-note";
 
     return (

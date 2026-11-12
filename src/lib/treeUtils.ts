@@ -5,7 +5,12 @@ import {
   SortOrder,
   TopLevelFolder,
 } from "../types";
-import { todayDateString } from "./fileUtils";
+import {
+  isCodeNote,
+  isImageNote,
+  isPdfNote,
+  todayDateString,
+} from "./fileUtils";
 
 export type NoteUpdates = Partial<
   Pick<
@@ -271,6 +276,34 @@ export function removeNodeFromTree(
     );
 }
 
+export function normalizeExplorerNode(node: ExplorerNode): ExplorerNode {
+  if (node.type === "note") {
+    const isPdf = isPdfNote(node);
+    const isImage = !isPdf && isImageNote(node);
+    const isCode = !isPdf && !isImage && isCodeNote(node);
+    const nextFileType = isPdf
+      ? "pdf"
+      : isImage
+        ? "image"
+        : isCode
+          ? "code"
+          : "markdown";
+    const nextTitle =
+      isCode && node.filePath && !node.title.includes(".")
+        ? node.filePath.split(/[/\\]/).pop() || node.title
+        : node.title;
+    return {
+      ...node,
+      fileType: nextFileType,
+      title: nextTitle,
+    };
+  }
+  return {
+    ...node,
+    children: node.children.map(normalizeExplorerNode),
+  };
+}
+
 /**
  * When scanning from disk, match nodes by filePath or folderPath to retain existing
  * stable IDs, so selected notes and open subfolders do not reset.
@@ -298,7 +331,16 @@ export function matchAndPreserveIds(
     return nodes.map((node) => {
       if (node.type === "note") {
         const existing = node.filePath ? noteByPath.get(node.filePath) : null;
-        return existing ? { ...node, id: existing.id } : node;
+        if (existing) {
+          return {
+            ...node,
+            id: existing.id,
+            content: node.content || existing.content || "",
+            fileType: node.fileType || existing.fileType,
+            title: node.title || existing.title,
+          };
+        }
+        return normalizeExplorerNode(node);
       }
       const existing = node.folderPath
         ? folderByPath.get(node.folderPath)
@@ -307,7 +349,7 @@ export function matchAndPreserveIds(
         node.children.length > 0
           ? mapScanned(node.children)
           : existing && existing.children.length > 0
-            ? existing.children
+            ? existing.children.map(normalizeExplorerNode)
             : [];
       return {
         ...node,

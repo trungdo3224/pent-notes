@@ -31,6 +31,7 @@ import {
   findNoteNode,
   insertIntoTree,
   matchAndPreserveIds,
+  normalizeExplorerNode,
   NoteUpdates,
   removeNodeFromTree,
   resolveActiveNoteData,
@@ -908,13 +909,21 @@ export const useNotesStore = create<NotesState>()(
 
       loadSubfolderChildren: async (folderId, subfolderId, subfolderPath) => {
         try {
-          const children = await fsApi.readDir(subfolderPath);
+          const rawChildren = await fsApi.readDir(subfolderPath);
+          const currentFolder = get().folders.find((f) => f.id === folderId);
+          const existingNode = currentFolder
+            ? findFolderNode(currentFolder.items, subfolderId)
+            : null;
+          const mergedChildren = existingNode
+            ? matchAndPreserveIds(rawChildren, existingNode.children || [])
+            : rawChildren.map(normalizeExplorerNode);
+
           set((s) => ({
             folders: mapFolderById(s.folders, folderId, (folder) => ({
               ...folder,
               items: updateFolderInTree(folder.items, subfolderId, {
-                children,
-                hasChildren: children.length > 0,
+                children: mergedChildren,
+                hasChildren: mergedChildren.length > 0,
                 isLoaded: true,
               }),
             })),
@@ -1798,7 +1807,53 @@ export const useNotesStore = create<NotesState>()(
           const latestFolder = get().folders.find((f) => f.id === folderId);
           if (!latestFolder || !latestFolder.localPath) return false;
 
-          const mergedItems = matchAndPreserveIds(
+          const expandedSet = new Set(get().expandedFolderIds ?? []);
+          async function refreshLoadedSubfolders(
+            scannedList: ExplorerNode[],
+            existingList: ExplorerNode[],
+          ): Promise<ExplorerNode[]> {
+            const merged = matchAndPreserveIds(scannedList, existingList);
+            return await Promise.all(
+              merged.map(async (node) => {
+                if (node.type !== "folder" || !node.folderPath) return node;
+                const existingFolder = existingList.find(
+                  (ex): ex is FolderItem =>
+                    ex.type === "folder" && ex.folderPath === node.folderPath,
+                );
+                const wasLoadedOrExpanded = Boolean(
+                  node.isLoaded ||
+                  (existingFolder &&
+                    (existingFolder.isLoaded ||
+                      (existingFolder.children &&
+                        existingFolder.children.length > 0))) ||
+                  expandedSet.has(node.id) ||
+                  (existingFolder && expandedSet.has(existingFolder.id)),
+                );
+                if (wasLoadedOrExpanded) {
+                  try {
+                    const diskChildren = await fsApi.readDir(node.folderPath);
+                    const existingChildren =
+                      existingFolder?.children || node.children || [];
+                    const refreshedChildren = await refreshLoadedSubfolders(
+                      diskChildren,
+                      existingChildren,
+                    );
+                    return {
+                      ...node,
+                      children: refreshedChildren,
+                      hasChildren: refreshedChildren.length > 0,
+                      isLoaded: true,
+                    };
+                  } catch {
+                    return node;
+                  }
+                }
+                return node;
+              }),
+            );
+          }
+
+          const mergedItems = await refreshLoadedSubfolders(
             result.items,
             latestFolder.items,
           );
@@ -1925,10 +1980,7 @@ export const useNotesStore = create<NotesState>()(
           );
           if (currentFolder) {
             const node = findFolderNode(currentFolder.items, subfolderId);
-            if (
-              node?.folderPath &&
-              (!node.children || node.children.length === 0)
-            ) {
+            if (node?.folderPath) {
               void get().loadSubfolderChildren(
                 currentFolder.id,
                 subfolderId,
@@ -1957,10 +2009,7 @@ export const useNotesStore = create<NotesState>()(
           );
           if (currentFolder) {
             const node = findFolderNode(currentFolder.items, subfolderId);
-            if (
-              node?.folderPath &&
-              (!node.children || node.children.length === 0)
-            ) {
+            if (node?.folderPath) {
               void get().loadSubfolderChildren(
                 currentFolder.id,
                 subfolderId,
@@ -2003,10 +2052,7 @@ export const useNotesStore = create<NotesState>()(
         const allIds = collectAllFolderIds(currentFolder.items);
         for (const fId of allIds) {
           const node = findFolderNode(currentFolder.items, fId);
-          if (
-            node?.folderPath &&
-            (!node.children || node.children.length === 0)
-          ) {
+          if (node?.folderPath) {
             void get().loadSubfolderChildren(
               currentFolder.id,
               fId,
@@ -2480,6 +2526,12 @@ export const useNotesStore = create<NotesState>()(
           if (state.paneLayout && getAllLeaves(state.paneLayout).length > 1) {
             state.isSplitViewActive = true;
           }
+          if (Array.isArray(state.folders)) {
+            state.folders = state.folders.map((f) => ({
+              ...f,
+              items: f.items.map(normalizeExplorerNode),
+            }));
+          }
         }
         const sessionId = getTabSessionId();
         sessionApi
@@ -2490,6 +2542,9 @@ export const useNotesStore = create<NotesState>()(
             }
           })
           .catch(() => {});
+        if (state?.selectedFolderId) {
+          void state.syncFolderFromDisk(state.selectedFolderId);
+        }
         state?.setHydrated(true);
       },
     },

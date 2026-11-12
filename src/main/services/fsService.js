@@ -9,10 +9,19 @@ import path from "node:path";
  */
 
 const NOTE_EXT_REGEX =
-  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif|py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
+  /\.(md|markdown|mdx|txt|pdf|png|jpe?g|gif|webp|svg|bmp|ico|avif|py|jsx?|tsx?|sh|bash|zsh|ps1|bat|cmd|sql|rs|go|c|cpp|h|hpp|cs|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html|ini|conf|cfg|env|properties|vue|svelte|astro|swift|dart|r)$/i;
 const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
 const CODE_EXT_REGEX =
-  /\.(py|jsx?|tsx?|sh|bash|zsh|sql|rs|go|c|cpp|h|hpp|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html)$/i;
+  /\.(py|jsx?|tsx?|sh|bash|zsh|ps1|bat|cmd|sql|rs|go|c|cpp|h|hpp|cs|java|kt|php|rb|lua|json|ya?ml|toml|xml|s?css|html|ini|conf|cfg|env|properties|vue|svelte|astro|swift|dart|r)$/i;
+
+const COMMON_DOTFILES = new Set([
+  ".env",
+  ".env.local",
+  ".env.example",
+  ".gitignore",
+  ".bashrc",
+  ".zshrc",
+]);
 
 const STRICT_IGNORE_NAMES = new Set([
   "node_modules",
@@ -50,7 +59,10 @@ function stripExt(name) {
 }
 
 function isStrictlyIgnored(name) {
-  if (name.startsWith(".") || STRICT_IGNORE_NAMES.has(name)) return true;
+  if (name.startsWith(".") && !COMMON_DOTFILES.has(name.toLowerCase())) {
+    return true;
+  }
+  if (STRICT_IGNORE_NAMES.has(name)) return true;
   const ext = path.extname(name).slice(1).toLowerCase();
   if (STRICT_IGNORE_EXTENSIONS.has(ext)) return true;
   return false;
@@ -102,12 +114,16 @@ export async function readDirectoryShallow(dirPath) {
         children: [],
         folderPath: fullPath,
       });
-    } else if (entry.isFile() && NOTE_EXT_REGEX.test(entry.name)) {
+    } else if (
+      (entry.isFile() || entry.isSymbolicLink()) &&
+      NOTE_EXT_REGEX.test(entry.name)
+    ) {
       const isPdf = entry.name.toLowerCase().endsWith(".pdf");
       const isImage = !isPdf && IMAGE_EXT_REGEX.test(entry.name);
       const isCode = !isPdf && !isImage && CODE_EXT_REGEX.test(entry.name);
       try {
         const stat = await fs.stat(fullPath);
+        if (!stat.isFile()) continue;
         notes.push({
           id: makeId("note"),
           type: "note",
