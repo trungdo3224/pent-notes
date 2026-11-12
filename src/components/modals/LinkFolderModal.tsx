@@ -1,6 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { FolderOpen, FolderPlus, LoaderCircle, X } from "lucide-react";
-import { useEscapeKey } from "../../hooks/useDomInteractions";
+import { FolderOpen, FolderPlus, LoaderCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { buildExplorerTreeFromFiles } from "../../lib/fileUtils";
 import { fsApi } from "../../lib/fsApi";
 import { useNotesStore } from "../../store/useNotesStore";
@@ -45,10 +53,6 @@ export const LinkFolderModal: React.FC = () => {
       setBusy(false);
     }
   }, [isOpen, initialTargetMode, activeFolder]);
-
-  useEscapeKey(isOpen && !busy, closeLinkModal);
-
-  if (!isOpen) return null;
 
   const handleBrowseFolderClick = async () => {
     if (
@@ -132,18 +136,11 @@ export const LinkFolderModal: React.FC = () => {
   };
 
   return (
-    <div
-      className="modal-backdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !busy) closeLinkModal();
-      }}
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => !open && !busy && closeLinkModal()}
     >
-      <div
-        className="modal add-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Add folder"
-      >
+      <DialogContent className="max-w-md p-6">
         <input
           ref={setFolderInputElement}
           type="file"
@@ -152,90 +149,96 @@ export const LinkFolderModal: React.FC = () => {
           onChange={(e) => void handleFolderFilesSelected(e)}
         />
 
-        <div className="modal-heading">
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <FolderPlus size={20} className="primary-accent-icon" />
-            <h2>Add Folder</h2>
+        <DialogHeader className="mb-2">
+          <div className="flex items-center gap-2">
+            <FolderPlus className="h-5 w-5 text-primary" />
+            <DialogTitle>Add Folder</DialogTitle>
           </div>
-          <button
-            type="button"
-            className="modal-close-btn"
-            aria-label="Close dialog"
-            onClick={closeLinkModal}
-            disabled={busy}
-          >
-            <X size={18} />
-          </button>
-        </div>
+        </DialogHeader>
 
         <form
           onSubmit={(e) => void handleSubmit(e)}
-          className="add-folder-form"
+          className="flex flex-col gap-4"
         >
-          <label className="field-label" htmlFor="local-folder-path-input">
-            Local folder path
-          </label>
-          <div className="folder-path-input-row">
-            <input
-              id="local-folder-path-input"
-              type="text"
-              className="form-input"
-              placeholder="C:\Users\you\Desktop\my-vault"
-              value={folderPath}
-              onChange={(e) => setFolderPath(e.target.value)}
-              disabled={busy}
-              autoFocus
-            />
-            <button
-              type="button"
-              className="subtle-btn browse-folder-btn"
-              onClick={() => void handleBrowseFolderClick()}
-              disabled={busy}
-              title="Browse and select a folder from your computer"
+          <div className="flex flex-col gap-1.5">
+            <label
+              htmlFor="local-folder-path-input"
+              className="text-xs font-medium text-foreground"
             >
-              <FolderOpen size={15} />
-              <span>Browse...</span>
-            </button>
+              Local folder path
+            </label>
+            <div className="flex gap-2">
+              <Input
+                id="local-folder-path-input"
+                type="text"
+                placeholder="C:\Users\you\Desktop\my-vault"
+                value={folderPath}
+                onChange={(e) => setFolderPath(e.target.value)}
+                disabled={busy}
+                autoFocus
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleBrowseFolderClick()}
+                disabled={busy}
+                className="gap-1.5 h-9 shrink-0"
+              >
+                <FolderOpen className="h-4 w-4" />
+                <span>Browse...</span>
+              </Button>
+            </div>
           </div>
 
           {targetMode !== "current-tab" && (
-            <>
-              <label className="field-label" htmlFor="local-tab-custom-name">
-                Folder display name<span>Optional</span>
-              </label>
-              <input
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="local-tab-custom-name"
+                  className="text-xs font-medium text-foreground"
+                >
+                  Folder display name
+                </label>
+                <span className="text-[11px] text-muted-foreground">
+                  Optional
+                </span>
+              </div>
+              <Input
                 id="local-tab-custom-name"
                 type="text"
-                className="form-input"
                 placeholder="Leave blank to use the directory name"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
                 maxLength={80}
                 disabled={busy}
               />
-            </>
+            </div>
           )}
 
           {activeFolder && (
-            <div className="import-destination-choice">
-              <span className="field-label" style={{ marginBottom: 6 }}>
+            <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3">
+              <span className="text-xs font-medium text-foreground">
                 Target placement
               </span>
-              <div className="destination-radios">
-                <label className="radio-option">
+              <div className="flex flex-col gap-2 text-xs">
+                <label className="flex items-center gap-2 cursor-pointer text-foreground">
                   <input
                     type="radio"
                     name="link-target"
+                    className="accent-primary"
                     checked={targetMode === "new-tab"}
                     onChange={() => setTargetMode("new-tab")}
                     disabled={busy}
                   />
                   <span>Open as a new tab</span>
                 </label>
-                <label className="radio-option">
+                <label className="flex items-center gap-2 cursor-pointer text-foreground">
                   <input
                     type="radio"
                     name="link-target"
+                    className="accent-primary"
                     checked={targetMode === "subfolder"}
                     onChange={() => setTargetMode("subfolder")}
                     disabled={busy}
@@ -244,10 +247,11 @@ export const LinkFolderModal: React.FC = () => {
                     Open as a subfolder inside &ldquo;{activeFolder.name}&rdquo;
                   </span>
                 </label>
-                <label className="radio-option">
+                <label className="flex items-center gap-2 cursor-pointer text-foreground">
                   <input
                     type="radio"
                     name="link-target"
+                    className="accent-primary"
                     checked={targetMode === "current-tab"}
                     onChange={() => setTargetMode("current-tab")}
                     disabled={busy}
@@ -261,35 +265,35 @@ export const LinkFolderModal: React.FC = () => {
           )}
 
           {error && (
-            <div className="form-error" role="alert">
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
               {error}
             </div>
           )}
 
-          <div className="modal-actions">
-            <button
+          <DialogFooter className="mt-2 flex gap-2">
+            <Button
               type="button"
-              className="subtle-btn"
+              variant="ghost"
               onClick={closeLinkModal}
               disabled={busy}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="primary-subtle-btn"
               disabled={busy || !folderPath.trim()}
+              className="gap-2"
             >
               {busy ? (
-                <LoaderCircle size={15} className="spin" />
+                <LoaderCircle className="h-4 w-4 animate-spin" />
               ) : (
-                <FolderPlus size={15} />
+                <FolderPlus className="h-4 w-4" />
               )}
               <span>{busy ? "Adding Folder..." : "Add Folder"}</span>
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

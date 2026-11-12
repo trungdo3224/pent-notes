@@ -12,9 +12,20 @@ import {
   RefreshCw,
   Sparkles,
   Trash2,
-  X,
 } from "lucide-react";
-import { useCopyFeedback, useEscapeKey } from "../../hooks/useDomInteractions";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useCopyFeedback } from "../../hooks/useDomInteractions";
 import { SessionInfo, sessionApi } from "../../lib/sessionManager";
 import { useNotesStore } from "../../store/useNotesStore";
 
@@ -51,10 +62,6 @@ export const SessionModal: React.FC = () => {
       void loadSessionsList();
     }
   }, [isOpen, currentSessionName, loadSessionsList]);
-
-  useEscapeKey(isOpen, closeSessionModal);
-
-  if (!isOpen) return null;
 
   const handleCommitRename = async () => {
     const trimmed = draftName.trim();
@@ -126,65 +133,51 @@ export const SessionModal: React.FC = () => {
   };
 
   return (
-    <div
-      className="modal-backdrop"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) closeSessionModal();
-      }}
-    >
-      <div
-        className="modal session-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Tab session management"
-      >
-        <div className="modal-heading">
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <Layers size={20} className="primary-accent-icon" />
-            <h2>Session Management</h2>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && closeSessionModal()}>
+      <DialogContent className="max-w-xl p-6">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <Layers className="h-5 w-5 text-primary" />
+            <DialogTitle>Session Management</DialogTitle>
           </div>
-          <button
-            type="button"
-            className="modal-close-btn"
-            aria-label="Close dialog"
-            onClick={closeSessionModal}
-          >
-            <X size={18} />
-          </button>
-        </div>
+          <DialogDescription className="text-xs">
+            Workspaces are stored in clean JSON files on disk (
+            <code className="px-1 py-0.5 rounded bg-muted">
+              data/sessions/*.json
+            </code>
+            ). New tabs start in your Default session. You can switch sessions
+            or create new ones anytime.
+          </DialogDescription>
+        </DialogHeader>
 
-        <p className="modal-description" style={{ marginBottom: 14 }}>
-          Workspaces are stored in clean JSON files on disk (
-          <code>data/sessions/*.json</code>). New tabs start in your Default
-          session. You can switch to any existing session or create new ones
-          whenever you need.
-        </p>
-
-        {/* Current Tab Active Session Card */}
-        <div className="current-session-card">
-          <div className="current-session-header">
-            <span className="current-session-tag">
-              <Radio size={11} className="session-pulse-dot" /> ACTIVE IN THIS
-              TAB
+        {/* Current Active Session Card */}
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
+              <Radio className="h-3 w-3 animate-pulse" /> ACTIVE IN THIS TAB
             </span>
-            <button
+            <Button
               type="button"
-              className="copy-link-btn"
+              variant="outline"
+              size="sm"
               onClick={handleCopyLink}
-              title="Copy link to this session"
+              className="h-7 gap-1.5 text-xs"
             >
-              {copiedLink ? <Check size={12} /> : <Copy size={12} />}
+              {copiedLink ? (
+                <Check className="h-3 w-3 text-primary" />
+              ) : (
+                <Copy className="h-3 w-3" />
+              )}
               <span>{copiedLink ? "Copied URL!" : "Share URL"}</span>
-            </button>
+            </Button>
           </div>
 
-          <div className="current-session-name-row">
+          <div className="flex items-center gap-2">
             {isRenaming ? (
-              <div style={{ display: "flex", gap: 6, flex: 1 }}>
-                <input
+              <div className="flex flex-1 items-center gap-2">
+                <Input
                   type="text"
-                  className="form-input"
-                  style={{ height: 32, fontSize: 14 }}
+                  className="h-8 text-sm"
                   value={draftName}
                   onChange={(e) => setDraftName(e.target.value)}
                   autoFocus
@@ -194,178 +187,206 @@ export const SessionModal: React.FC = () => {
                     if (e.key === "Escape") setIsRenaming(false);
                   }}
                 />
-                <button
+                <Button
                   type="button"
-                  className="primary-subtle-btn"
-                  style={{ height: 32, padding: "0 10px" }}
+                  size="sm"
+                  className="h-8 px-2.5"
                   onClick={() => void handleCommitRename()}
                 >
-                  <Check size={14} />
-                </button>
+                  <Check className="h-4 w-4" />
+                </Button>
               </div>
             ) : (
-              <>
-                <h3 className="current-session-title">{currentSessionName}</h3>
-                <button
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold text-foreground">
+                  {currentSessionName}
+                </h3>
+                <Button
                   type="button"
-                  className="icon-action-btn"
-                  title="Rename current session"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
                   onClick={() => setIsRenaming(true)}
+                  title="Rename current session"
                 >
-                  <Pencil size={13} />
-                </button>
-              </>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             )}
           </div>
-          <span className="current-session-id">ID: {currentSessionId}</span>
+          <span className="text-[11px] text-muted-foreground">
+            ID: {currentSessionId}
+          </span>
 
-          <div className="current-session-actions">
-            <button
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button
               type="button"
-              className="primary-subtle-btn"
+              size="sm"
               onClick={() => void handleCreateNewSession()}
-              title="Create a new session in this tab"
+              className="gap-1.5 h-8 text-xs"
             >
-              <Plus size={14} />
+              <Plus className="h-3.5 w-3.5" />
               <span>Create New Session</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="subtle-btn"
+              variant="outline"
+              size="sm"
               onClick={() => sessionApi.openSessionInNewTab()}
-              title="Open a fresh new session in a new browser tab"
+              className="gap-1.5 h-8 text-xs"
             >
-              <ExternalLink size={14} />
+              <ExternalLink className="h-3.5 w-3.5" />
               <span>New in New Tab</span>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="subtle-btn"
+              variant="outline"
+              size="sm"
               onClick={() => void handleDuplicateToNewTab()}
-              title="Duplicate this session into a new tab"
+              className="gap-1.5 h-8 text-xs"
             >
-              <Sparkles size={14} />
+              <Sparkles className="h-3.5 w-3.5" />
               <span>Duplicate</span>
-            </button>
+            </Button>
           </div>
         </div>
 
         {error && (
-          <div className="form-error" role="alert" style={{ margin: "12px 0" }}>
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {error}
           </div>
         )}
 
         {/* Saved Sessions List */}
-        <div className="sessions-list-section">
-          <div className="sessions-list-header">
-            <span className="sessions-list-title">
-              SAVED SESSIONS (<code>data/sessions/</code>)
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted-foreground">
+              SAVED SESSIONS (
+              <code className="text-[11px]">data/sessions/</code>)
             </span>
-            <button
+            <Button
               type="button"
-              className="icon-action-btn"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
               onClick={() => void loadSessionsList()}
-              title="Refresh list"
               disabled={loading}
+              title="Refresh list"
             >
-              <RefreshCw size={13} className={loading ? "spin" : ""} />
-            </button>
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+              />
+            </Button>
           </div>
 
-          {loading && sessions.length === 0 ? (
-            <div className="sessions-loading">
-              <LoaderCircle size={18} className="spin" />
-              <span>Loading saved sessions...</span>
-            </div>
-          ) : (
-            <div className="sessions-scroll-list">
-              {sessions.map((sess) => {
-                const isCurrent = sess.id === currentSessionId;
-                const formattedDate = sess.updatedAt
-                  ? new Date(sess.updatedAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      month: "short",
-                      day: "numeric",
-                    })
-                  : "Recent";
+          <ScrollArea className="h-[210px] rounded-md border border-border bg-card p-2">
+            {loading && sessions.length === 0 ? (
+              <div className="flex h-32 items-center justify-center gap-2 text-xs text-muted-foreground">
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+                <span>Loading saved sessions...</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {sessions.map((sess) => {
+                  const isCurrent = sess.id === currentSessionId;
+                  const formattedDate = sess.updatedAt
+                    ? new Date(sess.updatedAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "Recent";
 
-                return (
-                  <div
-                    key={sess.id}
-                    className={`session-card-row ${isCurrent ? "is-active" : ""}`}
-                  >
-                    <div className="session-card-info">
-                      <div className="session-card-top">
-                        <span className="session-card-name">{sess.name}</span>
-                        {isCurrent && (
-                          <span className="session-card-badge">Current</span>
+                  return (
+                    <div
+                      key={sess.id}
+                      className={`flex items-center justify-between gap-3 rounded-md border p-2.5 transition-colors ${
+                        isCurrent
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-card hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-0.5 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {sess.name}
+                          </span>
+                          {isCurrent && (
+                            <Badge
+                              variant="default"
+                              className="text-[10px] px-1.5 py-0"
+                            >
+                              Current
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <span>Updated: {formattedDate}</span>
+                          <span>•</span>
+                          <span>{sess.folderCount ?? 0} folders</span>
+                          <span>•</span>
+                          <span>{sess.noteCount ?? 0} notes</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {!isCurrent && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs gap-1"
+                            onClick={() =>
+                              sessionApi.switchSessionInCurrentTab(sess.id)
+                            }
+                            title="Switch to this session in this tab"
+                          >
+                            <FolderOpen className="h-3 w-3" />
+                            <span>Switch</span>
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                          onClick={() =>
+                            sessionApi.openSessionInNewTab(sess.id)
+                          }
+                          title="Open this session in a new browser tab"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                        {sessions.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                            onClick={() =>
+                              void handleDeleteSession(sess.id, sess.name)
+                            }
+                            title="Delete session"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         )}
                       </div>
-                      <div className="session-card-meta">
-                        <span>Updated: {formattedDate}</span>
-                        <span>•</span>
-                        <span>{sess.folderCount ?? 0} folders</span>
-                        <span>•</span>
-                        <span>{sess.noteCount ?? 0} notes</span>
-                      </div>
                     </div>
-
-                    <div className="session-card-actions">
-                      {!isCurrent ? (
-                        <button
-                          type="button"
-                          className="subtle-btn is-compact"
-                          onClick={() =>
-                            sessionApi.switchSessionInCurrentTab(sess.id)
-                          }
-                          title="Switch to this session in this tab"
-                        >
-                          <FolderOpen size={13} />
-                          <span>Switch</span>
-                        </button>
-                      ) : null}
-
-                      <button
-                        type="button"
-                        className="icon-action-btn"
-                        onClick={() => sessionApi.openSessionInNewTab(sess.id)}
-                        title="Open this session in a new browser tab"
-                      >
-                        <ExternalLink size={14} />
-                      </button>
-
-                      {sessions.length > 1 && (
-                        <button
-                          type="button"
-                          className="icon-action-btn is-danger"
-                          onClick={() =>
-                            void handleDeleteSession(sess.id, sess.name)
-                          }
-                          title="Delete session"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
         </div>
 
-        <div className="modal-actions" style={{ marginTop: 18 }}>
-          <button
-            type="button"
-            className="subtle-btn"
-            onClick={closeSessionModal}
-          >
+        <DialogFooter className="mt-2">
+          <Button variant="outline" onClick={closeSessionModal}>
             Close
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

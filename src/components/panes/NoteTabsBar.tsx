@@ -7,12 +7,7 @@ import React, {
 } from "react";
 import { Code, FileText, Image as ImageIcon, Plus, X } from "lucide-react";
 import { useClickOutside } from "../../hooks/useDomInteractions";
-import {
-  getCodeLanguageLabel,
-  isCodeNote,
-  isImageNote,
-  isPdfNote,
-} from "../../lib/fileUtils";
+import { isCodeNote, isImageNote, isPdfNote } from "../../lib/fileUtils";
 import { getAllLeaves } from "../../lib/paneLayoutTree";
 import { findNoteNode } from "../../lib/treeUtils";
 import { isNotePendingSave, useNotesStore } from "../../store/useNotesStore";

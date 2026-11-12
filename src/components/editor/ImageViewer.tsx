@@ -152,22 +152,22 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
     };
   }, [isDragging]);
 
-  const displayFilename = resolveDisplayFilename(title, filePath);
-
-  const handleOpenExternal = () => {
+  const handleOpenExternal = useCallback(() => {
     if (!resolvedSrc) return;
-    window.open(resolvedSrc, "_blank");
-  };
+    window.open(resolvedSrc, "_blank", "noopener,noreferrer");
+  }, [resolvedSrc]);
 
-  const handleDownload = () => {
+  const handleDownload = useCallback(() => {
     if (!resolvedSrc) return;
     const link = document.createElement("a");
     link.href = resolvedSrc;
-    link.download = displayFilename;
+    link.download = resolveDisplayFilename(title, filePath);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [filePath, resolvedSrc, title]);
+
+  const displayFilename = resolveDisplayFilename(title, filePath);
 
   if (!resolvedSrc || hasError) {
     return (
@@ -179,6 +179,17 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
         />
         <h3>Image Source Unavailable</h3>
         <p>No valid image path or data found for this file.</p>
+        {onClose && (
+          <button
+            type="button"
+            className="pdf-tool-btn"
+            style={{ marginTop: 12 }}
+            onClick={onClose}
+          >
+            <X size={14} />
+            <span>Close</span>
+          </button>
+        )}
       </div>
     );
   }
@@ -193,7 +204,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
           </span>
           {dimensions && (
             <span className="image-viewer-dimensions">
-              {dimensions.width} × {dimensions.height}
+              {dimensions.width} &times; {dimensions.height}
             </span>
           )}
         </div>

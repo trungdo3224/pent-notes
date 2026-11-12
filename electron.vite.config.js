@@ -1,5 +1,6 @@
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
+import { resolve } from "path";
 
 // Ensure Electron runs as a GUI application during dev/preview, even when launched from an IDE/terminal
 // environment that sets ELECTRON_RUN_AS_NODE=1 (such as VS Code/Antigravity/Cursor)
@@ -17,6 +18,11 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
   },
   renderer: {
+    resolve: {
+      alias: {
+        "@": resolve(__dirname, "src"),
+      },
+    },
     plugins: [react()],
     optimizeDeps: {
       include: [
