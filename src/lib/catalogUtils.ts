@@ -58,6 +58,49 @@ const HEADING_HIGHLIGHT_DURATION_MS = 1800;
 const HEX_COLOR_REGEX = /^[0-9a-fA-F]{3,6}$/;
 const HASHTAG_REGEX = /(?:^|\s)#([a-zA-Z][a-zA-Z0-9_\-\/]*)/g;
 const HEADING_LINE_REGEX = /^(#{1,6})\s+(.+)$/;
+const FENCE_LINE_REGEX = /^(?:\s*>\s?)*\s{0,3}(`{3,}|~{3,})(.*)$/;
+
+interface FenceState {
+  char: "`" | "~";
+  length: number;
+}
+
+function updateFenceState(
+  line: string,
+  currentFence: FenceState | null,
+): { fence: FenceState | null; isFenceLine: boolean } {
+  const match = line.match(FENCE_LINE_REGEX);
+  if (!match) {
+    return { fence: currentFence, isFenceLine: false };
+  }
+  const marker = match[1];
+  const rest = match[2];
+  const char = marker[0] as "`" | "~";
+
+  if (!currentFence) {
+    if (char === "`" && rest.includes("`")) {
+      return { fence: null, isFenceLine: false };
+    }
+    return {
+      fence: { char, length: marker.length },
+      isFenceLine: true,
+    };
+  }
+
+  if (
+    char === currentFence.char &&
+    marker.length >= currentFence.length &&
+    rest.trim() === ""
+  ) {
+    return { fence: null, isFenceLine: true };
+  }
+
+  return { fence: currentFence, isFenceLine: false };
+}
+
+function stripInlineCode(line: string): string {
+  return line.replace(/(`+)([^\r\n]*?)\1/g, " ");
+}
 
 export function countWords(text: string): number {
   const trimmed = text.trim();
@@ -78,17 +121,13 @@ export function extractHeadings(markdown: string): HeadingItem[] {
   if (!markdown) return [];
   const headings: HeadingItem[] = [];
   const lines = markdown.split("\n");
-  let inCodeBlock = false;
+  let fence: FenceState | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
-    const trimmed = rawLine.trim();
-
-    if (trimmed.startsWith("```")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
+    const fenceStep = updateFenceState(rawLine, fence);
+    fence = fenceStep.fence;
+    if (fenceStep.isFenceLine || fence !== null) continue;
 
     const match = rawLine.match(HEADING_LINE_REGEX);
     if (match) {
@@ -153,7 +192,7 @@ export function extractTags(markdown: string): TagItem[] {
   if (!markdown) return [];
   const tagCounts = new Map<string, number>();
   const lines = markdown.split("\n");
-  let inCodeBlock = false;
+  let fence: FenceState | null = null;
   let inFrontmatter = false;
 
   for (let i = 0; i < lines.length; i++) {
@@ -179,13 +218,13 @@ export function extractTags(markdown: string): TagItem[] {
       continue;
     }
 
-    if (trimmed.startsWith("```")) {
-      inCodeBlock = !inCodeBlock;
+    const fenceStep = updateFenceState(rawLine, fence);
+    fence = fenceStep.fence;
+    if (fenceStep.isFenceLine || fence !== null || /^#{1,6}\s+/.test(trimmed)) {
       continue;
     }
-    if (inCodeBlock || /^#{1,6}\s+/.test(trimmed)) continue;
 
-    const tagMatches = rawLine.match(HASHTAG_REGEX);
+    const tagMatches = stripInlineCode(rawLine).match(HASHTAG_REGEX);
     if (tagMatches) {
       for (const match of tagMatches) {
         const clean = match.trim().replace(/^#/, "");
@@ -259,18 +298,17 @@ function extractNoteLinks(markdown: string): string[] {
   const links: string[] = [];
   const seen = new Set<string>();
   const lines = markdown.split("\n");
-  let inCodeBlock = false;
+  let fence: FenceState | null = null;
 
   for (const rawLine of lines) {
-    const trimmed = rawLine.trim();
-    if (trimmed.startsWith("```")) {
-      inCodeBlock = !inCodeBlock;
-      continue;
-    }
-    if (inCodeBlock) continue;
+    const fenceStep = updateFenceState(rawLine, fence);
+    fence = fenceStep.fence;
+    if (fenceStep.isFenceLine || fence !== null) continue;
+
+    const cleanLine = stripInlineCode(rawLine);
 
     // 1. Wikilinks: [[Target]] or escaped \[\[Target\]\]
-    const wikiMatches = rawLine.matchAll(/\\?\[\\?\[([^\]]+?)\\?\]\\?\]/g);
+    const wikiMatches = cleanLine.matchAll(/\\?\[\\?\[([^\]]+?)\\?\]\\?\]/g);
     for (const match of wikiMatches) {
       const target = match[1]
         .replace(/\\+/g, "")
@@ -284,7 +322,7 @@ function extractNoteLinks(markdown: string): string[] {
     }
 
     // 2. Standard internal markdown links: [Label](target.md) (excluding images ![...] and external URLs)
-    const mdMatches = rawLine.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/g);
+    const mdMatches = cleanLine.matchAll(/(?<!!)\[[^\]]+\]\(([^)]+)\)/g);
     for (const match of mdMatches) {
       const rawHref = match[1].trim().replace(/^<|>$/g, "");
       if (
@@ -601,33 +639,37 @@ function resolveTargetHeadingLine(
   const doc = view.state.doc;
   const cleanTarget = normalizeHeadingText(headingText);
 
-  if (lineNumber && lineNumber >= 1 && lineNumber <= doc.lines) {
-    const candidate = doc.line(lineNumber);
-    if (normalizeHeadingText(candidate.text) === cleanTarget) {
-      return candidate;
-    }
-  }
-
+  let exactLineMatch: Line | null = null;
+  let sameLevelMatch: Line | null = null;
   let fallbackMatch: Line | null = null;
+  let fence: FenceState | null = null;
+
   for (let i = 1; i <= doc.lines; i++) {
     const line = doc.line(i);
+    const fenceStep = updateFenceState(line.text, fence);
+    fence = fenceStep.fence;
+    if (fenceStep.isFenceLine || fence !== null) continue;
+
+    if (lineNumber && i === lineNumber) {
+      if (normalizeHeadingText(line.text) === cleanTarget) {
+        return line;
+      }
+      exactLineMatch = line;
+    }
+
     const match = line.text.match(HEADING_LINE_REGEX);
     if (!match) continue;
     const lineLevel = match[1].length;
     const normalized = normalizeHeadingText(match[2]);
-    if (lineLevel === level && normalized === cleanTarget) {
-      return line;
+    if (!sameLevelMatch && lineLevel === level && normalized === cleanTarget) {
+      sameLevelMatch = line;
     }
     if (!fallbackMatch && normalized.includes(cleanTarget)) {
       fallbackMatch = line;
     }
   }
 
-  if (fallbackMatch) return fallbackMatch;
-  if (lineNumber && lineNumber >= 1 && lineNumber <= doc.lines) {
-    return doc.line(lineNumber);
-  }
-  return null;
+  return sameLevelMatch ?? fallbackMatch ?? exactLineMatch;
 }
 
 function computeScrollTargetTop(

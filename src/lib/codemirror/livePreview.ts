@@ -2,8 +2,6 @@ import {
   Decoration,
   DecorationSet,
   EditorView,
-  ViewPlugin,
-  ViewUpdate,
   WidgetType,
 } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
@@ -63,6 +61,39 @@ class CheckboxWidget extends WidgetType {
   }
 }
 
+interface CopyButtonElement extends HTMLButtonElement {
+  __codeText?: string;
+  __langLabel?: string;
+  __copiedTimer?: ReturnType<typeof setTimeout>;
+  __isCopied?: boolean;
+}
+
+function createCheckSvg(): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "12");
+  svg.setAttribute("height", "12");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2.5");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+
+  const polyline = document.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "polyline",
+  );
+  polyline.setAttribute("points", "20 6 9 17 4 12");
+  svg.appendChild(polyline);
+  return svg;
+}
+
+function setCopyButtonIdleLabel(btn: CopyButtonElement, label: string): void {
+  const span = document.createElement("span");
+  span.textContent = label;
+  btn.replaceChildren(span);
+}
+
 class CodeBlockCopyWidget extends WidgetType {
   constructor(
     readonly codeText: string,
@@ -86,32 +117,39 @@ class CodeBlockCopyWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    const btn = document.createElement("button");
+    const btn = document.createElement("button") as CopyButtonElement;
     btn.type = "button";
     btn.className = "cm-codeblock-copy-btn";
     btn.title = "Copy code to clipboard";
     btn.setAttribute("aria-label", "Copy code");
 
-    const labelText = this.langLabel || "Copy";
-    const checkSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-
-    btn.innerHTML = `<span>${labelText}</span>`;
+    btn.__codeText = this.codeText;
+    btn.__langLabel = this.langLabel || "Copy";
+    btn.__isCopied = false;
+    setCopyButtonIdleLabel(btn, btn.__langLabel);
 
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const textToCopy =
-        (btn as { __codeText?: string }).__codeText ?? this.codeText;
-
+      const textToCopy = btn.__codeText ?? this.codeText;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard
           .writeText(textToCopy)
           .then(() => {
-            btn.innerHTML = `${checkSvg}<span>Copied</span>`;
+            if (btn.__copiedTimer) {
+              clearTimeout(btn.__copiedTimer);
+            }
+            const labelSpan = document.createElement("span");
+            labelSpan.textContent = "Copied";
+            btn.replaceChildren(createCheckSvg(), labelSpan);
             btn.classList.add("is-copied");
-            setTimeout(() => {
-              btn.innerHTML = `<span>${labelText}</span>`;
+            btn.__isCopied = true;
+
+            btn.__copiedTimer = setTimeout(() => {
+              btn.__isCopied = false;
+              btn.__copiedTimer = undefined;
+              setCopyButtonIdleLabel(btn, btn.__langLabel || "Copy");
               btn.classList.remove("is-copied");
             }, 1800);
           })
@@ -125,22 +163,51 @@ class CodeBlockCopyWidget extends WidgetType {
   }
 
   updateDOM(dom: HTMLElement): boolean {
-    (dom as { __codeText?: string }).__codeText = this.codeText;
+    const btn = dom as CopyButtonElement;
+    btn.__codeText = this.codeText;
+    btn.__langLabel = this.langLabel || "Copy";
+    if (!btn.__isCopied) {
+      setCopyButtonIdleLabel(btn, btn.__langLabel);
+    }
     return true;
   }
+
+  destroy(dom: HTMLElement): void {
+    const btn = dom as CopyButtonElement;
+    if (btn.__copiedTimer) {
+      clearTimeout(btn.__copiedTimer);
+      btn.__copiedTimer = undefined;
+    }
+  }
+}
+
+function getEffectiveEndLine(state: EditorState, from: number, to: number) {
+  const effectiveTo =
+    to > from && state.doc.lineAt(to).from === to ? to - 1 : to;
+  return state.doc.lineAt(effectiveTo);
 }
 
 function extractCodeBlockText(
   state: EditorState,
   startLineNum: number,
   endLineNum: number,
+  hasClosingFence: boolean,
+  stripBlockquotePrefix: boolean,
 ): string {
-  if (endLineNum > startLineNum + 1) {
-    const codeStart = state.doc.line(startLineNum + 1).from;
-    const codeEnd = state.doc.line(endLineNum - 1).to;
-    return state.sliceDoc(codeStart, codeEnd);
+  const lastCodeLineNum = hasClosingFence ? endLineNum - 1 : endLineNum;
+  if (lastCodeLineNum < startLineNum + 1) {
+    return "";
   }
-  return "";
+  const codeStart = state.doc.line(startLineNum + 1).from;
+  const codeEnd = state.doc.line(lastCodeLineNum).to;
+  let text = state.sliceDoc(codeStart, codeEnd);
+  if (stripBlockquotePrefix) {
+    text = text
+      .split("\n")
+      .map((line) => line.replace(/^\s*(?:>\s?)+/, ""))
+      .join("\n");
+  }
+  return text;
 }
 
 function isCursorInRange(
@@ -167,6 +234,79 @@ const emptyReplace = Decoration.replace({});
 interface SpanRange {
   from: number;
   to: number;
+}
+
+type TreeSyntaxNode = ReturnType<ReturnType<typeof syntaxTree>["resolve"]>;
+
+function collectNestedCodeLineRanges(
+  state: EditorState,
+  root: TreeSyntaxNode,
+  ranges: SpanRange[],
+): void {
+  let child = root.firstChild;
+  while (child) {
+    if (child.name === "FencedCode" || child.name === "CodeBlock") {
+      const startLine = state.doc.lineAt(child.from);
+      const endLine = getEffectiveEndLine(state, child.from, child.to);
+      ranges.push({ from: startLine.from, to: endLine.to });
+    } else {
+      collectNestedCodeLineRanges(state, child, ranges);
+    }
+    child = child.nextSibling;
+  }
+}
+
+function appendBlockquoteDecorations(
+  decorations: Range<Decoration>[],
+  state: EditorState,
+  bqNode: TreeSyntaxNode,
+): void {
+  const codeRanges: SpanRange[] = [];
+  collectNestedCodeLineRanges(state, bqNode, codeRanges);
+  if (codeRanges.length === 0) {
+    decorations.push(
+      Decoration.mark({ class: "cm-blockquote" }).range(bqNode.from, bqNode.to),
+    );
+    return;
+  }
+
+  let pos = bqNode.from;
+  for (const range of codeRanges) {
+    if (range.from > pos) {
+      decorations.push(
+        Decoration.mark({ class: "cm-blockquote" }).range(pos, range.from),
+      );
+    }
+    pos = Math.max(pos, range.to);
+  }
+  if (bqNode.to > pos) {
+    decorations.push(
+      Decoration.mark({ class: "cm-blockquote" }).range(pos, bqNode.to),
+    );
+  }
+}
+
+function appendCodeBlockLineDecorations(
+  decorations: Range<Decoration>[],
+  state: EditorState,
+  startLineNum: number,
+  endLineNum: number,
+  collapseFirstFence: boolean,
+  collapseLastFence: boolean,
+): void {
+  for (let l = startLineNum; l <= endLineNum; l++) {
+    const line = state.doc.line(l);
+    let cls = "cm-codeblock-line";
+    if (l === startLineNum) {
+      cls += " cm-codeblock-first";
+      if (collapseFirstFence) cls += " cm-codeblock-fence-collapsed";
+    }
+    if (l === endLineNum) {
+      cls += " cm-codeblock-last";
+      if (collapseLastFence) cls += " cm-codeblock-fence-collapsed";
+    }
+    decorations.push(Decoration.line({ class: cls }).range(line.from));
+  }
 }
 
 function overlapsAnyRange(
@@ -320,19 +460,34 @@ function buildDecorations(state: EditorState): DecorationSet {
         return false;
       }
 
-      // 6. InlineCode (`code`)
+      // 6. InlineCode (`code` or multi-backtick ``code ` here``)
       if (name === "InlineCode") {
         excludedRanges.push({ from, to });
         const cursorInside = isCursorInRange(state, from, to);
-        if (!cursorInside && to - from > 2) {
-          decorations.push(emptyReplace.range(from, from + 1));
-          decorations.push(
-            Decoration.mark({ class: "cm-inline-code" }).range(
-              from + 1,
-              to - 1,
-            ),
-          );
-          decorations.push(emptyReplace.range(to - 1, to));
+        const marks = node.node.getChildren("CodeMark");
+        const openMark = marks[0];
+        const closeMark = marks.length > 1 ? marks[marks.length - 1] : null;
+
+        if (
+          !cursorInside &&
+          openMark &&
+          closeMark &&
+          closeMark.from >= openMark.to
+        ) {
+          if (openMark.to > openMark.from) {
+            decorations.push(emptyReplace.range(openMark.from, openMark.to));
+          }
+          if (closeMark.from > openMark.to) {
+            decorations.push(
+              Decoration.mark({ class: "cm-inline-code" }).range(
+                openMark.to,
+                closeMark.from,
+              ),
+            );
+          }
+          if (closeMark.to > closeMark.from) {
+            decorations.push(emptyReplace.range(closeMark.from, closeMark.to));
+          }
         } else if (to > from) {
           decorations.push(
             Decoration.mark({ class: "cm-inline-code" }).range(from, to),
@@ -421,11 +576,9 @@ function buildDecorations(state: EditorState): DecorationSet {
         return false;
       }
 
-      // 11. Blockquotes
+      // 11. Blockquotes (skip nested code blocks so code isn't italicized)
       if (name === "Blockquote" && to > from) {
-        decorations.push(
-          Decoration.mark({ class: "cm-blockquote" }).range(from, to),
-        );
+        appendBlockquoteDecorations(decorations, state, node.node);
       }
 
       // 11b. HorizontalRule (---, ***, ___)
@@ -445,37 +598,49 @@ function buildDecorations(state: EditorState): DecorationSet {
       // 12. Fenced Code Blocks: Continuous terminal block with Copy button
       if (name === "FencedCode") {
         const startLine = state.doc.lineAt(from);
-        const endLine = state.doc.lineAt(to);
-        const cursorInside = isCursorInRange(state, from, to);
+        const endLine = getEffectiveEndLine(state, from, to);
+        const cursorInside = isCursorInRange(state, from, endLine.to);
         excludedRanges.push({ from: startLine.from, to: endLine.to });
 
-        const rawInfo = startLine.text
-          .replace(/^\s*(?:`{3,}|~{3,})\s*/, "")
-          .trim();
+        const codeMarks = node.node.getChildren("CodeMark");
+        const openMark = codeMarks[0] ?? null;
+        const candidateCloseMark =
+          codeMarks.length > 1 ? codeMarks[codeMarks.length - 1] : null;
+        const hasClosingFence = Boolean(
+          candidateCloseMark &&
+          endLine.number > startLine.number &&
+          candidateCloseMark.from >= endLine.from,
+        );
+        const closeMark = hasClosingFence ? candidateCloseMark : null;
+
+        const codeInfo = node.node.getChild("CodeInfo");
+        const rawInfo = codeInfo
+          ? state.sliceDoc(codeInfo.from, codeInfo.to).trim()
+          : "";
         const langLabel = rawInfo
           ? rawInfo.charAt(0).toUpperCase() + rawInfo.slice(1)
           : "";
 
-        for (let l = startLine.number; l <= endLine.number; l++) {
-          const line = state.doc.line(l);
-          let cls = "cm-codeblock-line";
-          if (l === startLine.number) {
-            cls += " cm-codeblock-first";
-            if (!cursorInside) cls += " cm-codeblock-fence-collapsed";
-          }
-          if (l === endLine.number) {
-            cls += " cm-codeblock-last";
-            if (!cursorInside && endLine.number > startLine.number) {
-              cls += " cm-codeblock-fence-collapsed";
-            }
-          }
-          decorations.push(Decoration.line({ class: cls }).range(line.from));
-        }
+        appendCodeBlockLineDecorations(
+          decorations,
+          state,
+          startLine.number,
+          endLine.number,
+          !cursorInside,
+          !cursorInside && hasClosingFence,
+        );
+
+        const prefixBeforeOpen = openMark
+          ? state.sliceDoc(startLine.from, openMark.from)
+          : "";
+        const isInBlockquote = /^\s*(?:>\s*)+$/.test(prefixBeforeOpen);
 
         const codeText = extractCodeBlockText(
           state,
           startLine.number,
           endLine.number,
+          hasClosingFence,
+          isInBlockquote,
         );
         decorations.push(
           Decoration.widget({
@@ -488,29 +653,56 @@ function buildDecorations(state: EditorState): DecorationSet {
           if (startLine.to > startLine.from) {
             decorations.push(emptyReplace.range(startLine.from, startLine.to));
           }
-          if (endLine.number > startLine.number && endLine.to > endLine.from) {
+          if (hasClosingFence && endLine.to > endLine.from) {
             decorations.push(emptyReplace.range(endLine.from, endLine.to));
           }
-          return false;
+        } else {
+          for (const mark of [openMark, closeMark]) {
+            if (mark && mark.to > mark.from) {
+              decorations.push(
+                Decoration.mark({ class: "cm-codeblock-fence" }).range(
+                  mark.from,
+                  mark.to,
+                ),
+              );
+            }
+          }
+          if (codeInfo && codeInfo.to > codeInfo.from) {
+            decorations.push(
+              Decoration.mark({ class: "cm-codeblock-info" }).range(
+                codeInfo.from,
+                codeInfo.to,
+              ),
+            );
+          }
         }
-        return true;
+        return false;
       }
 
       if (name === "CodeBlock") {
-        excludedRanges.push({ from, to });
-        return false;
-      }
+        const startLine = state.doc.lineAt(from);
+        const endLine = getEffectiveEndLine(state, from, to);
+        excludedRanges.push({ from: startLine.from, to: endLine.to });
 
-      if (name === "CodeMark" && to > from) {
-        decorations.push(
-          Decoration.mark({ class: "cm-codeblock-fence" }).range(from, to),
+        appendCodeBlockLineDecorations(
+          decorations,
+          state,
+          startLine.number,
+          endLine.number,
+          false,
+          false,
         );
-        return false;
-      }
 
-      if (name === "CodeInfo" && to > from) {
+        const codeText = state
+          .sliceDoc(startLine.from, endLine.to)
+          .split("\n")
+          .map((line) => line.replace(/^(?:\t| {1,4})/, ""))
+          .join("\n");
         decorations.push(
-          Decoration.mark({ class: "cm-codeblock-info" }).range(from, to),
+          Decoration.widget({
+            widget: new CodeBlockCopyWidget(codeText, ""),
+            side: 1,
+          }).range(startLine.to),
         );
         return false;
       }
@@ -563,29 +755,28 @@ export const livePreviewField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 });
 
-export const codeBlockCursorPlugin = ViewPlugin.fromClass(
-  class {
-    constructor(view: EditorView) {
-      this.checkCodeBlock(view);
+function hasCodeBlockAncestor(
+  node: ReturnType<ReturnType<typeof syntaxTree>["resolve"]> | null,
+): boolean {
+  let cur = node;
+  while (cur) {
+    if (cur.name === "FencedCode" || cur.name === "CodeBlock") {
+      return true;
     }
-    update(update: ViewUpdate) {
-      if (update.selectionSet || update.docChanged) {
-        this.checkCodeBlock(update.view);
-      }
-    }
-    checkCodeBlock(view: EditorView) {
-      const pos = view.state.selection.main.head;
-      const node = syntaxTree(view.state).resolveInner(pos, 1);
-      let inCode = false;
-      let cur: typeof node | null = node;
-      while (cur) {
-        if (cur.name === "FencedCode" || cur.name === "CodeBlock") {
-          inCode = true;
-          break;
-        }
-        cur = cur.parent;
-      }
-      view.dom.classList.toggle("cm-in-codeblock", inCode);
-    }
-  },
+    cur = cur.parent;
+  }
+  return false;
+}
+
+function isCursorInCodeBlock(state: EditorState): boolean {
+  const pos = state.selection.main.head;
+  const tree = syntaxTree(state);
+  return (
+    hasCodeBlockAncestor(tree.resolve(pos, 1)) ||
+    hasCodeBlockAncestor(tree.resolve(pos, -1))
+  );
+}
+
+export const codeBlockCursorPlugin = EditorView.editorAttributes.of((view) =>
+  isCursorInCodeBlock(view.state) ? { class: "cm-in-codeblock" } : null,
 );

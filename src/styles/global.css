@@ -2917,7 +2917,7 @@ body.is-col-resizing * {
 
 /* CodeMirror Live Preview Inline Images */
 .cm-image-container {
-  margin: 12px 0;
+  margin: 0;
   position: relative;
   user-select: none;
   max-width: 100%;
@@ -2926,6 +2926,8 @@ body.is-col-resizing * {
 .cm-image-container.is-block {
   display: block;
   clear: both;
+  margin: 0;
+  padding: 12px 0;
 }
 
 .cm-image-container.is-inline {

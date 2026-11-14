@@ -376,6 +376,9 @@ export class ImageWidget extends WidgetType {
     };
 
     img.addEventListener("click", openViewer);
+    img.addEventListener("load", () => {
+      view.requestMeasure();
+    });
 
     // Floating action toolbar on hover
     const toolbar = document.createElement("div");
@@ -486,6 +489,7 @@ export class ImageWidget extends WidgetType {
       errorCard.appendChild(errText);
       errorCard.appendChild(fixBtn);
       wrapper.appendChild(errorCard);
+      view.requestMeasure();
     });
 
     return container;

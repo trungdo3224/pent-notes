@@ -266,6 +266,11 @@ function renderCellContent(raw: string, targetEl: HTMLElement): void {
   });
 }
 
+interface TableWidgetElement extends HTMLDivElement {
+  __resizeObserver?: ResizeObserver;
+  __cleanupTimer?: () => void;
+}
+
 /**
  * Interactive In-Place Table Widget for CodeMirror 6.
  * Keeps the table in styled view permanently even during editing.
@@ -296,11 +301,12 @@ export class TableWidget extends WidgetType {
     return Math.max(lines * 34 + 60, 90);
   }
 
-  updateDOM(dom: HTMLElement): boolean {
-    // If user is currently typing inside this table, preserve the DOM to keep focus and cursor intact
-    if (dom.contains(document.activeElement)) {
+  updateDOM(dom: HTMLElement, _view: EditorView, prev: TableWidget): boolean {
+    // Preserve DOM while typing in a cell or when only upstream offsets shifted
+    if (dom.contains(document.activeElement) || prev.rawText === this.rawText) {
       dom.dataset.from = String(this.from);
       dom.dataset.to = String(this.to);
+      dom.dataset.rawText = this.rawText;
       const inner = dom.querySelector<HTMLElement>(".cm-table-container");
       if (inner) {
         inner.dataset.from = String(this.from);
@@ -309,6 +315,18 @@ export class TableWidget extends WidgetType {
       return true;
     }
     return false;
+  }
+
+  destroy(dom: HTMLElement): void {
+    const el = dom as TableWidgetElement;
+    if (el.__resizeObserver) {
+      el.__resizeObserver.disconnect();
+      delete el.__resizeObserver;
+    }
+    if (el.__cleanupTimer) {
+      el.__cleanupTimer();
+      delete el.__cleanupTimer;
+    }
   }
 
   toDOM(view: EditorView): HTMLElement {
@@ -321,10 +339,11 @@ export class TableWidget extends WidgetType {
       return fallback;
     }
 
-    const wrapper = document.createElement("div");
+    const wrapper = document.createElement("div") as TableWidgetElement;
     wrapper.className = "cm-table-wrapper";
     wrapper.dataset.from = String(this.from);
     wrapper.dataset.to = String(this.to);
+    wrapper.dataset.rawText = this.rawText;
 
     const container = document.createElement("div");
     container.className = "cm-table-container";
@@ -333,26 +352,53 @@ export class TableWidget extends WidgetType {
     wrapper.appendChild(container);
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let isDirty = false;
+
+    const clearPendingSync = () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
+    };
+    wrapper.__cleanupTimer = clearPendingSync;
+
+    if (typeof ResizeObserver === "function") {
+      let lastHeight = -1;
+      const ro = new ResizeObserver((entries) => {
+        const nextHeight =
+          entries[0]?.contentRect.height ?? wrapper.offsetHeight;
+        if (nextHeight !== lastHeight) {
+          lastHeight = nextHeight;
+          view.requestMeasure();
+        }
+      });
+      ro.observe(wrapper);
+      wrapper.__resizeObserver = ro;
+    }
 
     const dispatchUpdate = () => {
+      isDirty = false;
       const curFrom = Number(container.dataset.from);
       const curTo = Number(container.dataset.to);
       const newMarkdown = serializeTableToMarkdown(container);
 
+      const latestRawText = wrapper.dataset.rawText ?? this.rawText;
       if (
         newMarkdown &&
-        (newMarkdown !== this.rawText || curTo !== curFrom + newMarkdown.length)
+        (newMarkdown !== latestRawText ||
+          curTo !== curFrom + newMarkdown.length)
       ) {
         view.dispatch({
           changes: { from: curFrom, to: curTo, insert: newMarkdown },
         });
         container.dataset.to = String(curFrom + newMarkdown.length);
         wrapper.dataset.to = String(curFrom + newMarkdown.length);
+        wrapper.dataset.rawText = newMarkdown;
       }
     };
 
     const scheduleSync = () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
+      clearPendingSync();
       debounceTimer = setTimeout(dispatchUpdate, 150);
     };
 
@@ -505,14 +551,19 @@ export class TableWidget extends WidgetType {
     });
 
     // Content editing & input sync
-    table.addEventListener("input", scheduleSync);
+    table.addEventListener("input", () => {
+      isDirty = true;
+      scheduleSync();
+    });
 
     table.addEventListener(
       "blur",
       (e) => {
         if (!table.contains(e.relatedTarget as Node)) {
-          if (debounceTimer) clearTimeout(debounceTimer);
-          dispatchUpdate();
+          clearPendingSync();
+          if (isDirty) {
+            dispatchUpdate();
+          }
         }
       },
       true,

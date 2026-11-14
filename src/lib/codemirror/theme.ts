@@ -95,11 +95,8 @@ export const editorTheme = EditorView.theme({
   "&.cm-in-codeblock .cm-cursor, &.cm-in-codeblock .cm-dropCursor": {
     borderLeftColor: "var(--code-caret, #38bdf8) !important",
   },
-  "&.cm-in-codeblock .cm-content": {
-    caretColor: "var(--code-caret, #38bdf8) !important",
-  },
   "&.cm-in-codeblock .cm-selectionBackground, &.cm-in-codeblock ::selection": {
-    color: "#ffffff !important",
+    color: "var(--selection-text) !important",
   },
   ".cm-selectionBackground, ::selection": {
     backgroundColor: "var(--selection-bg) !important",
@@ -192,11 +189,21 @@ export const editorTheme = EditorView.theme({
     textAlign: "center",
   },
   ".cm-hr-line": {
-    borderBottom: "1px solid var(--border-subtle)",
-    height: "1px",
-    margin: "18px 0",
-    padding: "0 !important",
+    position: "relative",
+    height: "auto",
+    margin: "0 !important",
+    padding: "18px 0 !important",
     lineHeight: "0",
+    borderBottom: "none",
+  },
+  ".cm-hr-line::after": {
+    content: '""',
+    position: "absolute",
+    left: "0",
+    right: "0",
+    top: "50%",
+    borderTop: "1px solid var(--border-subtle)",
+    pointerEvents: "none",
   },
   ".cm-task-checkbox": {
     cursor: "pointer",
@@ -207,39 +214,39 @@ export const editorTheme = EditorView.theme({
 
   /* Fenced Code Blocks - Clean Minimal Block */
   ".cm-codeblock-line": {
-    backgroundColor:
-      "color-mix(in srgb, #000000 24%, var(--bg-editor)) !important",
+    backgroundColor: "var(--code-bg) !important",
     color: "var(--code-text) !important",
     fontFamily: "var(--font-mono)",
     fontSize: "0.88em",
+    lineHeight: "1.55",
     paddingLeft: "16px !important",
     paddingRight: "16px !important",
-    borderLeft: "1px solid var(--border-subtle)",
-    borderRight: "1px solid var(--border-subtle)",
+    borderLeft: "1px solid var(--code-border, var(--border-subtle))",
+    borderRight: "1px solid var(--code-border, var(--border-subtle))",
     margin: "0 !important",
     borderRadius: "0",
   },
   ".cm-codeblock-first": {
     position: "relative",
-    borderTop: "1px solid var(--border-subtle)",
+    borderTop: "1px solid var(--code-border, var(--border-subtle))",
     borderTopLeftRadius: "6px",
     borderTopRightRadius: "6px",
     paddingTop: "8px !important",
     paddingRight: "72px !important",
-    margin: "6px 0 0 !important",
+    margin: "0 !important",
   },
   ".cm-codeblock-last": {
-    borderBottom: "1px solid var(--border-subtle)",
+    borderBottom: "1px solid var(--code-border, var(--border-subtle))",
     borderBottomLeftRadius: "6px",
     borderBottomRightRadius: "6px",
     paddingBottom: "8px !important",
-    margin: "0 0 6px !important",
+    margin: "0 !important",
   },
   ".cm-codeblock-first.cm-codeblock-fence-collapsed": {
     fontSize: "0",
     lineHeight: "0",
-    minHeight: "10px",
-    paddingTop: "10px !important",
+    minHeight: "32px",
+    paddingTop: "31px !important",
     paddingBottom: "0 !important",
   },
   ".cm-codeblock-last.cm-codeblock-fence-collapsed": {

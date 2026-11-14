@@ -43,6 +43,84 @@ interface OllamaChatboxProps {
   noteContent: string;
 }
 
+export type ChatMessageSegment =
+  { kind: "text"; text: string } | { kind: "code"; lang: string; code: string };
+
+/**
+ * Splits a markdown chat message into prose segments and closed fenced code blocks
+ * supporting backtick (`>=3`) and tilde (`>=3`) fences while preserving leading whitespace.
+ */
+export function splitChatMarkdownBlocks(content: string): ChatMessageSegment[] {
+  if (!content.includes("```") && !content.includes("~~~")) {
+    return [{ kind: "text", text: content }];
+  }
+
+  const segments: ChatMessageSegment[] = [];
+  const lines = content.split("\n");
+  let textBuffer: string[] = [];
+  let activeFence: {
+    char: "`" | "~";
+    length: number;
+    lang: string;
+    openRawLine: string;
+    codeLines: string[];
+  } | null = null;
+
+  const flushText = () => {
+    if (textBuffer.length > 0) {
+      segments.push({ kind: "text", text: textBuffer.join("\n") });
+      textBuffer = [];
+    }
+  };
+
+  for (const rawLine of lines) {
+    const cleanLine = rawLine.replace(/\r$/, "");
+    const fenceMatch = cleanLine.match(/^\s{0,3}(`{3,}|~{3,})(.*)$/);
+
+    if (!activeFence) {
+      if (fenceMatch) {
+        const marker = fenceMatch[1];
+        const rest = fenceMatch[2];
+        const char = marker[0] as "`" | "~";
+        if (char !== "`" || !rest.includes("`")) {
+          flushText();
+          const lang = rest.trim().split(/\s+/)[0] || "";
+          activeFence = {
+            char,
+            length: marker.length,
+            lang,
+            openRawLine: rawLine,
+            codeLines: [],
+          };
+          continue;
+        }
+      }
+      textBuffer.push(rawLine);
+    } else if (
+      fenceMatch &&
+      fenceMatch[1][0] === activeFence.char &&
+      fenceMatch[1].length >= activeFence.length &&
+      fenceMatch[2].trim() === ""
+    ) {
+      segments.push({
+        kind: "code",
+        lang: activeFence.lang,
+        code: activeFence.codeLines.join("\n"),
+      });
+      activeFence = null;
+    } else {
+      activeFence.codeLines.push(cleanLine);
+    }
+  }
+
+  if (activeFence) {
+    textBuffer.push(activeFence.openRawLine, ...activeFence.codeLines);
+  }
+  flushText();
+
+  return segments;
+}
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -368,29 +446,26 @@ export const OllamaChatbox: React.FC<OllamaChatboxProps> = ({
 
   // Render markdown with code block copy buttons
   const renderMessageContent = (content: string) => {
-    if (!content.includes("```")) {
-      return <div className="ollama-text-content">{content}</div>;
+    const segments = splitChatMarkdownBlocks(content);
+    if (segments.length === 1 && segments[0].kind === "text") {
+      return <div className="ollama-text-content">{segments[0].text}</div>;
     }
 
-    const parts = content.split(/(```[\s\S]*?```)/g);
     return (
       <div className="ollama-text-content">
-        {parts.map((part, index) => {
-          if (part.startsWith("```") && part.endsWith("```")) {
-            const lines = part.slice(3, -3).trim().split("\n");
-            const firstLine = lines[0].trim();
-            const lang = firstLine && !firstLine.includes(" ") ? firstLine : "";
-            const code = (lang ? lines.slice(1) : lines).join("\n");
-
+        {segments.map((segment, index) => {
+          if (segment.kind === "code") {
             return (
               <div key={index} className="ollama-code-block">
                 <div className="ollama-code-header">
-                  <span className="ollama-code-lang">{lang || "code"}</span>
+                  <span className="ollama-code-lang">
+                    {segment.lang || "code"}
+                  </span>
                   <button
                     type="button"
                     className="ollama-code-copy-btn"
                     onClick={() => {
-                      void navigator.clipboard?.writeText(code);
+                      void navigator.clipboard?.writeText(segment.code);
                     }}
                     title="Copy code"
                   >
@@ -399,12 +474,12 @@ export const OllamaChatbox: React.FC<OllamaChatboxProps> = ({
                   </button>
                 </div>
                 <pre className="ollama-code-body">
-                  <code>{code}</code>
+                  <code>{segment.code}</code>
                 </pre>
               </div>
             );
           }
-          return <span key={index}>{part}</span>;
+          return <span key={index}>{segment.text}</span>;
         })}
       </div>
     );
