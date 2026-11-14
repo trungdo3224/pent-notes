@@ -1,20 +1,24 @@
-import { StateStorage } from 'zustand/middleware';
-import { getTabSessionId, getTabSessionName } from './sessionManager';
+import { StateStorage } from "zustand/middleware";
+import {
+  getTabSessionId,
+  getTabSessionName,
+  sessionApi,
+} from "./sessionManager";
 
 interface StoredEnvelope {
   savedAt: number;
   payload: string;
 }
 
-const IDB_NAME = 'pentnotes-db';
-const IDB_STORE = 'workspace-kv';
+const IDB_NAME = "pentnotes-db";
+const IDB_STORE = "workspace-kv";
 const IDB_VERSION = 2;
 const SERVER_WRITE_DEBOUNCE_MS = 150;
 
 function openIdb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB unavailable'));
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB unavailable"));
       return;
     }
     const request = indexedDB.open(IDB_NAME, IDB_VERSION);
@@ -32,9 +36,9 @@ function openIdb(): Promise<IDBDatabase> {
 function isStoredEnvelope(val: unknown): val is StoredEnvelope {
   return (
     Boolean(val) &&
-    typeof val === 'object' &&
-    typeof (val as StoredEnvelope).savedAt === 'number' &&
-    typeof (val as StoredEnvelope).payload === 'string'
+    typeof val === "object" &&
+    typeof (val as StoredEnvelope).savedAt === "number" &&
+    typeof (val as StoredEnvelope).payload === "string"
   );
 }
 
@@ -42,9 +46,10 @@ async function idbGet(key: string): Promise<StoredEnvelope | null> {
   try {
     const db = await openIdb();
     return await new Promise<StoredEnvelope | null>((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, 'readonly');
+      const tx = db.transaction(IDB_STORE, "readonly");
       const req = tx.objectStore(IDB_STORE).get(key);
-      req.onsuccess = () => resolve(isStoredEnvelope(req.result) ? req.result : null);
+      req.onsuccess = () =>
+        resolve(isStoredEnvelope(req.result) ? req.result : null);
       req.onerror = () => reject(req.error);
     });
   } catch {
@@ -53,12 +58,12 @@ async function idbGet(key: string): Promise<StoredEnvelope | null> {
 }
 
 async function idbMutate(
-  operation: (store: IDBObjectStore) => void
+  operation: (store: IDBObjectStore) => void,
 ): Promise<void> {
   try {
     const db = await openIdb();
     await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, 'readwrite');
+      const tx = db.transaction(IDB_STORE, "readwrite");
       operation(tx.objectStore(IDB_STORE));
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
@@ -81,29 +86,9 @@ async function idbDelete(key: string): Promise<void> {
 }
 
 async function serverGet(sessionId: string): Promise<StoredEnvelope | null> {
-  if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
-    try {
-      const data = await window.electronAPI.sessions.get(sessionId);
-      if (data && typeof data.payload === 'string' && data.payload !== 'null') {
-        return {
-          savedAt: data.updatedAt || Date.now(),
-          payload: data.payload,
-        };
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
   try {
-    const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
-      method: 'GET',
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data && typeof data.payload === 'string' && data.payload !== 'null') {
+    const data = await sessionApi.getSession(sessionId);
+    if (data && typeof data.payload === "string" && data.payload !== "null") {
       return {
         savedAt: data.updatedAt || Date.now(),
         payload: data.payload,
@@ -118,31 +103,15 @@ async function serverGet(sessionId: string): Promise<StoredEnvelope | null> {
 async function serverSet(
   sessionId: string,
   envelope: StoredEnvelope,
-  keepalive = false
+  keepalive = false,
 ): Promise<void> {
-  if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
-    try {
-      await window.electronAPI.sessions.save(
-        sessionId,
-        getTabSessionName(),
-        envelope.payload
-      );
-      return;
-    } catch {
-      return;
-    }
-  }
-
   try {
-    await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        payload: envelope.payload,
-        name: getTabSessionName(),
-      }),
+    await sessionApi.saveSession(
+      sessionId,
+      envelope.payload,
+      getTabSessionName(),
       keepalive,
-    });
+    );
   } catch {
     // Static build or offline fallback relies on IndexedDB
   }
@@ -151,7 +120,10 @@ async function serverSet(
 let pendingEnvelope: StoredEnvelope | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
-function scheduleServerWrite(sessionId: string, envelope: StoredEnvelope): void {
+function scheduleServerWrite(
+  sessionId: string,
+  envelope: StoredEnvelope,
+): void {
   pendingEnvelope = envelope;
   if (saveTimer) {
     clearTimeout(saveTimer);
@@ -178,16 +150,19 @@ function flushServerWriteImmediate(sessionId: string): void {
   }
 }
 
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   const flushCurrent = () => {
     const sessionId = getTabSessionId();
     flushServerWriteImmediate(sessionId);
   };
-  window.addEventListener('beforeunload', flushCurrent);
-  window.addEventListener('pagehide', flushCurrent);
+  window.addEventListener("beforeunload", flushCurrent);
+  window.addEventListener("pagehide", flushCurrent);
 }
 
-function getSessionStorageKey(name: string): { sessionId: string; idbKey: string } {
+function getSessionStorageKey(name: string): {
+  sessionId: string;
+  idbKey: string;
+} {
   const sessionId = getTabSessionId();
   return {
     sessionId,
@@ -203,7 +178,10 @@ export const workspaceStorage: StateStorage = {
     try {
       const remoteEnvelope = await serverGet(sessionId);
       if (remoteEnvelope && remoteEnvelope.payload) {
-        if (!cachedEnvelope || remoteEnvelope.savedAt >= cachedEnvelope.savedAt) {
+        if (
+          !cachedEnvelope ||
+          remoteEnvelope.savedAt >= cachedEnvelope.savedAt
+        ) {
           await idbSet(idbKey, remoteEnvelope);
           return remoteEnvelope.payload;
         }
@@ -228,18 +206,8 @@ export const workspaceStorage: StateStorage = {
   async removeItem(name: string): Promise<void> {
     const { sessionId, idbKey } = getSessionStorageKey(name);
     await idbDelete(idbKey);
-
-    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
-      try {
-        await window.electronAPI.sessions.delete(sessionId);
-      } catch {
-        // Ignore
-      }
-      return;
-    }
-
     try {
-      await fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+      await sessionApi.deleteSession(sessionId);
     } catch {
       // Ignore network errors when deleting session
     }

@@ -21,6 +21,40 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
+function registerAbortableStreamIpc({
+  startChannel,
+  abortChannel,
+  eventChannelPrefix,
+  startStream,
+  isTerminal,
+}) {
+  const activeStreams = new Map();
+
+  ipcMain.on(startChannel, (event, payload) => {
+    const { reqId } = payload;
+    if (activeStreams.has(reqId)) {
+      activeStreams.get(reqId)();
+    }
+    const abort = startStream(payload, (chunk) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(`${eventChannelPrefix}:${reqId}`, chunk);
+      }
+      if (isTerminal(chunk)) {
+        activeStreams.delete(reqId);
+      }
+    });
+    activeStreams.set(reqId, abort);
+  });
+
+  ipcMain.on(abortChannel, (_, { reqId }) => {
+    const abort = activeStreams.get(reqId);
+    if (abort) {
+      abort();
+      activeStreams.delete(reqId);
+    }
+  });
+}
+
 function registerIpcHandlers() {
   // Filesystem handlers
   ipcMain.handle("fs:scan", async (_, folderPath) => {
@@ -98,9 +132,6 @@ function registerIpcHandlers() {
   });
 
   // Ollama AI Assistant handlers
-  const activeOllamaPulls = new Map();
-  const activeOllamaChats = new Map();
-
   ipcMain.handle("ollama:list-models", async (_, host) => {
     return await ollamaService.listModels(host);
   });
@@ -112,58 +143,25 @@ function registerIpcHandlers() {
     },
   );
 
-  ipcMain.on("ollama:pull-start", (event, { reqId, host, modelName }) => {
-    if (activeOllamaPulls.has(reqId)) {
-      activeOllamaPulls.get(reqId)();
-    }
-    const abort = ollamaService.pullModel(host, modelName, (progress) => {
-      if (!event.sender.isDestroyed()) {
-        event.sender.send(`ollama:pull-progress:${reqId}`, progress);
-      }
-      if (
-        progress.status === "success" ||
-        progress.status === "error" ||
-        progress.status === "aborted"
-      ) {
-        activeOllamaPulls.delete(reqId);
-      }
-    });
-    activeOllamaPulls.set(reqId, abort);
+  registerAbortableStreamIpc({
+    startChannel: "ollama:pull-start",
+    abortChannel: "ollama:pull-abort",
+    eventChannelPrefix: "ollama:pull-progress",
+    startStream: ({ host, modelName }, send) =>
+      ollamaService.pullModel(host, modelName, send),
+    isTerminal: (progress) =>
+      progress.status === "success" ||
+      progress.status === "error" ||
+      progress.status === "aborted",
   });
 
-  ipcMain.on("ollama:pull-abort", (_, { reqId }) => {
-    const abort = activeOllamaPulls.get(reqId);
-    if (abort) {
-      abort();
-      activeOllamaPulls.delete(reqId);
-    }
-  });
-
-  ipcMain.on("ollama:chat-start", (event, { reqId, host, model, messages }) => {
-    if (activeOllamaChats.has(reqId)) {
-      activeOllamaChats.get(reqId)();
-    }
-    const abort = ollamaService.chatStream(
-      host,
-      { model, messages },
-      (chunk) => {
-        if (!event.sender.isDestroyed()) {
-          event.sender.send(`ollama:chat-chunk:${reqId}`, chunk);
-        }
-        if (chunk.done || chunk.error) {
-          activeOllamaChats.delete(reqId);
-        }
-      },
-    );
-    activeOllamaChats.set(reqId, abort);
-  });
-
-  ipcMain.on("ollama:chat-abort", (_, { reqId }) => {
-    const abort = activeOllamaChats.get(reqId);
-    if (abort) {
-      abort();
-      activeOllamaChats.delete(reqId);
-    }
+  registerAbortableStreamIpc({
+    startChannel: "ollama:chat-start",
+    abortChannel: "ollama:chat-abort",
+    eventChannelPrefix: "ollama:chat-chunk",
+    startStream: ({ host, model, messages }, send) =>
+      ollamaService.chatStream(host, { model, messages }, send),
+    isTerminal: (chunk) => Boolean(chunk.done || chunk.error),
   });
 }
 

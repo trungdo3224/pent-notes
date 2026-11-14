@@ -5,12 +5,7 @@ import {
   SortOrder,
   TopLevelFolder,
 } from "../types";
-import {
-  isCodeNote,
-  isImageNote,
-  isPdfNote,
-  todayDateString,
-} from "./fileUtils";
+import { resolveNoteFileType, todayDateString } from "./fileUtils";
 
 export type NoteUpdates = Partial<
   Pick<
@@ -278,18 +273,9 @@ export function removeNodeFromTree(
 
 export function normalizeExplorerNode(node: ExplorerNode): ExplorerNode {
   if (node.type === "note") {
-    const isPdf = isPdfNote(node);
-    const isImage = !isPdf && isImageNote(node);
-    const isCode = !isPdf && !isImage && isCodeNote(node);
-    const nextFileType = isPdf
-      ? "pdf"
-      : isImage
-        ? "image"
-        : isCode
-          ? "code"
-          : "markdown";
+    const nextFileType = resolveNoteFileType(node);
     const nextTitle =
-      isCode && node.filePath && !node.title.includes(".")
+      nextFileType === "code" && node.filePath && !node.title.includes(".")
         ? node.filePath.split(/[/\\]/).pop() || node.title
         : node.title;
     return {
@@ -302,6 +288,54 @@ export function normalizeExplorerNode(node: ExplorerNode): ExplorerNode {
     ...node,
     children: node.children.map(normalizeExplorerNode),
   };
+}
+
+/**
+ * Finds a note and its owning top-level folder across the workspace, checking
+ * preferredFolderId first when provided.
+ */
+export function findNoteAcrossFolders(
+  folders: TopLevelFolder[],
+  noteId: string,
+  preferredFolderId?: string | null,
+): { folder: TopLevelFolder; note: NoteItem } | null {
+  if (preferredFolderId) {
+    const preferred = folders.find((f) => f.id === preferredFolderId);
+    if (preferred) {
+      const note = findNoteNode(preferred.items, noteId);
+      if (note) return { folder: preferred, note };
+    }
+  }
+  for (const folder of folders) {
+    if (folder.id === preferredFolderId) continue;
+    const note = findNoteNode(folder.items, noteId);
+    if (note) return { folder, note };
+  }
+  return null;
+}
+
+/**
+ * Finds a note, its owning top-level folder, and its display breadcrumb path
+ * across the workspace, checking preferredFolderId first when provided.
+ */
+export function findNoteAndPathAcrossFolders(
+  folders: TopLevelFolder[],
+  noteId: string,
+  preferredFolderId?: string | null,
+): { folder: TopLevelFolder; note: NoteItem; path: string[] } | null {
+  if (preferredFolderId) {
+    const preferred = folders.find((f) => f.id === preferredFolderId);
+    if (preferred) {
+      const found = findNoteAndPath(preferred.items, noteId, [preferred.name]);
+      if (found) return { folder: preferred, ...found };
+    }
+  }
+  for (const folder of folders) {
+    if (folder.id === preferredFolderId) continue;
+    const found = findNoteAndPath(folder.items, noteId, [folder.name]);
+    if (found) return { folder, ...found };
+  }
+  return null;
 }
 
 /**

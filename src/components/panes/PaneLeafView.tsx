@@ -1,35 +1,20 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useMemo } from "react";
+import { ChevronDown, FileText, X } from "lucide-react";
 import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Code,
-  FileText,
-  Folder,
-  HardDrive,
-  Link2,
-  Search,
-  X,
-} from "lucide-react";
-import { useClickOutside } from "../../hooks/useDomInteractions";
-import {
-  countWords,
   listConnectableNotes,
   resolveWorkspaceConnections,
 } from "../../lib/catalogUtils";
+import { isImageNote, isPdfNote } from "../../lib/fileUtils";
 import {
-  getCodeLanguageLabel,
-  isCodeNote,
-  isImageNote,
-  isPdfNote,
-} from "../../lib/fileUtils";
-import { findNoteAndPath } from "../../lib/treeUtils";
+  findNoteAndPath,
+  findNoteAndPathAcrossFolders,
+} from "../../lib/treeUtils";
 import { useNotesStore } from "../../store/useNotesStore";
 import { PaneLeafNode, TopLevelFolder } from "../../types";
-import { CodeEditor } from "../editor/CodeEditor";
-import { ImageViewer } from "../editor/ImageViewer";
-import { MarkdownEditor } from "../editor/MarkdownEditor";
-import { PdfViewer } from "../editor/PdfViewer";
+import { NoteDocumentView } from "../editor/NoteDocumentView";
+import { NoteBreadcrumb } from "../shared/NoteBreadcrumb";
+import { EditorNoteStatus } from "../shared/NoteMetaBadges";
+import { WorkspaceNotePicker } from "../shared/WorkspaceNotePicker";
 
 interface PaneLeafViewProps {
   leaf: PaneLeafNode;
@@ -56,17 +41,6 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
   const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
   const loadNoteContent = useNotesStore((s) => s.loadNoteContent);
 
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [filterQuery, setFilterQuery] = useState("");
-  const pickerRef = useRef<HTMLDivElement>(null);
-
-  const closePicker = useCallback(() => {
-    setIsPickerOpen(false);
-    setFilterQuery("");
-  }, []);
-  useClickOutside(pickerRef, isPickerOpen, closePicker);
-
-  // Resolve note data for this leaf
   const noteData = useMemo(() => {
     if (!leaf.noteId) return null;
     if (leaf.folderId) {
@@ -76,29 +50,16 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
         if (found) return found;
       }
     }
-    for (const f of folders) {
-      const found = findNoteAndPath(f.items, leaf.noteId, [f.name]);
-      if (found) return found;
-    }
-    return null;
+    return findNoteAndPathAcrossFolders(folders, leaf.noteId);
   }, [folders, leaf.folderId, leaf.noteId]);
 
   const note = noteData?.note ?? null;
   const breadcrumb = noteData?.path ?? [];
 
-  // Workspace searchable notes for switcher
-  const allWorkspaceNotes = useMemo(() => {
-    const all = listConnectableNotes(folders, null);
-    if (!filterQuery.trim()) return all;
-    const q = filterQuery.trim().toLowerCase();
-    return all.filter((item) => {
-      const title = (item.note.title || "Untitled").toLowerCase();
-      const folderPath = [item.topFolderName, ...item.subfolderNames]
-        .join("/")
-        .toLowerCase();
-      return title.includes(q) || folderPath.includes(q);
-    });
-  }, [folders, filterQuery]);
+  const allWorkspaceNotes = useMemo(
+    () => listConnectableNotes(folders, null),
+    [folders],
+  );
 
   const noteContent = note
     ? (activeNoteContents[note.id] ?? note.content ?? "")
@@ -116,7 +77,6 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
     }
   }, [note, activeNoteContents, loadNoteContent]);
 
-  // Connected notes for this note
   const connections = useMemo(
     () =>
       note
@@ -130,13 +90,9 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
     [folders, note, noteContent, activeNoteContents],
   );
 
-  const isPdf = note ? isPdfNote(note) : false;
-  const isImage = note && !isPdf ? isImageNote(note) : false;
-  const isCode = note && !isPdf && !isImage ? isCodeNote(note) : false;
-  const codeLang = isCode
-    ? getCodeLanguageLabel(note?.filePath || note?.title)
-    : "";
-  const words = note ? countWords(noteContent) : 0;
+  const isContentLoading = Boolean(
+    note?.filePath && activeNoteContents[note.id] === undefined,
+  );
 
   return (
     <section
@@ -159,141 +115,44 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
           </span>
 
           {note ? (
-            <div className="editor-breadcrumb" aria-label="Note path">
-              {breadcrumb.length > 0 && (
-                <Folder
-                  size={13}
-                  strokeWidth={1.9}
-                  className="breadcrumb-icon"
-                />
-              )}
-              {breadcrumb.map((segment, idx) => (
-                <React.Fragment key={`${segment}-${idx}`}>
-                  {idx > 0 && (
-                    <ChevronRight
-                      size={12}
-                      strokeWidth={2}
-                      className="breadcrumb-sep"
-                    />
-                  )}
-                  <span
-                    className={
-                      idx === breadcrumb.length - 1
-                        ? "breadcrumb-current"
-                        : "breadcrumb-part"
-                    }
-                    title={segment}
-                  >
-                    {segment}
-                  </span>
-                </React.Fragment>
-              ))}
-            </div>
+            <NoteBreadcrumb segments={breadcrumb} />
           ) : (
             <span className="editor-pane-empty-title">Select a file</span>
           )}
 
           {/* Quick File Switcher Popover */}
-          <div className="pane-file-switch-wrap" ref={pickerRef}>
-            <button
-              type="button"
-              className="pane-file-switch-btn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsPickerOpen((v) => !v);
-              }}
-              title={`Switch file in Pane ${index + 1}`}
-              aria-label="Switch file"
-            >
-              <FileText size={12} />
-              <ChevronDown size={11} />
-            </button>
-
-            {isPickerOpen && (
-              <div
-                className="editor-link-popover pane-switch-popover"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="editor-link-popover-header">
-                  <span>OPEN FILE IN PANE {index + 1}</span>
-                </div>
-                <div className="editor-link-search">
-                  <Search size={12} className="editor-link-search-icon" />
-                  <input
-                    type="text"
-                    className="editor-link-search-input"
-                    placeholder="Search files in workspace..."
-                    value={filterQuery}
-                    onChange={(e) => setFilterQuery(e.target.value)}
-                    autoFocus
-                  />
-                </div>
-                <div className="editor-link-list">
-                  {allWorkspaceNotes.length === 0 ? (
-                    <div className="editor-link-empty">
-                      No matching files found.
-                    </div>
-                  ) : (
-                    allWorkspaceNotes.map((opt) => {
-                      const isCurrent = note?.id === opt.note.id;
-                      const pathLabel = [
-                        opt.topFolderName,
-                        ...opt.subfolderNames,
-                      ].join(" / ");
-                      return (
-                        <button
-                          key={opt.note.id}
-                          type="button"
-                          className={`editor-link-option ${isCurrent ? "is-linked" : ""}`}
-                          onClick={() => {
-                            setPaneNote(leaf.id, opt.topFolderId, opt.note.id);
-                            closePicker();
-                          }}
-                        >
-                          <div className="editor-link-option-info">
-                            <span className="editor-link-option-title">
-                              {opt.note.title.trim() || "Untitled"}
-                            </span>
-                            <span className="editor-link-option-path">
-                              {pathLabel}
-                            </span>
-                          </div>
-                          {isCurrent && <Check size={13} strokeWidth={2.3} />}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          <WorkspaceNotePicker
+            wrapperClassName="pane-file-switch-wrap"
+            popoverClassName="editor-link-popover pane-switch-popover"
+            headerTitle={`OPEN FILE IN PANE ${index + 1}`}
+            searchPlaceholder="Search files in workspace..."
+            emptyText="No matching files found."
+            buttonClassName="pane-file-switch-btn"
+            buttonTitle={`Switch file in Pane ${index + 1}`}
+            buttonAriaLabel="Switch file"
+            buttonContent={
+              <>
+                <FileText size={12} />
+                <ChevronDown size={11} />
+              </>
+            }
+            options={allWorkspaceNotes}
+            isOptionActive={(opt) => note?.id === opt.note.id}
+            onSelectOption={(opt) =>
+              setPaneNote(leaf.id, opt.topFolderId, opt.note.id)
+            }
+            closeOnSelect
+            showUnlinkedPlus={false}
+            showSearchIcon
+            stopTriggerPropagation
+            stopPopoverClickPropagation
+          />
         </div>
 
         {/* Pane Header Controls */}
         <div className="editor-pane-header-right">
           {note && (
-            <>
-              {isPdf ? (
-                <span className="editor-pdf-badge">PDF</span>
-              ) : isImage ? (
-                <span className="editor-image-badge">IMG</span>
-              ) : isCode ? (
-                <span className="editor-code-badge" title={note.filePath}>
-                  <Code size={11} />
-                  <span>{codeLang}</span>
-                </span>
-              ) : note.filePath ? (
-                <span className="editor-disk-badge" title={note.filePath}>
-                  <HardDrive size={11} />
-                </span>
-              ) : null}
-
-              {!isPdf && !isImage && (
-                <span className="editor-meta">
-                  {isCode ? `${noteContent.split("\n").length}L` : `${words}w`}
-                </span>
-              )}
-            </>
+            <EditorNoteStatus note={note} content={noteContent} compact />
           )}
 
           {/* Pane Header Actions */}
@@ -318,111 +177,19 @@ export const PaneLeafView: React.FC<PaneLeafViewProps> = ({
 
       {/* Pane Content */}
       {note ? (
-        isPdf ? (
-          <div className="editor-pdf-full">
-            <PdfViewer
-              title={note.title}
-              filePath={note.filePath}
-              pdfData={note.pdfData}
-            />
-          </div>
-        ) : isImage ? (
-          <div className="editor-pdf-full">
-            <ImageViewer
-              title={note.title}
-              filePath={note.filePath}
-              imageData={note.imageData}
-            />
-          </div>
-        ) : isCode ? (
-          <div className="editor-code-full">
-            {Boolean(
-              note.filePath && activeNoteContents[note.id] === undefined,
-            ) ? (
-              <div className="editor-loading-placeholder" />
-            ) : (
-              <CodeEditor
-                key={`code-editor-${leaf.id}-${note.id}`}
-                value={noteContent}
-                onChange={(val) => updateNote(note.id, { content: val })}
-                filePath={note.filePath || note.title}
-              />
-            )}
-          </div>
-        ) : (
-          <div className="editor-scroll-container">
-            <div className="editor-column">
-              <input
-                type="text"
-                className="note-title-input"
-                placeholder="Note title..."
-                value={note.title}
-                onChange={(e) => updateNote(note.id, { title: e.target.value })}
-                onFocus={onSelect}
-              />
-
-              {Boolean(
-                note.filePath && activeNoteContents[note.id] === undefined,
-              ) ? (
-                <div className="editor-loading-placeholder" />
-              ) : (
-                <MarkdownEditor
-                  key={`editor-${leaf.id}-${note.id}`}
-                  value={noteContent}
-                  onChange={(val) => updateNote(note.id, { content: val })}
-                  filePath={note.filePath || note.title}
-                />
-              )}
-
-              {/* Connected Notes Footer */}
-              {connections && connections.linkedNotes.length > 0 && (
-                <div
-                  className="connected-notes-footer"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="connected-notes-header">
-                    <Link2
-                      size={13}
-                      strokeWidth={2}
-                      className="connected-notes-icon"
-                    />
-                    <span>
-                      Connected notes ({connections.linkedNotes.length})
-                    </span>
-                  </div>
-                  <div className="connected-notes-list">
-                    {connections.linkedNotes.map((item) => (
-                      <div key={item.note.id} className="connected-note-pill">
-                        <button
-                          type="button"
-                          className="connected-note-label-btn"
-                          onClick={() =>
-                            openInSplitView(item.topFolderId, item.note.id)
-                          }
-                          title={`Open "${item.note.title.trim() || "Untitled"}" in separated tab`}
-                        >
-                          <span className="connected-note-title">
-                            {item.note.title.trim() || "Untitled"}
-                          </span>
-                        </button>
-
-                        <button
-                          type="button"
-                          className="connected-note-unlink-btn"
-                          onClick={() => toggleNoteLink(note.id, item.note.id)}
-                          title={`Unlink "${item.note.title.trim() || "Untitled"}"`}
-                          aria-label="Unlink"
-                        >
-                          <X size={11} strokeWidth={2.2} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )
+        <NoteDocumentView
+          note={note}
+          content={noteContent}
+          isLoading={isContentLoading}
+          linkedNotes={connections?.linkedNotes ?? []}
+          paneKey={leaf.id}
+          onTitleFocus={onSelect}
+          onChangeTitle={(title) => updateNote(note.id, { title })}
+          onChangeContent={(content) => updateNote(note.id, { content })}
+          onOpenLinkedNote={openInSplitView}
+          onUnlinkNote={(targetId) => toggleNoteLink(note.id, targetId)}
+          stopFooterClickPropagation
+        />
       ) : (
         <div className="split-empty-pane" onClick={onSelect}>
           <FileText size={36} strokeWidth={1.5} className="split-empty-icon" />

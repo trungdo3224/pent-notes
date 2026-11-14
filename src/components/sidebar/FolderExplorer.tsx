@@ -15,23 +15,15 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Code,
-  Columns2,
-  Copy,
-  FilePlus,
-  Files,
   FileText,
-  FileUp,
   Folder,
   FolderOpen,
-  FolderPlus,
   FolderSync,
-  FolderUp,
   Image as ImageIcon,
   Link2,
   List,
   PanelLeftClose,
   Pencil,
-  Rows2,
   Trash2,
   Unlink,
 } from "lucide-react";
@@ -58,29 +50,14 @@ import {
   useNotesStore,
 } from "../../store/useNotesStore";
 import { ExplorerNode, FolderItem, NoteItem } from "../../types";
+import { InlineRenameInput } from "../shared/InlineRenameInput";
+import {
+  ExplorerContextMenu,
+  ExplorerContextMenuState,
+} from "./ExplorerContextMenu";
 
 const BASE_INDENT_PX = 14;
 const DEPTH_INDENT_STEP_PX = 16;
-
-type ExplorerContextMenuState =
-  | {
-      kind: "note";
-      note: NoteItem;
-      parentFolderId: string | null;
-      x: number;
-      y: number;
-    }
-  | {
-      kind: "subfolder";
-      subfolder: FolderItem;
-      x: number;
-      y: number;
-    }
-  | {
-      kind: "root";
-      x: number;
-      y: number;
-    };
 
 interface FlatExplorerNode {
   id: string;
@@ -181,25 +158,12 @@ export const FolderExplorer: React.FC = () => {
   const [focusedFolderId, setFocusedFolderId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] =
     useState<ExplorerContextMenuState | null>(null);
-  const renameInputRef = useRef<HTMLInputElement>(null);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
-  const skipCommitRef = useRef(false);
   const folderMenuRef = useRef<HTMLDivElement>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const closeFolderMenu = useCallback(() => setIsFolderMenuOpen(false), []);
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   useClickOutside(folderMenuRef, isFolderMenuOpen, closeFolderMenu);
-  useClickOutside(contextMenuRef, Boolean(contextMenu), closeContextMenu);
-
-  useEffect(() => {
-    if (!contextMenu) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setContextMenu(null);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [contextMenu]);
 
   useEffect(() => {
     setFocusedFolderId(null);
@@ -228,20 +192,12 @@ export const FolderExplorer: React.FC = () => {
     if (pendingRenameNodeId && folder) {
       const target = findFolderNode(folder.items, pendingRenameNodeId);
       if (target) {
-        skipCommitRef.current = false;
         setEditingNodeId(target.id);
         setDraftName(target.name);
       }
       clearPendingRenameNode();
     }
   }, [pendingRenameNodeId, folder, clearPendingRenameNode]);
-
-  useEffect(() => {
-    if (editingNodeId && renameInputRef.current) {
-      renameInputRef.current.focus();
-      renameInputRef.current.select();
-    }
-  }, [editingNodeId]);
 
   const visibleFlatNodes = useMemo(() => {
     if (!folder?.items) return [];
@@ -322,16 +278,11 @@ export const FolderExplorer: React.FC = () => {
 
   const startSubfolderRename = (node: FolderItem, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    skipCommitRef.current = false;
     setEditingNodeId(node.id);
     setDraftName(node.name);
   };
 
   const commitSubfolderRename = (nodeId: string) => {
-    if (skipCommitRef.current) {
-      skipCommitRef.current = false;
-      return;
-    }
     const trimmed = draftName.trim();
     if (trimmed) {
       renameSubfolder(nodeId, trimmed);
@@ -341,16 +292,11 @@ export const FolderExplorer: React.FC = () => {
 
   const startNoteRename = (node: NoteItem, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    skipCommitRef.current = false;
     setEditingNodeId(node.id);
     setDraftName(node.title);
   };
 
   const commitNoteRename = (nodeId: string) => {
-    if (skipCommitRef.current) {
-      skipCommitRef.current = false;
-      return;
-    }
     const trimmed = draftName.trim();
     if (trimmed) {
       updateNote(nodeId, { title: trimmed });
@@ -471,23 +417,13 @@ export const FolderExplorer: React.FC = () => {
             )}
 
             {isEditing ? (
-              <input
-                ref={renameInputRef}
-                type="text"
+              <InlineRenameInput
                 className="explorer-rename-input"
+                ariaLabel={`Rename ${node.name}`}
                 value={draftName}
-                onChange={(e) => setDraftName(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                onBlur={() => commitSubfolderRename(node.id)}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === "Enter") {
-                    commitSubfolderRename(node.id);
-                  } else if (e.key === "Escape") {
-                    skipCommitRef.current = true;
-                    setEditingNodeId(null);
-                  }
-                }}
+                onChange={setDraftName}
+                onCommit={() => commitSubfolderRename(node.id)}
+                onCancel={() => setEditingNodeId(null)}
               />
             ) : (
               <span className="explorer-row-label">{node.name}</span>
@@ -602,23 +538,13 @@ export const FolderExplorer: React.FC = () => {
           />
         )}
         {isEditingNote ? (
-          <input
-            ref={renameInputRef}
-            type="text"
+          <InlineRenameInput
             className="explorer-rename-input"
+            ariaLabel={`Rename ${node.title.trim() || "note"}`}
             value={draftName}
-            onChange={(e) => setDraftName(e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            onBlur={() => commitNoteRename(node.id)}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === "Enter") {
-                commitNoteRename(node.id);
-              } else if (e.key === "Escape") {
-                skipCommitRef.current = true;
-                setEditingNodeId(null);
-              }
-            }}
+            onChange={setDraftName}
+            onCommit={() => commitNoteRename(node.id)}
+            onCancel={() => setEditingNodeId(null)}
           />
         ) : (
           <span className="explorer-row-label">
@@ -910,358 +836,34 @@ export const FolderExplorer: React.FC = () => {
         )}
       </div>
 
-      {/* Unified Right-Click Context Menu (Note, Subfolder, or Root Folder) */}
-      {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          className="explorer-context-menu"
-          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
-          role="menu"
-          aria-label="Sidebar context actions"
-        >
-          {contextMenu.kind === "note" && (
-            <>
-              <div className="context-menu-header">
-                <FileText size={12} className="context-menu-header-icon" />
-                <span>{contextMenu.note.title.trim() || "Untitled"}</span>
-              </div>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetId = contextMenu.note.id;
-                  closeContextMenu();
-                  setFocusedFolderId(null);
-                  selectNote(targetId);
-                }}
-              >
-                <FileText size={14} strokeWidth={1.8} />
-                <span>Open note</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetNote = contextMenu.note;
-                  closeContextMenu();
-                  if (folder) {
-                    splitPane("horizontal", folder.id, targetNote.id);
-                  }
-                }}
-              >
-                <Columns2 size={14} strokeWidth={1.8} />
-                <span>Split right</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetNote = contextMenu.note;
-                  closeContextMenu();
-                  if (folder) {
-                    splitPane("vertical", folder.id, targetNote.id);
-                  }
-                }}
-              >
-                <Rows2 size={14} strokeWidth={1.8} />
-                <span>Split down</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetParentId = contextMenu.parentFolderId;
-                  closeContextMenu();
-                  void createNote(targetParentId);
-                }}
-              >
-                <FilePlus size={14} strokeWidth={1.8} />
-                <span>New note</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetParentId = contextMenu.parentFolderId;
-                  closeContextMenu();
-                  void createCodeFile(targetParentId);
-                }}
-              >
-                <Code size={14} strokeWidth={1.8} />
-                <span>New code file</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetParentId = contextMenu.parentFolderId;
-                  closeContextMenu();
-                  void createSubfolder(targetParentId);
-                }}
-              >
-                <FolderPlus size={14} strokeWidth={1.8} />
-                <span>New subfolder</span>
-              </button>
-
-              <div className="dropdown-menu-divider" />
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetNote = contextMenu.note;
-                  closeContextMenu();
-                  startNoteRename(targetNote);
-                }}
-              >
-                <Pencil size={14} strokeWidth={1.8} />
-                <span>Rename note</span>
-              </button>
-
-              {selectedNoteId && selectedNoteId !== contextMenu.note.id && (
-                <button
-                  type="button"
-                  className="dropdown-menu-item is-link-item"
-                  role="menuitem"
-                  onClick={() => {
-                    const targetId = contextMenu.note.id;
-                    closeContextMenu();
-                    toggleNoteLink(selectedNoteId, targetId);
-                  }}
-                >
-                  {connections.linkedNoteIds.has(contextMenu.note.id) ? (
-                    <>
-                      <Unlink size={14} strokeWidth={1.9} />
-                      <span>Unlink from current note</span>
-                    </>
-                  ) : (
-                    <>
-                      <Link2 size={14} strokeWidth={1.9} />
-                      <span>Link with current note</span>
-                    </>
-                  )}
-                </button>
-              )}
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const title = contextMenu.note.title.trim() || "Untitled";
-                  closeContextMenu();
-                  void navigator.clipboard?.writeText(`[[${title}]]`);
-                }}
-              >
-                <Copy size={14} strokeWidth={1.8} />
-                <span>Copy [[WikiLink]]</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const { note: targetNote, parentFolderId } = contextMenu;
-                  closeContextMenu();
-                  void duplicateNote(targetNote.id, parentFolderId);
-                }}
-              >
-                <Files size={14} strokeWidth={1.8} />
-                <span>Duplicate note</span>
-              </button>
-
-              <div className="dropdown-menu-divider" />
-
-              <button
-                type="button"
-                className="dropdown-menu-item is-danger"
-                role="menuitem"
-                onClick={() => {
-                  const targetId = contextMenu.note.id;
-                  closeContextMenu();
-                  deleteNode(targetId);
-                }}
-              >
-                <Trash2 size={14} strokeWidth={1.8} />
-                <span>Delete note</span>
-              </button>
-            </>
-          )}
-
-          {contextMenu.kind === "subfolder" && (
-            <>
-              <div className="context-menu-header">
-                <Folder size={12} className="context-menu-header-icon" />
-                <span>{contextMenu.subfolder.name}</span>
-              </div>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetId = contextMenu.subfolder.id;
-                  closeContextMenu();
-                  void createNote(targetId);
-                }}
-              >
-                <FilePlus size={14} strokeWidth={1.8} />
-                <span>New note</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetId = contextMenu.subfolder.id;
-                  closeContextMenu();
-                  void createCodeFile(targetId);
-                }}
-              >
-                <Code size={14} strokeWidth={1.8} />
-                <span>New code file</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetId = contextMenu.subfolder.id;
-                  closeContextMenu();
-                  void createSubfolder(targetId);
-                }}
-              >
-                <FolderPlus size={14} strokeWidth={1.8} />
-                <span>New subfolder</span>
-              </button>
-
-              <div className="dropdown-menu-divider" />
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  const targetFolder = contextMenu.subfolder;
-                  closeContextMenu();
-                  startSubfolderRename(targetFolder);
-                }}
-              >
-                <Pencil size={14} strokeWidth={1.8} />
-                <span>Rename subfolder</span>
-              </button>
-
-              <div className="dropdown-menu-divider" />
-
-              <button
-                type="button"
-                className="dropdown-menu-item is-danger"
-                role="menuitem"
-                onClick={() => {
-                  const targetId = contextMenu.subfolder.id;
-                  closeContextMenu();
-                  deleteNode(targetId);
-                }}
-              >
-                <Trash2 size={14} strokeWidth={1.8} />
-                <span>Delete subfolder</span>
-              </button>
-            </>
-          )}
-
-          {contextMenu.kind === "root" && (
-            <>
-              <div className="context-menu-header">
-                <Folder size={12} className="context-menu-header-icon" />
-                <span>{folder.name}</span>
-              </div>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  closeContextMenu();
-                  void createNote(null);
-                }}
-              >
-                <FilePlus size={14} strokeWidth={1.8} />
-                <span>New note</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  closeContextMenu();
-                  void createCodeFile(null);
-                }}
-              >
-                <Code size={14} strokeWidth={1.8} />
-                <span>New code file</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  closeContextMenu();
-                  void createSubfolder(null);
-                }}
-              >
-                <FolderPlus size={14} strokeWidth={1.8} />
-                <span>New subfolder</span>
-              </button>
-
-              <div className="dropdown-menu-divider" />
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  closeContextMenu();
-                  noteFileInputRef.current?.click();
-                }}
-              >
-                <FileUp size={14} strokeWidth={1.8} />
-                <span>Import notes here...</span>
-              </button>
-
-              <button
-                type="button"
-                className="dropdown-menu-item"
-                role="menuitem"
-                onClick={() => {
-                  closeContextMenu();
-                  openLinkModal("subfolder");
-                }}
-              >
-                <FolderUp size={14} strokeWidth={1.8} />
-                <span>Add subfolder...</span>
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      <ExplorerContextMenu
+        contextMenu={contextMenu}
+        folderName={folder.name}
+        selectedNoteId={selectedNoteId}
+        isLinkedWithCurrent={
+          contextMenu?.kind === "note"
+            ? connections.linkedNoteIds.has(contextMenu.note.id)
+            : false
+        }
+        onClose={closeContextMenu}
+        onSelectNote={(noteId) => {
+          setFocusedFolderId(null);
+          selectNote(noteId);
+        }}
+        onSplitPane={(direction, noteId) => {
+          splitPane(direction, folder.id, noteId);
+        }}
+        onCreateNote={createNote}
+        onCreateCodeFile={createCodeFile}
+        onCreateSubfolder={createSubfolder}
+        onStartNoteRename={startNoteRename}
+        onToggleNoteLink={toggleNoteLink}
+        onDuplicateNote={duplicateNote}
+        onDeleteNode={deleteNode}
+        onStartSubfolderRename={startSubfolderRename}
+        onImportNotesHere={() => noteFileInputRef.current?.click()}
+        onAddSubfolder={() => openLinkModal("subfolder")}
+      />
     </aside>
   );
 };

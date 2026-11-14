@@ -149,6 +149,47 @@ export function isCodeNote(
   );
 }
 
+export type ResolvedNoteFileType = "markdown" | "pdf" | "image" | "code";
+
+export type NoteTypeDescriptor =
+  | string
+  | (Pick<NoteItem, "fileType" | "filePath"> & {
+      title?: string;
+      pdfData?: string;
+      imageData?: string;
+    });
+
+/**
+ * Resolves a filename or NoteItem metadata object to a normalized viewer file type.
+ */
+export function resolveNoteFileType(
+  noteOrFileName: NoteTypeDescriptor,
+): ResolvedNoteFileType {
+  if (typeof noteOrFileName === "string") {
+    if (isPdfFileName(noteOrFileName)) return "pdf";
+    if (isImageFileName(noteOrFileName)) return "image";
+    if (isCodeFileName(noteOrFileName)) return "code";
+    return "markdown";
+  }
+  if (isPdfNote(noteOrFileName)) return "pdf";
+  if (isImageNote(noteOrFileName)) return "image";
+  if (isCodeNote(noteOrFileName)) return "code";
+  return "markdown";
+}
+
+/**
+ * Triggers a browser file download for a URL or data URI via a transient anchor element.
+ */
+export function triggerBrowserDownload(url: string, filename: string): void {
+  if (!url) return;
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 export function getCodeLanguageLabel(filePathOrTitle?: string): string {
   if (!filePathOrTitle) return "CODE";
   const match = filePathOrTitle.match(/\.([a-z0-9_-]+)$/i);
@@ -243,19 +284,20 @@ export function readFileAsDataUrl(file: File): Promise<string> {
 }
 
 async function buildNoteItemFromFile(file: File): Promise<NoteItem> {
-  const isPdf = isPdfFileName(file.name);
-  const isImage = !isPdf && isImageFileName(file.name);
-  const isCode = !isPdf && !isImage && isCodeFileName(file.name);
-  const pdfData = isPdf ? await readFileAsDataUrl(file) : undefined;
-  const imageData = isImage ? await readFileAsDataUrl(file) : undefined;
-  const content = isPdf || isImage ? "" : await file.text();
+  const fileType = resolveNoteFileType(file.name);
+  const isBinary = fileType === "pdf" || fileType === "image";
+  const pdfData =
+    fileType === "pdf" ? await readFileAsDataUrl(file) : undefined;
+  const imageData =
+    fileType === "image" ? await readFileAsDataUrl(file) : undefined;
+  const content = isBinary ? "" : await file.text();
 
   return {
     id: createId("note"),
     type: "note",
-    title: isCode ? file.name : stripNoteExtension(file.name),
+    title: fileType === "code" ? file.name : stripNoteExtension(file.name),
     content,
-    fileType: isPdf ? "pdf" : isImage ? "image" : isCode ? "code" : "markdown",
+    fileType,
     pdfData,
     imageData,
     updatedAt: fileDateString(file),

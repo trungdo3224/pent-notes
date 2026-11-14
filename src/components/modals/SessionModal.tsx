@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { InlineRenameInput } from "../shared/InlineRenameInput";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCopyFeedback } from "../../hooks/useDomInteractions";
@@ -175,17 +175,14 @@ export const SessionModal: React.FC = () => {
           <div className="flex items-center gap-2">
             {isRenaming ? (
               <div className="flex flex-1 items-center gap-2">
-                <Input
-                  type="text"
+                <InlineRenameInput
+                  variant="ui"
                   className="h-8 text-sm"
                   value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                  autoFocus
-                  onBlur={() => void handleCommitRename()}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void handleCommitRename();
-                    if (e.key === "Escape") setIsRenaming(false);
-                  }}
+                  onChange={setDraftName}
+                  onCommit={() => void handleCommitRename()}
+                  onCancel={() => setIsRenaming(false)}
+                  stopClickPropagation={false}
                 />
                 <Button
                   type="button"

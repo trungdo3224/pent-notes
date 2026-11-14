@@ -7,10 +7,23 @@ export interface ScanResult {
   items: ExplorerNode[];
 }
 
+function getElectronFs() {
+  return typeof window !== "undefined" ? window.electronAPI?.fs : undefined;
+}
+
 export const fsApi = {
+  getRawFileUrl(filePath: string): string {
+    const electronFs = getElectronFs();
+    if (electronFs?.getRawUrl) {
+      return electronFs.getRawUrl(filePath);
+    }
+    return `/api/fs/raw?path=${encodeURIComponent(filePath)}`;
+  },
+
   async scanFolder(folderPath: string): Promise<ScanResult> {
-    if (typeof window !== "undefined" && window.electronAPI?.fs) {
-      return await window.electronAPI.fs.scanFolder(folderPath);
+    const electronFs = getElectronFs();
+    if (electronFs) {
+      return await electronFs.scanFolder(folderPath);
     }
     return postJson<ScanResult>(
       "/api/fs/scan",
@@ -20,8 +33,9 @@ export const fsApi = {
   },
 
   async writeFile(filePath: string, content: string): Promise<void> {
-    if (typeof window !== "undefined" && window.electronAPI?.fs) {
-      await window.electronAPI.fs.writeFile(filePath, content);
+    const electronFs = getElectronFs();
+    if (electronFs) {
+      await electronFs.writeFile(filePath, content);
       return;
     }
     await postJson<{ ok: boolean }>(
@@ -36,8 +50,9 @@ export const fsApi = {
     name?: string,
     content?: string,
   ): Promise<NoteItem> {
-    if (typeof window !== "undefined" && window.electronAPI?.fs) {
-      return await window.electronAPI.fs.createFile(parentPath, name, content);
+    const electronFs = getElectronFs();
+    if (electronFs) {
+      return await electronFs.createFile(parentPath, name, content);
     }
     const data = await postJson<{ note: NoteItem }>(
       "/api/fs/create-file",
@@ -48,8 +63,9 @@ export const fsApi = {
   },
 
   async createFolder(parentPath: string, name?: string): Promise<FolderItem> {
-    if (typeof window !== "undefined" && window.electronAPI?.fs) {
-      return await window.electronAPI.fs.createFolder(parentPath, name);
+    const electronFs = getElectronFs();
+    if (electronFs) {
+      return await electronFs.createFolder(parentPath, name);
     }
     const data = await postJson<{ folder: FolderItem }>(
       "/api/fs/create-folder",
@@ -60,8 +76,9 @@ export const fsApi = {
   },
 
   async renamePath(oldPath: string, newPath: string): Promise<string> {
-    if (typeof window !== "undefined" && window.electronAPI?.fs) {
-      return await window.electronAPI.fs.renamePath(oldPath, newPath);
+    const electronFs = getElectronFs();
+    if (electronFs) {
+      return await electronFs.renamePath(oldPath, newPath);
     }
     const data = await postJson<{ path: string }>(
       "/api/fs/rename",
@@ -72,8 +89,9 @@ export const fsApi = {
   },
 
   async deletePath(targetPath: string): Promise<void> {
-    if (typeof window !== "undefined" && window.electronAPI?.fs) {
-      await window.electronAPI.fs.deletePath(targetPath);
+    const electronFs = getElectronFs();
+    if (electronFs) {
+      await electronFs.deletePath(targetPath);
       return;
     }
     await postJson<{ ok: boolean }>(
@@ -84,8 +102,9 @@ export const fsApi = {
   },
 
   async readFile(filePath: string): Promise<string> {
-    if (typeof window !== "undefined" && window.electronAPI?.fs) {
-      return await window.electronAPI.fs.readFile(filePath);
+    const electronFs = getElectronFs();
+    if (electronFs) {
+      return await electronFs.readFile(filePath);
     }
     const data = await postJson<{ content: string }>(
       "/api/fs/read-file",
@@ -96,8 +115,9 @@ export const fsApi = {
   },
 
   async readDir(dirPath: string): Promise<ExplorerNode[]> {
-    if (typeof window !== "undefined" && window.electronAPI?.fs) {
-      return await window.electronAPI.fs.readDir(dirPath);
+    const electronFs = getElectronFs();
+    if (electronFs) {
+      return await electronFs.readDir(dirPath);
     }
     const data = await postJson<{ items: ExplorerNode[] }>(
       "/api/fs/read-dir",
@@ -112,12 +132,9 @@ export const fsApi = {
     fileName: string,
     base64Data: string,
   ): Promise<{ ok: boolean; absolutePath: string; relativePath: string }> {
-    if (typeof window !== "undefined" && window.electronAPI?.fs?.saveImage) {
-      return await window.electronAPI.fs.saveImage(
-        parentDir,
-        fileName,
-        base64Data,
-      );
+    const electronFs = getElectronFs();
+    if (electronFs?.saveImage) {
+      return await electronFs.saveImage(parentDir, fileName, base64Data);
     }
     throw new Error("Native filesystem image saving is not available");
   },

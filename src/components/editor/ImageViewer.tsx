@@ -15,6 +15,8 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
+import { triggerBrowserDownload } from "../../lib/fileUtils";
+import { fsApi } from "../../lib/fsApi";
 
 export interface ImageViewerProps {
   title: string;
@@ -65,10 +67,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
     if (imageUrl) return imageUrl;
     if (imageData) return imageData;
     if (filePath) {
-      if (typeof window !== "undefined" && window.electronAPI?.fs?.getRawUrl) {
-        return window.electronAPI.fs.getRawUrl(filePath);
-      }
-      return `/api/fs/raw?path=${encodeURIComponent(filePath)}`;
+      return fsApi.getRawFileUrl(filePath);
     }
     return "";
   }, [filePath, imageData, imageUrl]);
@@ -159,12 +158,10 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
 
   const handleDownload = useCallback(() => {
     if (!resolvedSrc) return;
-    const link = document.createElement("a");
-    link.href = resolvedSrc;
-    link.download = resolveDisplayFilename(title, filePath);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    triggerBrowserDownload(
+      resolvedSrc,
+      resolveDisplayFilename(title, filePath),
+    );
   }, [filePath, resolvedSrc, title]);
 
   const displayFilename = resolveDisplayFilename(title, filePath);

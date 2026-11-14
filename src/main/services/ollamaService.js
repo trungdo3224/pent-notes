@@ -26,18 +26,32 @@ export async function listModels(host = DEFAULT_HOST) {
 }
 
 /**
- * Pull and download a new model from Ollama library with streaming progress
+ * Shared abortable NDJSON stream runner for Ollama streaming endpoints.
  */
-export function pullModel(host, modelName, onProgress) {
+function streamNdjson(
+  url,
+  body,
+  { noBodyError, onItem, onComplete, onError, onAbort },
+) {
   const controller = new AbortController();
-  const url = `${getBaseUrl(host)}/api/pull`;
+
+  const processLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return true;
+    try {
+      const parsed = JSON.parse(trimmed);
+      return onItem(parsed) !== false;
+    } catch {
+      return true;
+    }
+  };
 
   (async () => {
     try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: modelName, stream: true }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 
@@ -49,12 +63,12 @@ export function pullModel(host, modelName, onProgress) {
         } catch {
           // Fallback to generic message
         }
-        onProgress({ status: "error", error: errMsg });
+        onError(errMsg);
         return;
       }
 
       if (!res.body) {
-        onProgress({ status: "error", error: "No response body from Ollama" });
+        onError(noBodyError);
         return;
       }
 
@@ -71,43 +85,20 @@ export function pullModel(host, modelName, onProgress) {
         buffer = lines.pop() || "";
 
         for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const parsed = JSON.parse(trimmed);
-            if (parsed.error) {
-              onProgress({ status: "error", error: parsed.error });
-              return;
-            }
-            onProgress(parsed);
-          } catch {
-            // Ignore incomplete line chunk
-          }
+          if (!processLine(line)) return;
         }
       }
 
-      if (buffer.trim()) {
-        try {
-          const parsed = JSON.parse(buffer.trim());
-          if (parsed.error) {
-            onProgress({ status: "error", error: parsed.error });
-            return;
-          }
-          onProgress(parsed);
-        } catch {
-          // Ignore
-        }
+      if (buffer.trim() && !processLine(buffer)) {
+        return;
       }
 
-      onProgress({ status: "success" });
+      onComplete();
     } catch (err) {
       if (controller.signal.aborted) {
-        onProgress({ status: "aborted" });
+        onAbort();
       } else {
-        onProgress({
-          status: "error",
-          error: err instanceof Error ? err.message : String(err),
-        });
+        onError(err instanceof Error ? err.message : String(err));
       }
     }
   })();
@@ -116,85 +107,47 @@ export function pullModel(host, modelName, onProgress) {
 }
 
 /**
+ * Pull and download a new model from Ollama library with streaming progress
+ */
+export function pullModel(host, modelName, onProgress) {
+  return streamNdjson(
+    `${getBaseUrl(host)}/api/pull`,
+    { name: modelName, stream: true },
+    {
+      noBodyError: "No response body from Ollama",
+      onItem: (parsed) => {
+        if (parsed.error) {
+          onProgress({ status: "error", error: parsed.error });
+          return false;
+        }
+        onProgress(parsed);
+        return true;
+      },
+      onComplete: () => onProgress({ status: "success" }),
+      onError: (error) => onProgress({ status: "error", error }),
+      onAbort: () => onProgress({ status: "aborted" }),
+    },
+  );
+}
+
+/**
  * Stream chat completions from Ollama instance
  */
 export function chatStream(host, { model, messages }, onChunk) {
-  const controller = new AbortController();
-  const url = `${getBaseUrl(host)}/api/chat`;
-
-  (async () => {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages, stream: true }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        let errMsg = `Ollama error (HTTP ${res.status})`;
-        try {
-          const errData = await res.json();
-          if (errData?.error) errMsg = errData.error;
-        } catch {
-          // Fallback to generic message
-        }
-        onChunk({ error: errMsg, done: true });
-        return;
-      }
-
-      if (!res.body) {
-        onChunk({ error: "No response stream from Ollama", done: true });
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder("utf-8");
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const parsed = JSON.parse(trimmed);
-            onChunk(parsed);
-          } catch {
-            // Ignore incomplete line chunk
-          }
-        }
-      }
-
-      if (buffer.trim()) {
-        try {
-          const parsed = JSON.parse(buffer.trim());
-          onChunk(parsed);
-        } catch {
-          // Ignore
-        }
-      }
-
-      onChunk({ done: true });
-    } catch (err) {
-      if (controller.signal.aborted) {
-        onChunk({ done: true, aborted: true });
-      } else {
-        onChunk({
-          error: err instanceof Error ? err.message : String(err),
-          done: true,
-        });
-      }
-    }
-  })();
-
-  return () => controller.abort();
+  return streamNdjson(
+    `${getBaseUrl(host)}/api/chat`,
+    { model, messages, stream: true },
+    {
+      noBodyError: "No response stream from Ollama",
+      onItem: (parsed) => {
+        onChunk(parsed);
+        return true;
+      },
+      onComplete: () => onChunk({ done: true }),
+      onError: (error) => onChunk({ error, done: true }),
+      onAbort: () => onChunk({ done: true, aborted: true }),
+    },
+  );
 }
 
 function decodeHtmlEntities(str) {

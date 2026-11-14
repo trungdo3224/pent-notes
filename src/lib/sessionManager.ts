@@ -1,5 +1,5 @@
-import { createId } from './fileUtils';
-import { postJson, requestJson } from './httpClient';
+import { createId } from "./fileUtils";
+import { postJson, requestJson } from "./httpClient";
 
 export interface SessionInfo {
   id: string;
@@ -18,39 +18,48 @@ export interface SessionData {
   payload: string;
 }
 
-const SESSION_STORAGE_KEY = 'pentnotes_session_id';
-const LOCAL_STORAGE_LAST_SESSION = 'pentnotes_last_session';
-const DEFAULT_SESSION_ID = 'default';
-
-function generateSessionId(): string {
-  return createId('session');
-}
-
-function updateUrlSessionParam(sessionId: string): void {
-  const nextUrl = new URL(window.location.href);
-  if (sessionId === DEFAULT_SESSION_ID) {
-    nextUrl.searchParams.delete('session');
-  } else {
-    nextUrl.searchParams.set('session', sessionId);
-  }
-  window.history.replaceState({}, '', nextUrl.toString());
-}
-
-function persistSessionInTabStorage(sessionId: string, syncUrl = false): string {
-  sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
-  localStorage.setItem(LOCAL_STORAGE_LAST_SESSION, sessionId);
-  activeSessionIdCache = sessionId;
-  if (syncUrl) {
-    updateUrlSessionParam(sessionId);
-  }
-  return sessionId;
-}
+const SESSION_STORAGE_KEY = "pentnotes_session_id";
+const LOCAL_STORAGE_LAST_SESSION = "pentnotes_last_session";
+const DEFAULT_SESSION_ID = "default";
 
 let activeSessionIdCache: string | null = null;
 let activeSessionNameCache: string | null = null;
 
+function getElectronSessions() {
+  return typeof window !== "undefined"
+    ? window.electronAPI?.sessions
+    : undefined;
+}
+
+function generateSessionId(): string {
+  return createId("session");
+}
+
+function buildSessionUrl(sessionId: string): string {
+  const nextUrl = new URL(window.location.href);
+  if (sessionId === DEFAULT_SESSION_ID) {
+    nextUrl.searchParams.delete("session");
+  } else {
+    nextUrl.searchParams.set("session", sessionId);
+  }
+  return nextUrl.toString();
+}
+
+function persistSessionInTabStorage(
+  sessionId: string,
+  syncUrl = false,
+): string {
+  sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+  localStorage.setItem(LOCAL_STORAGE_LAST_SESSION, sessionId);
+  activeSessionIdCache = sessionId;
+  if (syncUrl) {
+    window.history.replaceState({}, "", buildSessionUrl(sessionId));
+  }
+  return sessionId;
+}
+
 export function getTabSessionId(): string {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return DEFAULT_SESSION_ID;
   }
 
@@ -59,34 +68,30 @@ export function getTabSessionId(): string {
   }
 
   const urlParams = new URLSearchParams(window.location.search);
-  const paramSession = urlParams.get('session');
+  const paramSession = urlParams.get("session");
 
-  // Case 1: Explicit ?session=new
-  if (paramSession === 'new') {
+  if (paramSession === "new") {
     return persistSessionInTabStorage(generateSessionId(), true);
   }
 
-  // Case 2: Specific session in URL ?session=<id>
   if (paramSession && paramSession.trim()) {
     return persistSessionInTabStorage(paramSession.trim(), false);
   }
 
-  // Case 3: Re-reading from current tab's sessionStorage (e.g. page refresh)
   const storedInTab = sessionStorage.getItem(SESSION_STORAGE_KEY);
   if (storedInTab && storedInTab.trim()) {
     activeSessionIdCache = storedInTab.trim();
     return activeSessionIdCache;
   }
 
-  // Case 4: Default for new tabs — always use default state without auto-creating sessions
   return persistSessionInTabStorage(DEFAULT_SESSION_ID, false);
 }
 
 export function getTabSessionName(): string {
   if (activeSessionNameCache) return activeSessionNameCache;
   const id = getTabSessionId();
-  if (id === DEFAULT_SESSION_ID) return 'Default Session';
-  return id.replace(/^session-/, 'Session ');
+  if (id === DEFAULT_SESSION_ID) return "Default Session";
+  return id.replace(/^session-/, "Session ");
 }
 
 export function setTabSessionName(name: string): void {
@@ -95,115 +100,119 @@ export function setTabSessionName(name: string): void {
 
 export const sessionApi = {
   async listSessions(): Promise<SessionInfo[]> {
-    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
-      return (await window.electronAPI.sessions.list()) as SessionInfo[];
+    const electronSessions = getElectronSessions();
+    if (electronSessions) {
+      return (await electronSessions.list()) as SessionInfo[];
     }
     return requestJson<SessionInfo[]>(
-      '/api/sessions',
-      { method: 'GET', cache: 'no-store' },
-      'Failed to list sessions.'
+      "/api/sessions",
+      { method: "GET", cache: "no-store" },
+      "Failed to list sessions.",
     );
   },
 
   async getSession(id: string): Promise<SessionData> {
-    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
-      const data = (await window.electronAPI.sessions.get(id)) as SessionData;
-      setTabSessionName(data.name);
-      return data;
-    }
-    const data = await requestJson<SessionData>(
-      `/api/sessions/${encodeURIComponent(id)}`,
-      { method: 'GET', cache: 'no-store' },
-      'Failed to load session.'
-    );
+    const electronSessions = getElectronSessions();
+    const data = electronSessions
+      ? ((await electronSessions.get(id)) as SessionData)
+      : await requestJson<SessionData>(
+          `/api/sessions/${encodeURIComponent(id)}`,
+          { method: "GET", cache: "no-store" },
+          "Failed to load session.",
+        );
     setTabSessionName(data.name);
     return data;
   },
 
-  async saveSession(id: string, payload: string, name?: string): Promise<void> {
-    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
-      await window.electronAPI.sessions.save(id, name, payload);
+  async saveSession(
+    id: string,
+    payload: string,
+    name?: string,
+    keepalive = false,
+  ): Promise<void> {
+    const electronSessions = getElectronSessions();
+    if (electronSessions) {
+      await electronSessions.save(id, name, payload);
       return;
     }
     await requestJson<{ ok: boolean }>(
       `/api/sessions/${encodeURIComponent(id)}`,
       {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ payload, name }),
+        keepalive,
       },
-      'Failed to save session.'
+      "Failed to save session.",
     );
   },
 
-  async createSession(name?: string, cloneFromId?: string): Promise<SessionData> {
-    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
+  async createSession(
+    name?: string,
+    cloneFromId?: string,
+  ): Promise<SessionData> {
+    const electronSessions = getElectronSessions();
+    if (electronSessions) {
       const newId = generateSessionId();
-      let initialPayload = 'null';
+      let initialPayload = "null";
       if (cloneFromId) {
-        const source = await window.electronAPI.sessions.get(cloneFromId);
-        if (source && source.payload) initialPayload = source.payload;
+        const source = await electronSessions.get(cloneFromId);
+        if (source?.payload) initialPayload = source.payload;
       }
-      await window.electronAPI.sessions.save(newId, name, initialPayload);
-      return (await window.electronAPI.sessions.get(newId)) as SessionData;
+      await electronSessions.save(newId, name, initialPayload);
+      return (await electronSessions.get(newId)) as SessionData;
     }
     const data = await postJson<{ session: SessionData }>(
-      '/api/sessions',
+      "/api/sessions",
       { name, cloneFromId },
-      'Failed to create session.'
+      "Failed to create session.",
     );
     return data.session;
   },
 
   async renameSession(id: string, newName: string): Promise<void> {
-    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
-      const session = await window.electronAPI.sessions.get(id);
-      await window.electronAPI.sessions.save(id, newName, session.payload);
-      if (id === getTabSessionId()) {
-        setTabSessionName(newName);
-      }
-      return;
+    const electronSessions = getElectronSessions();
+    if (electronSessions) {
+      const session = await electronSessions.get(id);
+      await electronSessions.save(id, newName, session.payload);
+    } else {
+      await requestJson<{ ok: boolean }>(
+        `/api/sessions/${encodeURIComponent(id)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newName }),
+        },
+        "Failed to rename session.",
+      );
     }
-    await requestJson<{ ok: boolean }>(
-      `/api/sessions/${encodeURIComponent(id)}`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName }),
-      },
-      'Failed to rename session.'
-    );
     if (id === getTabSessionId()) {
       setTabSessionName(newName);
     }
   },
 
   async deleteSession(id: string): Promise<void> {
-    if (typeof window !== 'undefined' && window.electronAPI?.sessions) {
-      await window.electronAPI.sessions.delete(id);
+    const electronSessions = getElectronSessions();
+    if (electronSessions) {
+      await electronSessions.delete(id);
       return;
     }
     await requestJson<{ ok: boolean }>(
       `/api/sessions/${encodeURIComponent(id)}`,
-      { method: 'DELETE' },
-      'Failed to delete session.'
+      { method: "DELETE" },
+      "Failed to delete session.",
     );
   },
 
   openSessionInNewTab(id?: string): void {
-    const targetUrl = id ? `/?session=${encodeURIComponent(id)}` : '/?session=new';
-    window.open(targetUrl, '_blank');
+    const targetUrl = id
+      ? `/?session=${encodeURIComponent(id)}`
+      : "/?session=new";
+    window.open(targetUrl, "_blank");
   },
 
   switchSessionInCurrentTab(id: string): void {
-    sessionStorage.setItem(SESSION_STORAGE_KEY, id);
-    localStorage.setItem(LOCAL_STORAGE_LAST_SESSION, id);
-    const newUrl = new URL(window.location.href);
-    if (id === DEFAULT_SESSION_ID) {
-      newUrl.searchParams.delete('session');
-    } else {
-      newUrl.searchParams.set('session', id);
-    }
-    window.location.href = newUrl.toString();
+    persistSessionInTabStorage(id, false);
+    window.location.href = buildSessionUrl(id);
   },
 };

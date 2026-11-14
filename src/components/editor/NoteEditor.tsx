@@ -1,21 +1,8 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
-  Check,
   ChevronDown,
-  ChevronRight,
-  Code,
-  FileText,
   FileUp,
-  Folder,
   FolderUp,
-  HardDrive,
-  Image as ImageIcon,
   Link2,
   PanelLeftOpen,
   PanelRightOpen,
@@ -24,15 +11,11 @@ import {
   Split,
   X,
 } from "lucide-react";
-import { useClickOutside } from "../../hooks/useDomInteractions";
 import {
-  countWords,
   listConnectableNotes,
   resolveWorkspaceConnections,
 } from "../../lib/catalogUtils";
 import {
-  getCodeLanguageLabel,
-  isCodeNote,
   isImageNote,
   isPdfNote,
   NOTE_FILE_ACCEPT,
@@ -43,14 +26,13 @@ import {
   resolveActiveNoteData,
   useNotesStore,
 } from "../../store/useNotesStore";
-import { NoteItem } from "../../types";
-import { CodeEditor } from "./CodeEditor";
-import { ImageViewer } from "./ImageViewer";
-import { MarkdownEditor } from "./MarkdownEditor";
 import { NoteTabsBar } from "../panes/NoteTabsBar";
 import { PaneSplitTree } from "../panes/PaneSplitTree";
-import { PdfViewer } from "./PdfViewer";
 import { SplitHandleMenu } from "../panes/SplitHandleMenu";
+import { NoteBreadcrumb } from "../shared/NoteBreadcrumb";
+import { EditorNoteStatus } from "../shared/NoteMetaBadges";
+import { WorkspaceNotePicker } from "../shared/WorkspaceNotePicker";
+import { NoteDocumentView } from "./NoteDocumentView";
 
 export const NoteEditor: React.FC = () => {
   const folders = useNotesStore((s) => s.folders);
@@ -82,19 +64,9 @@ export const NoteEditor: React.FC = () => {
   const activeNoteContents = useNotesStore((s) => s.activeNoteContents);
   const loadNoteContent = useNotesStore((s) => s.loadNoteContent);
 
-  const [isLinkPickerOpen, setIsLinkPickerOpen] = useState(false);
-  const [linkFilter, setLinkFilter] = useState("");
-
   const pdfAttachInputRef = useRef<HTMLInputElement>(null);
   const noteFileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const linkPickerRef = useRef<HTMLDivElement>(null);
-
-  const closeLinkPicker = useCallback(() => {
-    setIsLinkPickerOpen(false);
-    setLinkFilter("");
-  }, []);
-  useClickOutside(linkPickerRef, isLinkPickerOpen, closeLinkPicker);
 
   // Active note resolution
   const activeFolder = useMemo(
@@ -144,18 +116,10 @@ export const NoteEditor: React.FC = () => {
     [folders, note?.id, noteContent, activeNoteContents],
   );
 
-  const connectableNotes = useMemo(() => {
-    const all = listConnectableNotes(folders, note?.id ?? null);
-    if (!linkFilter.trim()) return all;
-    const q = linkFilter.trim().toLowerCase();
-    return all.filter((item) => {
-      const title = (item.note.title || "Untitled").toLowerCase();
-      const folderPath = [item.topFolderName, ...item.subfolderNames]
-        .join("/")
-        .toLowerCase();
-      return title.includes(q) || folderPath.includes(q);
-    });
-  }, [folders, note?.id, linkFilter]);
+  const connectableNotes = useMemo(
+    () => listConnectableNotes(folders, note?.id ?? null),
+    [folders, note?.id],
+  );
 
   useEffect(() => {
     if (shouldFocusTitle && note && titleInputRef.current) {
@@ -192,7 +156,7 @@ export const NoteEditor: React.FC = () => {
                 <PanelTopOpen size={15} strokeWidth={1.8} />
               </button>
             )}
-            {renderBreadcrumb(breadcrumb)}
+            <NoteBreadcrumb segments={breadcrumb} />
           </div>
           <div className="editor-topbar-controls">
             {isRightSidebarCollapsed && (
@@ -287,169 +251,11 @@ export const NoteEditor: React.FC = () => {
     });
   };
 
-  function renderBreadcrumb(crumbs: string[]) {
-    return (
-      <div className="editor-breadcrumb" aria-label="Note path">
-        {crumbs.length > 0 && (
-          <Folder size={13} strokeWidth={1.9} className="breadcrumb-icon" />
-        )}
-        {crumbs.map((segment, index) => (
-          <React.Fragment key={`${segment}-${index}`}>
-            {index > 0 && (
-              <ChevronRight
-                size={12}
-                strokeWidth={2}
-                className="breadcrumb-sep"
-              />
-            )}
-            <span
-              className={
-                index === crumbs.length - 1
-                  ? "breadcrumb-current"
-                  : "breadcrumb-part"
-              }
-              title={segment}
-            >
-              {segment}
-            </span>
-          </React.Fragment>
-        ))}
-      </div>
-    );
-  }
-
-  const renderNoteContent = (targetNote: NoteItem, isPrimaryTitle = false) => {
-    const isPdf = isPdfNote(targetNote);
-    const isImage = !isPdf && isImageNote(targetNote);
-    const isCode = !isPdf && !isImage && isCodeNote(targetNote);
-
-    if (isPdf) {
-      return (
-        <div className="editor-pdf-full">
-          <PdfViewer
-            title={targetNote.title}
-            filePath={targetNote.filePath}
-            pdfData={targetNote.pdfData}
-          />
-        </div>
-      );
-    }
-
-    if (isImage) {
-      return (
-        <div className="editor-pdf-full">
-          <ImageViewer
-            title={targetNote.title}
-            filePath={targetNote.filePath}
-            imageData={targetNote.imageData}
-          />
-        </div>
-      );
-    }
-
-    if (isCode) {
-      const isContentLoading = Boolean(
-        targetNote.filePath && activeNoteContents[targetNote.id] === undefined,
-      );
-      return (
-        <div className="editor-code-full">
-          {isContentLoading ? (
-            <div className="editor-loading-placeholder" />
-          ) : (
-            <CodeEditor
-              key={`code-editor-${targetNote.id}`}
-              value={noteContent}
-              onChange={(val) => updateNote(targetNote.id, { content: val })}
-              filePath={targetNote.filePath || targetNote.title}
-            />
-          )}
-        </div>
-      );
-    }
-
-    const isContentLoading = Boolean(
-      targetNote.filePath && activeNoteContents[targetNote.id] === undefined,
-    );
-
-    return (
-      <div className="editor-scroll-container">
-        <div className="editor-column">
-          <input
-            ref={isPrimaryTitle ? titleInputRef : undefined}
-            type="text"
-            className="note-title-input"
-            placeholder="Note title..."
-            value={targetNote.title}
-            onChange={(e) =>
-              updateNote(targetNote.id, { title: e.target.value })
-            }
-          />
-
-          {isContentLoading ? (
-            <div className="editor-loading-placeholder" />
-          ) : (
-            <MarkdownEditor
-              key={`editor-${targetNote.id}`}
-              value={noteContent}
-              onChange={(val) => updateNote(targetNote.id, { content: val })}
-              filePath={targetNote.filePath}
-            />
-          )}
-
-          {/* Connected Notes Footer in Single View */}
-          {connections && connections.linkedNotes.length > 0 && (
-            <div className="connected-notes-footer">
-              <div className="connected-notes-header">
-                <Link2
-                  size={13}
-                  strokeWidth={2}
-                  className="connected-notes-icon"
-                />
-                <span>Connected notes ({connections.linkedNotes.length})</span>
-              </div>
-              <div className="connected-notes-list">
-                {connections.linkedNotes.map((item) => (
-                  <div key={item.note.id} className="connected-note-pill">
-                    <button
-                      type="button"
-                      className="connected-note-label-btn"
-                      onClick={() =>
-                        openInSplitView(item.topFolderId, item.note.id)
-                      }
-                      title={`Open "${item.note.title.trim() || "Untitled"}" in separated tab`}
-                    >
-                      <span className="connected-note-title">
-                        {item.note.title.trim() || "Untitled"}
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="connected-note-unlink-btn"
-                      onClick={() => toggleNoteLink(note!.id, item.note.id)}
-                      title={`Unlink "${item.note.title.trim() || "Untitled"}"`}
-                      aria-label={`Unlink ${item.note.title.trim() || "Untitled"}`}
-                    >
-                      <X size={11} strokeWidth={2.2} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const primaryWords = note ? countWords(noteContent) : 0;
   const isPrimaryPdf = note ? isPdfNote(note) : false;
   const isPrimaryImage = note && !isPrimaryPdf ? isImageNote(note) : false;
-  const isPrimaryCode =
-    note && !isPrimaryPdf && !isPrimaryImage ? isCodeNote(note) : false;
-  const primaryCodeLang = isPrimaryCode
-    ? getCodeLanguageLabel(note?.filePath || note?.title)
-    : "";
+  const isPrimaryContentLoading = Boolean(
+    note?.filePath && activeNoteContents[note.id] === undefined,
+  );
 
   return (
     <main className="editor-pane">
@@ -470,7 +276,7 @@ export const NoteEditor: React.FC = () => {
             </button>
           )}
 
-          {!isSplitViewActive && renderBreadcrumb(breadcrumb)}
+          {!isSplitViewActive && <NoteBreadcrumb segments={breadcrumb} />}
 
           {isSplitViewActive && (
             <div className="editor-split-indicator-pill">
@@ -484,45 +290,7 @@ export const NoteEditor: React.FC = () => {
 
         <div className="editor-topbar-controls">
           {!isSplitViewActive && note && (
-            <>
-              {isPrimaryPdf ? (
-                <span
-                  className="editor-pdf-badge"
-                  title="Embedded PDF document"
-                >
-                  <FileText size={12} className="pdf-badge-icon" />
-                  <span>PDF Document</span>
-                </span>
-              ) : isPrimaryImage ? (
-                <span className="editor-image-badge" title="Image viewer">
-                  <ImageIcon size={12} className="image-badge-icon" />
-                  <span>Image</span>
-                </span>
-              ) : isPrimaryCode ? (
-                <span
-                  className="editor-code-badge"
-                  title={`Code file: ${note.filePath || ""}`}
-                >
-                  <Code size={12} className="code-badge-icon" />
-                  <span>{primaryCodeLang}</span>
-                </span>
-              ) : note.filePath ? (
-                <span
-                  className="editor-disk-badge"
-                  title={`Live disk sync: ${note.filePath}`}
-                >
-                  <HardDrive size={12} className="disk-badge-icon" />
-                </span>
-              ) : null}
-
-              {!isPrimaryPdf && !isPrimaryImage && (
-                <span className="editor-meta">
-                  {isPrimaryCode
-                    ? `${noteContent.split("\n").length} lines`
-                    : `${primaryWords} ${primaryWords === 1 ? "word" : "words"}`}
-                </span>
-              )}
-            </>
+            <EditorNoteStatus note={note} content={noteContent} />
           )}
 
           <input
@@ -535,106 +303,55 @@ export const NoteEditor: React.FC = () => {
 
           {/* Collapsible Link & Attach Menu */}
           {note && (
-            <div className="editor-link-picker-wrap" ref={linkPickerRef}>
-              <button
-                type="button"
-                className={`mode-btn editor-link-btn ${
-                  isLinkPickerOpen || connections.linkedNotes.length > 0
+            <WorkspaceNotePicker
+              wrapperClassName="editor-link-picker-wrap"
+              headerTitle="CONNECT WITH NOTES"
+              searchPlaceholder="Search notes to link..."
+              emptyText="No other notes found in workspace."
+              buttonClassName={(isOpen) =>
+                `mode-btn editor-link-btn ${
+                  isOpen || connections.linkedNotes.length > 0
                     ? "is-active"
                     : ""
-                }`}
-                onClick={() => setIsLinkPickerOpen((v) => !v)}
-                title="Link notes or attach a PDF to this note"
-                aria-label="Link notes and attach files"
-                aria-expanded={isLinkPickerOpen}
-              >
-                <Link2 size={13} strokeWidth={2} />
-                {connections.linkedNotes.length > 0 && (
-                  <span className="editor-link-count-badge">
-                    {connections.linkedNotes.length}
-                  </span>
-                )}
-                <ChevronDown size={12} strokeWidth={2} />
-              </button>
-
-              {isLinkPickerOpen && (
-                <div className="editor-link-popover">
-                  {!isPrimaryPdf && !isPrimaryImage && (
-                    <>
-                      <button
-                        type="button"
-                        className="editor-link-option is-attach-btn"
-                        onClick={() => {
-                          closeLinkPicker();
-                          pdfAttachInputRef.current?.click();
-                        }}
-                      >
-                        <FileUp size={14} strokeWidth={1.8} />
-                        <span>Attach PDF to this note</span>
-                      </button>
-                      <div className="dropdown-menu-divider" />
-                    </>
+                }`
+              }
+              buttonTitle="Link notes or attach a PDF to this note"
+              buttonAriaLabel="Link notes and attach files"
+              buttonContent={
+                <>
+                  <Link2 size={13} strokeWidth={2} />
+                  {connections.linkedNotes.length > 0 && (
+                    <span className="editor-link-count-badge">
+                      {connections.linkedNotes.length}
+                    </span>
                   )}
-
-                  <div className="editor-link-popover-header">
-                    <span>CONNECT WITH NOTES</span>
-                  </div>
-
-                  <div className="editor-link-search">
-                    <input
-                      type="text"
-                      className="editor-link-search-input"
-                      placeholder="Search notes to link..."
-                      value={linkFilter}
-                      onChange={(e) => setLinkFilter(e.target.value)}
-                      autoFocus
-                    />
-                  </div>
-
-                  <div className="editor-link-list">
-                    {connectableNotes.length === 0 ? (
-                      <div className="editor-link-empty">
-                        No other notes found in workspace.
-                      </div>
-                    ) : (
-                      connectableNotes.map((opt) => {
-                        const isLinked = connections.linkedNoteIds.has(
-                          opt.note.id,
-                        );
-                        const pathLabel = [
-                          opt.topFolderName,
-                          ...opt.subfolderNames,
-                        ].join(" / ");
-                        return (
-                          <button
-                            key={opt.note.id}
-                            type="button"
-                            className={`editor-link-option ${isLinked ? "is-linked" : ""}`}
-                            onClick={() => toggleNoteLink(note.id, opt.note.id)}
-                          >
-                            <div className="editor-link-option-info">
-                              <span className="editor-link-option-title">
-                                {opt.note.title.trim() || "Untitled"}
-                              </span>
-                              <span className="editor-link-option-path">
-                                {pathLabel}
-                              </span>
-                            </div>
-                            <span className="editor-link-option-check">
-                              {isLinked ? (
-                                <Check size={13} strokeWidth={2.3} />
-                              ) : (
-                                <Plus size={13} />
-                              )}
-                            </span>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+                  <ChevronDown size={12} strokeWidth={2} />
+                </>
+              }
+              options={connectableNotes}
+              isOptionActive={(opt) =>
+                connections.linkedNoteIds.has(opt.note.id)
+              }
+              onSelectOption={(opt) => toggleNoteLink(note.id, opt.note.id)}
+              renderTopActions={(close) =>
+                !isPrimaryPdf && !isPrimaryImage ? (
+                  <>
+                    <button
+                      type="button"
+                      className="editor-link-option is-attach-btn"
+                      onClick={() => {
+                        close();
+                        pdfAttachInputRef.current?.click();
+                      }}
+                    >
+                      <FileUp size={14} strokeWidth={1.8} />
+                      <span>Attach PDF to this note</span>
+                    </button>
+                    <div className="dropdown-menu-divider" />
+                  </>
+                ) : null
+              }
+            />
           )}
 
           {/* Unified Grouped Split Handle */}
@@ -679,7 +396,19 @@ export const NoteEditor: React.FC = () => {
       {isSplitViewActive && paneLayout ? (
         <PaneSplitTree root={paneLayout} />
       ) : (
-        note && renderNoteContent(note, true)
+        note && (
+          <NoteDocumentView
+            note={note}
+            content={noteContent}
+            isLoading={isPrimaryContentLoading}
+            linkedNotes={connections.linkedNotes}
+            titleInputRef={titleInputRef}
+            onChangeTitle={(title) => updateNote(note.id, { title })}
+            onChangeContent={(content) => updateNote(note.id, { content })}
+            onOpenLinkedNote={openInSplitView}
+            onUnlinkNote={(targetId) => toggleNoteLink(note.id, targetId)}
+          />
+        )
       )}
     </main>
   );

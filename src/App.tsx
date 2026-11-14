@@ -14,6 +14,7 @@ import { LinkFolderModal } from "./components/modals/LinkFolderModal";
 import { SearchModal } from "./components/modals/SearchModal";
 import { SessionModal } from "./components/modals/SessionModal";
 import { SettingsModal } from "./components/modals/SettingsModal";
+import { SidebarResizer } from "./components/shared/SidebarResizer";
 import { useEscapeKey, usePointerDrag } from "./hooks/useDomInteractions";
 import {
   ImageViewerEventDetail,
@@ -195,41 +196,23 @@ export const App: React.FC = () => {
       <div className="workspace-body" ref={workspaceRef}>
         <FolderExplorer />
         {!isSidebarCollapsed && (
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            tabIndex={0}
-            className={`sidebar-resizer ${isDraggingSidebar ? "is-active" : ""}`}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              setIsDraggingSidebar(true);
-            }}
-            onTouchStart={() => setIsDraggingSidebar(true)}
-            onDoubleClick={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
+          <SidebarResizer
+            isActive={isDraggingSidebar}
+            onStartDrag={() => setIsDraggingSidebar(true)}
+            onResetWidth={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
             title="Drag to resize sidebar (Double-click to reset)"
-          >
-            <div className="sidebar-resizer-line" />
-          </div>
+          />
         )}
         <NoteEditor />
         {!isRightSidebarCollapsed && (
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            tabIndex={0}
-            className={`sidebar-resizer ${isDraggingRightSidebar ? "is-active" : ""}`}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              setIsDraggingRightSidebar(true);
-            }}
-            onTouchStart={() => setIsDraggingRightSidebar(true)}
-            onDoubleClick={() =>
+          <SidebarResizer
+            isActive={isDraggingRightSidebar}
+            onStartDrag={() => setIsDraggingRightSidebar(true)}
+            onResetWidth={() =>
               setRightSidebarWidth(DEFAULT_RIGHT_SIDEBAR_WIDTH)
             }
             title="Drag to resize catalog sidebar (Double-click to reset)"
-          >
-            <div className="sidebar-resizer-line" />
-          </div>
+          />
         )}
         <NoteCatalogSidebar
           onOpenSearchWithQuery={(query) => {

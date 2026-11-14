@@ -148,46 +148,61 @@ export async function fetchOllamaModels(
   return (data.models as OllamaModel[]) || [];
 }
 
-/**
- * Pull and download a model from Ollama library with streaming progress.
- * Returns an abort function.
- */
-export function pullOllamaModel(
-  host: string,
-  modelName: string,
-  onProgress: (progress: OllamaPullProgress) => void,
-): () => void {
-  if (typeof window !== "undefined" && window.electronAPI?.ollama?.pullModel) {
-    return window.electronAPI.ollama.pullModel(host, modelName, onProgress);
-  }
+interface NdjsonStreamHandlers<T> {
+  noBodyError: string;
+  onItem: (item: T) => boolean | void;
+  onComplete: () => void;
+  onError: (error: string) => void;
+  onAbort: () => void;
+}
 
-  // Web fallback with ReadableStream
+function streamNdjson<T>(
+  url: string,
+  body: unknown,
+  {
+    noBodyError,
+    onItem,
+    onComplete,
+    onError,
+    onAbort,
+  }: NdjsonStreamHandlers<T>,
+): () => void {
   const controller = new AbortController();
-  const url = `${cleanBaseUrl(host)}/api/pull`;
+
+  const processLine = (line: string): boolean => {
+    const trimmed = line.trim();
+    if (!trimmed) return true;
+    try {
+      const parsed = JSON.parse(trimmed) as T;
+      return onItem(parsed) !== false;
+    } catch {
+      return true;
+    }
+  };
 
   (async () => {
     try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: modelName, stream: true }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
 
       if (!res.ok) {
         let errMsg = `Ollama error (HTTP ${res.status})`;
         try {
-          const errData = await res.json();
+          const errData = (await res.json()) as { error?: string };
           if (errData?.error) errMsg = errData.error;
         } catch {
-          // Ignore
+          // Fallback to HTTP status message
         }
-        onProgress({ status: "error", error: errMsg });
+        onError(errMsg);
         return;
       }
 
       if (!res.body) {
-        onProgress({ status: "error", error: "No response body from Ollama" });
+        onError(noBodyError);
         return;
       }
 
@@ -204,48 +219,58 @@ export function pullOllamaModel(
         buffer = lines.pop() || "";
 
         for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const parsed = JSON.parse(trimmed) as OllamaPullProgress;
-            if (parsed.error) {
-              onProgress({ status: "error", error: parsed.error });
-              return;
-            }
-            onProgress(parsed);
-          } catch {
-            // Ignore incomplete line chunk
-          }
+          if (!processLine(line)) return;
         }
       }
 
-      if (buffer.trim()) {
-        try {
-          const parsed = JSON.parse(buffer.trim()) as OllamaPullProgress;
-          if (parsed.error) {
-            onProgress({ status: "error", error: parsed.error });
-            return;
-          }
-          onProgress(parsed);
-        } catch {
-          // Ignore
-        }
+      if (buffer.trim() && !processLine(buffer)) {
+        return;
       }
 
-      onProgress({ status: "success" });
+      onComplete();
     } catch (err) {
       if (controller.signal.aborted) {
-        onProgress({ status: "aborted" });
+        onAbort();
       } else {
-        onProgress({
-          status: "error",
-          error: err instanceof Error ? err.message : String(err),
-        });
+        onError(err instanceof Error ? err.message : String(err));
       }
     }
   })();
 
   return () => controller.abort();
+}
+
+/**
+ * Pull and download a model from Ollama library with streaming progress.
+ * Returns an abort function.
+ */
+export function pullOllamaModel(
+  host: string,
+  modelName: string,
+  onProgress: (progress: OllamaPullProgress) => void,
+): () => void {
+  if (typeof window !== "undefined" && window.electronAPI?.ollama?.pullModel) {
+    return window.electronAPI.ollama.pullModel(host, modelName, onProgress);
+  }
+
+  return streamNdjson<OllamaPullProgress>(
+    `${cleanBaseUrl(host)}/api/pull`,
+    { name: modelName, stream: true },
+    {
+      noBodyError: "No response body from Ollama",
+      onItem: (parsed) => {
+        if (parsed.error) {
+          onProgress({ status: "error", error: parsed.error });
+          return false;
+        }
+        onProgress(parsed);
+        return true;
+      },
+      onComplete: () => onProgress({ status: "success" }),
+      onError: (error) => onProgress({ status: "error", error }),
+      onAbort: () => onProgress({ status: "aborted" }),
+    },
+  );
 }
 
 /**
@@ -262,81 +287,18 @@ export function streamOllamaChat(
     return window.electronAPI.ollama.chat(host, { model, messages }, onChunk);
   }
 
-  // Web fallback with ReadableStream
-  const controller = new AbortController();
-  const url = `${cleanBaseUrl(host)}/api/chat`;
-
-  (async () => {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages, stream: true }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        let errMsg = `Ollama error (HTTP ${res.status})`;
-        try {
-          const errData = await res.json();
-          if (errData?.error) errMsg = errData.error;
-        } catch {
-          // Ignore
-        }
-        onChunk({ error: errMsg, done: true });
-        return;
-      }
-
-      if (!res.body) {
-        onChunk({ error: "No response stream from Ollama", done: true });
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder("utf-8");
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const parsed = JSON.parse(trimmed) as OllamaChatChunk;
-            onChunk(parsed);
-          } catch {
-            // Ignore incomplete line chunk
-          }
-        }
-      }
-
-      if (buffer.trim()) {
-        try {
-          const parsed = JSON.parse(buffer.trim()) as OllamaChatChunk;
-          onChunk(parsed);
-        } catch {
-          // Ignore
-        }
-      }
-
-      onChunk({ done: true });
-    } catch (err) {
-      if (controller.signal.aborted) {
-        onChunk({ done: true, aborted: true });
-      } else {
-        onChunk({
-          error: err instanceof Error ? err.message : String(err),
-          done: true,
-        });
-      }
-    }
-  })();
-
-  return () => controller.abort();
+  return streamNdjson<OllamaChatChunk>(
+    `${cleanBaseUrl(host)}/api/chat`,
+    { model, messages, stream: true },
+    {
+      noBodyError: "No response stream from Ollama",
+      onItem: (parsed) => {
+        onChunk(parsed);
+        return true;
+      },
+      onComplete: () => onChunk({ done: true }),
+      onError: (error) => onChunk({ error, done: true }),
+      onAbort: () => onChunk({ done: true, aborted: true }),
+    },
+  );
 }

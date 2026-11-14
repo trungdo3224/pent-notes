@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { Download, ExternalLink, FileText } from "lucide-react";
+import { triggerBrowserDownload } from "../../lib/fileUtils";
+import { fsApi } from "../../lib/fsApi";
 
 interface PdfViewerProps {
   title: string;
@@ -51,10 +53,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
       return pdfData;
     }
     if (filePath) {
-      if (typeof window !== "undefined" && window.electronAPI?.fs?.getRawUrl) {
-        return window.electronAPI.fs.getRawUrl(filePath);
-      }
-      return `/api/fs/raw?path=${encodeURIComponent(filePath)}`;
+      return fsApi.getRawFileUrl(filePath);
     }
     return "";
   }, [filePath, pdfData]);
@@ -94,12 +93,7 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({
   };
 
   const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = pdfUrl;
-    link.download = displayFilename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    triggerBrowserDownload(pdfUrl, displayFilename);
   };
 
   return (

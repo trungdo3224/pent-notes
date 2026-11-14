@@ -1,15 +1,10 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { Code, FileText, Image as ImageIcon, Plus, X } from "lucide-react";
-import { useClickOutside } from "../../hooks/useDomInteractions";
-import { isCodeNote, isImageNote, isPdfNote } from "../../lib/fileUtils";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import { Code, Plus, X } from "lucide-react";
+import { clampMenuPosition } from "../../hooks/useDomInteractions";
 import { getAllLeaves } from "../../lib/paneLayoutTree";
-import { findNoteNode } from "../../lib/treeUtils";
+import { findNoteAcrossFolders, findNoteNode } from "../../lib/treeUtils";
+import { FloatingContextMenu } from "../shared/FloatingContextMenu";
+import { NoteFileIcon } from "../shared/NoteMetaBadges";
 import { isNotePendingSave, useNotesStore } from "../../store/useNotesStore";
 import { NoteItem } from "../../types";
 
@@ -39,22 +34,11 @@ export const NoteTabsBar: React.FC = () => {
   const createCodeFile = useNotesStore((s) => s.createCodeFile);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const contextMenuRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<TabContextMenuState | null>(
     null,
   );
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
-  useClickOutside(contextMenuRef, Boolean(contextMenu), closeContextMenu);
-
-  useEffect(() => {
-    if (!contextMenu) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setContextMenu(null);
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [contextMenu]);
 
   const activeFolder = useMemo(
     () => folders.find((f) => f.id === selectedFolderId) ?? null,
@@ -129,13 +113,10 @@ export const NoteTabsBar: React.FC = () => {
 
     for (const item of sidePaneNotes) {
       if (!seenIds.has(item.noteId)) {
-        let noteNode = findNoteNode(activeFolder.items, item.noteId);
-        if (!noteNode) {
-          for (const folder of folders) {
-            noteNode = findNoteNode(folder.items, item.noteId);
-            if (noteNode) break;
-          }
-        }
+        const noteNode =
+          findNoteNode(activeFolder.items, item.noteId) ??
+          findNoteAcrossFolders(folders, item.noteId)?.note ??
+          null;
         if (noteNode) {
           resolved.push(noteNode);
           seenIds.add(noteNode.id);
@@ -194,16 +175,7 @@ export const NoteTabsBar: React.FC = () => {
   const handleContextMenu = (e: React.MouseEvent, noteId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    const menuWidth = 160;
-    const menuHeight = 245;
-    const x = Math.max(
-      8,
-      Math.min(e.clientX, window.innerWidth - menuWidth - 8),
-    );
-    const y = Math.max(
-      8,
-      Math.min(e.clientY, window.innerHeight - menuHeight - 8),
-    );
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 160, 245);
     setContextMenu({ x, y, noteId });
   };
 
@@ -242,9 +214,6 @@ export const NoteTabsBar: React.FC = () => {
       >
         {openNotes.map((note) => {
           const isActive = note.id === currentActiveNoteId;
-          const isPdf = isPdfNote(note);
-          const isImage = !isPdf && isImageNote(note);
-          const isCode = !isPdf && !isImage && isCodeNote(note);
           const isContextOpen = contextMenu?.noteId === note.id;
           const paneNums = paneNumbersByNoteId.get(note.id);
           const paneBadge =
@@ -266,18 +235,7 @@ export const NoteTabsBar: React.FC = () => {
               aria-selected={isActive}
             >
               <div className="note-tab-icon">
-                {isPdf ? (
-                  <span className="note-tab-pdf-badge">PDF</span>
-                ) : isImage ? (
-                  <ImageIcon
-                    size={13}
-                    className="note-tab-file-icon is-image-icon"
-                  />
-                ) : isCode ? (
-                  <Code size={13} className="note-tab-file-icon is-code-icon" />
-                ) : (
-                  <FileText size={13} className="note-tab-file-icon" />
-                )}
+                <NoteFileIcon note={note} />
               </div>
 
               <span className="note-tab-title">
@@ -328,12 +286,13 @@ export const NoteTabsBar: React.FC = () => {
       </div>
 
       {contextMenu && (
-        <div
-          ref={contextMenuRef}
+        <FloatingContextMenu
+          isOpen
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={closeContextMenu}
           className="note-tab-context-menu"
-          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
-          role="menu"
-          aria-label="Tab actions"
+          ariaLabel="Tab actions"
         >
           <button
             type="button"
@@ -446,7 +405,7 @@ export const NoteTabsBar: React.FC = () => {
           >
             Split Down
           </button>
-        </div>
+        </FloatingContextMenu>
       )}
     </div>
   );

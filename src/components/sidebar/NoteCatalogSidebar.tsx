@@ -29,6 +29,7 @@ import {
   scrollToHeading,
 } from "../../lib/catalogUtils";
 import { findLeaf } from "../../lib/paneLayoutTree";
+import { findNoteAndPathAcrossFolders } from "../../lib/treeUtils";
 import {
   DEFAULT_RIGHT_SIDEBAR_WIDTH,
   findNoteAndPath,
@@ -84,10 +85,11 @@ export const NoteCatalogSidebar: React.FC<NoteCatalogSidebarProps> = ({
             if (found) return found;
           }
         }
-        for (const f of folders) {
-          const found = findNoteAndPath(f.items, activeLeaf.noteId, [f.name]);
-          if (found) return found;
-        }
+        const crossFound = findNoteAndPathAcrossFolders(
+          folders,
+          activeLeaf.noteId,
+        );
+        if (crossFound) return crossFound;
       }
     }
     return resolveActiveNoteData(activeFolder, selectedNoteByFolder, sortOrder);

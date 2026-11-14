@@ -26,7 +26,8 @@
     "build:electron": "electron-vite build",
     "preview:electron": "electron-vite preview",
     "start": "electron-vite dev",
-    "test": "tsc -b && eslint src",
+    "test": "tsc -b && eslint src && vitest run",
+    "test:unit": "vitest run",
     "prepare": "husky"
   },
   "dependencies": {
