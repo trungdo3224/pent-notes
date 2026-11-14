@@ -609,6 +609,7 @@ export const FolderNavbar: React.FC<FolderNavbarProps> = ({ onOpenSearch }) => {
     onClosePlusMenu: closePlusMenu,
     onOpenSettings: () => openSettingsModal(),
     onToggleNavbar: toggleNavbar,
+    onManageSessions: openSessionModal,
     onNewSession: () => sessionApi.openSessionInNewTab(),
     onCreateFolder: createTopFolder,
     onImportFolder: () => openLinkModal("new-tab"),

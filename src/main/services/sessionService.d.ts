@@ -15,6 +15,7 @@ export interface MainSessionRecord {
   payload: string;
 }
 
+export function setDataDir(dirPath: string | null): void;
 export function ensureSessionsDir(): Promise<void>;
 export function listAllSessions(): Promise<MainSessionSummary[]>;
 export function readSessionPayloadIfExists(
@@ -22,6 +23,10 @@ export function readSessionPayloadIfExists(
 ): Promise<string | null>;
 export function getOrSeedSession(
   sessionId: string,
+  suggestedName?: string,
+  cloneFromId?: string,
+): Promise<MainSessionRecord>;
+export function createSession(
   suggestedName?: string,
   cloneFromId?: string,
 ): Promise<MainSessionRecord>;

@@ -24,6 +24,11 @@ const DEFAULT_SESSION_ID = "default";
 
 let activeSessionIdCache: string | null = null;
 let activeSessionNameCache: string | null = null;
+let beforeSessionSwitchHandler: (() => void) | null = null;
+
+export function registerBeforeSessionSwitch(handler: () => void): void {
+  beforeSessionSwitchHandler = handler;
+}
 
 function getElectronSessions() {
   return typeof window !== "undefined"
@@ -81,7 +86,15 @@ export function getTabSessionId(): string {
   const storedInTab = sessionStorage.getItem(SESSION_STORAGE_KEY);
   if (storedInTab && storedInTab.trim()) {
     activeSessionIdCache = storedInTab.trim();
+    localStorage.setItem(LOCAL_STORAGE_LAST_SESSION, activeSessionIdCache);
     return activeSessionIdCache;
+  }
+
+  if (window.electronAPI?.isElectron) {
+    const lastSession = localStorage.getItem(LOCAL_STORAGE_LAST_SESSION);
+    if (lastSession && lastSession.trim()) {
+      return persistSessionInTabStorage(lastSession.trim(), false);
+    }
   }
 
   return persistSessionInTabStorage(DEFAULT_SESSION_ID, false);
@@ -92,6 +105,10 @@ export function getTabSessionName(): string {
   const id = getTabSessionId();
   if (id === DEFAULT_SESSION_ID) return "Default Session";
   return id.replace(/^session-/, "Session ");
+}
+
+export function getKnownTabSessionName(): string | undefined {
+  return activeSessionNameCache ?? undefined;
 }
 
 export function setTabSessionName(name: string): void {
@@ -126,7 +143,7 @@ export const sessionApi = {
 
   async saveSession(
     id: string,
-    payload: string,
+    payload?: string,
     name?: string,
     keepalive = false,
   ): Promise<void> {
@@ -153,13 +170,24 @@ export const sessionApi = {
   ): Promise<SessionData> {
     const electronSessions = getElectronSessions();
     if (electronSessions) {
+      if (typeof electronSessions.create === "function") {
+        return (await electronSessions.create(
+          name,
+          cloneFromId,
+        )) as SessionData;
+      }
       const newId = generateSessionId();
+      let resolvedName = typeof name === "string" ? name.trim() : "";
+      if (!resolvedName) {
+        const existing = await electronSessions.list();
+        resolvedName = `Session ${existing.length + 1}`;
+      }
       let initialPayload = "null";
       if (cloneFromId) {
         const source = await electronSessions.get(cloneFromId);
         if (source?.payload) initialPayload = source.payload;
       }
-      await electronSessions.save(newId, name, initialPayload);
+      await electronSessions.save(newId, resolvedName, initialPayload);
       return (await electronSessions.get(newId)) as SessionData;
     }
     const data = await postJson<{ session: SessionData }>(
@@ -173,8 +201,7 @@ export const sessionApi = {
   async renameSession(id: string, newName: string): Promise<void> {
     const electronSessions = getElectronSessions();
     if (electronSessions) {
-      const session = await electronSessions.get(id);
-      await electronSessions.save(id, newName, session.payload);
+      await electronSessions.save(id, newName, undefined);
     } else {
       await requestJson<{ ok: boolean }>(
         `/api/sessions/${encodeURIComponent(id)}`,
@@ -195,24 +222,41 @@ export const sessionApi = {
     const electronSessions = getElectronSessions();
     if (electronSessions) {
       await electronSessions.delete(id);
-      return;
+    } else {
+      await requestJson<{ ok: boolean }>(
+        `/api/sessions/${encodeURIComponent(id)}`,
+        { method: "DELETE" },
+        "Failed to delete session.",
+      );
     }
-    await requestJson<{ ok: boolean }>(
-      `/api/sessions/${encodeURIComponent(id)}`,
-      { method: "DELETE" },
-      "Failed to delete session.",
-    );
+    if (
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem(LOCAL_STORAGE_LAST_SESSION) === id
+    ) {
+      localStorage.removeItem(LOCAL_STORAGE_LAST_SESSION);
+    }
   },
 
   openSessionInNewTab(id?: string): void {
-    const targetUrl = id
-      ? `/?session=${encodeURIComponent(id)}`
-      : "/?session=new";
-    window.open(targetUrl, "_blank");
+    const electronSessions = getElectronSessions();
+    if (typeof electronSessions?.openWindow === "function") {
+      void electronSessions.openWindow(id);
+      return;
+    }
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("session", id && id.trim() ? id.trim() : "new");
+    window.open(nextUrl.toString(), "_blank");
   },
 
   switchSessionInCurrentTab(id: string): void {
+    beforeSessionSwitchHandler?.();
+    activeSessionNameCache = null;
     persistSessionInTabStorage(id, false);
-    window.location.href = buildSessionUrl(id);
+    const targetUrl = buildSessionUrl(id);
+    if (window.location.href === targetUrl) {
+      window.location.reload();
+    } else {
+      window.location.href = targetUrl;
+    }
   },
 };

@@ -55,9 +55,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   sessions: {
     list: () => ipcRenderer.invoke("sessions:list"),
     get: (sessionId) => ipcRenderer.invoke("sessions:get", sessionId),
+    create: (name, cloneFromId) =>
+      ipcRenderer.invoke("sessions:create", { name, cloneFromId }),
     save: (sessionId, name, payload) =>
       ipcRenderer.invoke("sessions:save", sessionId, name, payload),
     delete: (sessionId) => ipcRenderer.invoke("sessions:delete", sessionId),
+    openWindow: (sessionId) =>
+      ipcRenderer.invoke("sessions:open-window", sessionId),
   },
 
   window: {

@@ -1,6 +1,7 @@
 import React from "react";
 import {
   ChevronDown,
+  ExternalLink,
   FileUp,
   FolderPlus,
   FolderUp,
@@ -49,6 +50,7 @@ export interface NavbarActionControlsProps {
   onClosePlusMenu: () => void;
   onOpenSettings: () => void;
   onToggleNavbar: () => void;
+  onManageSessions: () => void;
   onNewSession: () => void;
   onCreateFolder: () => void;
   onImportFolder: () => void;
@@ -68,6 +70,7 @@ export const NavbarActionControls: React.FC<NavbarActionControlsProps> = ({
   onClosePlusMenu,
   onOpenSettings,
   onToggleNavbar,
+  onManageSessions,
   onNewSession,
   onCreateFolder,
   onImportFolder,
@@ -107,10 +110,26 @@ export const NavbarActionControls: React.FC<NavbarActionControlsProps> = ({
               className="plus-menu-item"
               onClick={() => {
                 onClosePlusMenu();
-                onNewSession();
+                onManageSessions();
               }}
             >
               <Layers size={15} strokeWidth={1.8} className="plus-menu-icon" />
+              <span>Manage sessions...</span>
+            </button>
+
+            <button
+              type="button"
+              className="plus-menu-item"
+              onClick={() => {
+                onClosePlusMenu();
+                onNewSession();
+              }}
+            >
+              <ExternalLink
+                size={15}
+                strokeWidth={1.8}
+                className="plus-menu-icon"
+              />
               <span>New session (new tab)...</span>
             </button>
 

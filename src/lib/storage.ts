@@ -1,7 +1,8 @@
 import { StateStorage } from "zustand/middleware";
 import {
+  getKnownTabSessionName,
   getTabSessionId,
-  getTabSessionName,
+  registerBeforeSessionSwitch,
   sessionApi,
 } from "./sessionManager";
 
@@ -100,16 +101,24 @@ async function serverGet(sessionId: string): Promise<StoredEnvelope | null> {
   }
 }
 
+interface PendingServerWrite {
+  sessionId: string;
+  sessionName?: string;
+  envelope: StoredEnvelope;
+}
+
 async function serverSet(
-  sessionId: string,
-  envelope: StoredEnvelope,
+  write: PendingServerWrite,
   keepalive = false,
 ): Promise<void> {
   try {
     await sessionApi.saveSession(
-      sessionId,
-      envelope.payload,
-      getTabSessionName(),
+      write.sessionId,
+      write.envelope.payload,
+      write.sessionName ??
+        (write.sessionId === getTabSessionId()
+          ? getKnownTabSessionName()
+          : undefined),
       keepalive,
     );
   } catch {
@@ -117,46 +126,48 @@ async function serverSet(
   }
 }
 
-let pendingEnvelope: StoredEnvelope | null = null;
+let pendingWrite: PendingServerWrite | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleServerWrite(
   sessionId: string,
   envelope: StoredEnvelope,
 ): void {
-  pendingEnvelope = envelope;
+  pendingWrite = {
+    sessionId,
+    sessionName: getKnownTabSessionName(),
+    envelope,
+  };
   if (saveTimer) {
     clearTimeout(saveTimer);
   }
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    if (pendingEnvelope) {
-      const toWrite = pendingEnvelope;
-      pendingEnvelope = null;
-      void serverSet(sessionId, toWrite);
+    if (pendingWrite) {
+      const toWrite = pendingWrite;
+      pendingWrite = null;
+      void serverSet(toWrite);
     }
   }, SERVER_WRITE_DEBOUNCE_MS);
 }
 
-function flushServerWriteImmediate(sessionId: string): void {
+export function flushPendingWorkspaceWrite(): void {
   if (saveTimer) {
     clearTimeout(saveTimer);
     saveTimer = null;
   }
-  if (pendingEnvelope) {
-    const toWrite = pendingEnvelope;
-    pendingEnvelope = null;
-    void serverSet(sessionId, toWrite, true);
+  if (pendingWrite) {
+    const toWrite = pendingWrite;
+    pendingWrite = null;
+    void serverSet(toWrite, true);
   }
 }
 
+registerBeforeSessionSwitch(flushPendingWorkspaceWrite);
+
 if (typeof window !== "undefined") {
-  const flushCurrent = () => {
-    const sessionId = getTabSessionId();
-    flushServerWriteImmediate(sessionId);
-  };
-  window.addEventListener("beforeunload", flushCurrent);
-  window.addEventListener("pagehide", flushCurrent);
+  window.addEventListener("beforeunload", flushPendingWorkspaceWrite);
+  window.addEventListener("pagehide", flushPendingWorkspaceWrite);
 }
 
 function getSessionStorageKey(name: string): {

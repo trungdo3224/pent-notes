@@ -1,9 +1,29 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const DATA_DIR = path.resolve("data");
-const STATE_FILE = path.join(DATA_DIR, "workspace.json");
-const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
+let customDataDir = null;
+
+export function setDataDir(dirPath) {
+  customDataDir = dirPath ? path.resolve(dirPath) : null;
+}
+
+function getDataDir() {
+  return (
+    customDataDir || process.env.PENTNOTES_DATA_DIR || path.resolve("data")
+  );
+}
+
+function getStateFile() {
+  return path.join(getDataDir(), "workspace.json");
+}
+
+function getSessionsDir() {
+  return path.join(getDataDir(), "sessions");
+}
+
+function makeSessionId() {
+  return `session-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
 async function writeFileAtomic(targetPath, content) {
   const tempFile = `${targetPath}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`;
@@ -52,15 +72,16 @@ function extractCounts(payloadStr) {
 }
 
 export async function ensureSessionsDir() {
-  await fs.mkdir(SESSIONS_DIR, { recursive: true });
+  const sessionsDir = getSessionsDir();
+  await fs.mkdir(sessionsDir, { recursive: true });
 
-  const defaultPath = path.join(SESSIONS_DIR, "default.json");
+  const defaultPath = path.join(sessionsDir, "default.json");
   try {
     await fs.stat(defaultPath);
   } catch {
     let initialPayload = "null";
     try {
-      const rawWorkspace = await fs.readFile(STATE_FILE, "utf-8");
+      const rawWorkspace = await fs.readFile(getStateFile(), "utf-8");
       const parsed = JSON.parse(rawWorkspace);
       initialPayload =
         parsed && typeof parsed.payload === "string"
@@ -86,12 +107,13 @@ export async function ensureSessionsDir() {
 
 export async function listAllSessions() {
   await ensureSessionsDir();
-  const entries = await fs.readdir(SESSIONS_DIR, { withFileTypes: true });
+  const sessionsDir = getSessionsDir();
+  const entries = await fs.readdir(sessionsDir, { withFileTypes: true });
   const results = [];
   for (const entry of entries) {
     if (entry.isFile() && entry.name.endsWith(".json")) {
       try {
-        const full = path.join(SESSIONS_DIR, entry.name);
+        const full = path.join(sessionsDir, entry.name);
         const raw = await fs.readFile(full, "utf-8");
         const data = JSON.parse(raw);
         const { folderCount, noteCount } = extractCounts(data.payload);
@@ -115,7 +137,7 @@ export async function listAllSessions() {
 export async function readSessionPayloadIfExists(sessionId) {
   try {
     const raw = await fs.readFile(
-      path.join(SESSIONS_DIR, `${sessionId}.json`),
+      path.join(getSessionsDir(), `${sessionId}.json`),
       "utf-8",
     );
     const data = JSON.parse(raw);
@@ -127,32 +149,33 @@ export async function readSessionPayloadIfExists(sessionId) {
 
 export async function getOrSeedSession(sessionId, suggestedName, cloneFromId) {
   await ensureSessionsDir();
-  const filePath = path.join(SESSIONS_DIR, `${sessionId}.json`);
+  const filePath = path.join(getSessionsDir(), `${sessionId}.json`);
   try {
     const raw = await fs.readFile(filePath, "utf-8");
     return JSON.parse(raw);
   } catch {
-    let payload =
-      (cloneFromId && (await readSessionPayloadIfExists(cloneFromId))) ||
-      "null";
-
-    if (payload === "null") {
-      const defaultPayload = await readSessionPayloadIfExists("default");
-      if (defaultPayload) {
-        payload = defaultPayload;
-      } else {
-        try {
-          const rawWs = await fs.readFile(STATE_FILE, "utf-8");
-          const parsed = JSON.parse(rawWs);
-          payload = parsed.payload || rawWs;
-        } catch {
-          // empty
-        }
+    let payload = "null";
+    if (cloneFromId) {
+      payload = (await readSessionPayloadIfExists(cloneFromId)) || "null";
+    } else if (sessionId === "default") {
+      try {
+        const rawWs = await fs.readFile(getStateFile(), "utf-8");
+        const parsed = JSON.parse(rawWs);
+        payload =
+          parsed && typeof parsed.payload === "string" ? parsed.payload : rawWs;
+      } catch {
+        // workspace.json absent
       }
     }
 
     const existing = await listAllSessions();
-    const sessionName = suggestedName || `Session ${existing.length + 1}`;
+    const trimmedSuggested =
+      typeof suggestedName === "string" ? suggestedName.trim() : "";
+    const sessionName =
+      trimmedSuggested ||
+      (sessionId === "default"
+        ? "Default Workspace"
+        : `Session ${existing.length + 1}`);
     const newSession = {
       id: sessionId,
       name: sessionName,
@@ -160,14 +183,19 @@ export async function getOrSeedSession(sessionId, suggestedName, cloneFromId) {
       updatedAt: Date.now(),
       payload,
     };
-    await fs.writeFile(filePath, JSON.stringify(newSession, null, 2), "utf-8");
+    await writeFileAtomic(filePath, JSON.stringify(newSession, null, 2));
     return newSession;
   }
 }
 
+export async function createSession(suggestedName, cloneFromId) {
+  const newId = makeSessionId();
+  return await getOrSeedSession(newId, suggestedName, cloneFromId);
+}
+
 export async function saveSession(sessionId, name, payload) {
   await ensureSessionsDir();
-  const sessionPath = path.join(SESSIONS_DIR, `${sessionId}.json`);
+  const sessionPath = path.join(getSessionsDir(), `${sessionId}.json`);
 
   let existing = null;
   try {
@@ -177,10 +205,17 @@ export async function saveSession(sessionId, name, payload) {
     // Not existing yet
   }
 
+  let fallbackName = existing?.name;
+  if (!fallbackName) {
+    if (sessionId === "default") {
+      fallbackName = "Default Workspace";
+    } else {
+      const all = await listAllSessions();
+      fallbackName = `Session ${all.length + 1}`;
+    }
+  }
   const sessionName =
-    typeof name === "string" && name.trim()
-      ? name.trim()
-      : existing?.name || "Session";
+    typeof name === "string" && name.trim() ? name.trim() : fallbackName;
 
   const sessionPayload =
     typeof payload === "string"
@@ -200,10 +235,10 @@ export async function saveSession(sessionId, name, payload) {
   await writeFileAtomic(sessionPath, JSON.stringify(updated, null, 2));
 
   if (sessionId === "default") {
-    await fs.mkdir(DATA_DIR, { recursive: true });
+    await fs.mkdir(getDataDir(), { recursive: true });
     await fs
       .writeFile(
-        STATE_FILE,
+        getStateFile(),
         JSON.stringify({
           savedAt: updated.updatedAt,
           payload: updated.payload,
@@ -228,7 +263,7 @@ export async function deleteSession(sessionId) {
   if (list.length <= 1) {
     throw new Error("Cannot delete the only remaining session.");
   }
-  const sessionPath = path.join(SESSIONS_DIR, `${sessionId}.json`);
+  const sessionPath = path.join(getSessionsDir(), `${sessionId}.json`);
   await fs.unlink(sessionPath).catch(() => {});
   return { ok: true };
 }

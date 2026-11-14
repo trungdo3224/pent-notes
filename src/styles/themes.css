@@ -1,3 +1,20 @@
+@tailwind base;
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-width: 0;
+    border-style: solid;
+    border-color: var(--line);
+  }
+
+  button {
+    background-color: transparent;
+    background-image: none;
+  }
+}
+
 /* ==========================================================================
    WARM MINIMALIST THEME SYSTEM (Calm Design)
    2 Dark themes (Warm Espresso, Deep Slate) & 1 Light theme (Warm Linen).

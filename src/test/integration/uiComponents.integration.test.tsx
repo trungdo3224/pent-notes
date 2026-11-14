@@ -314,4 +314,72 @@ describe("UI component integration with useNotesStore", () => {
       "Bug Bounty Vault",
     );
   });
+
+  it("opens SessionModal from FolderNavbar pill in expanded/slim modes and from the + menu", async () => {
+    seedWorkspace();
+    vi.spyOn(sessionApi, "listSessions").mockResolvedValue([
+      {
+        id: "default",
+        name: "Default Session",
+        createdAt: 1,
+        updatedAt: 2,
+        folderCount: 2,
+        noteCount: 4,
+      },
+    ]);
+
+    useNotesStore.setState({
+      isNavbarCollapsed: false,
+      isSessionModalOpen: false,
+      currentSessionId: "default",
+      currentSessionName: "Default Session",
+    });
+
+    render(
+      <>
+        <FolderNavbar onOpenSearch={vi.fn()} />
+        <SessionModal />
+      </>,
+    );
+
+    // 1. Expanded navbar SessionPillButton
+    fireEvent.click(screen.getByRole("button", { name: "Manage sessions" }));
+    expect(useNotesStore.getState().isSessionModalOpen).toBe(true);
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Session Management" }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Close" })[0]);
+    expect(useNotesStore.getState().isSessionModalOpen).toBe(false);
+
+    // 2. Slim navbar SessionPillButton
+    useNotesStore.setState({ isNavbarCollapsed: true });
+    await waitFor(() => {
+      expect(
+        document.querySelector(".navbar-slim-controls .session-navbar-pill"),
+      ).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Manage sessions" }));
+    expect(useNotesStore.getState().isSessionModalOpen).toBe(true);
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Session Management" }),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Close" })[0]);
+    expect(useNotesStore.getState().isSessionModalOpen).toBe(false);
+
+    // 3. "+" dropdown menu -> "Manage sessions..."
+    fireEvent.click(screen.getByRole("button", { name: "Create or import" }));
+    fireEvent.click(screen.getByRole("button", { name: "Manage sessions..." }));
+    expect(useNotesStore.getState().isSessionModalOpen).toBe(true);
+    await waitFor(() => {
+      expect(
+        screen.getByRole("dialog", { name: "Session Management" }),
+      ).toBeInTheDocument();
+    });
+  });
 });

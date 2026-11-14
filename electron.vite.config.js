@@ -18,6 +18,9 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
   },
   renderer: {
+    css: {
+      postcss: resolve(__dirname, "postcss.config.js"),
+    },
     resolve: {
       alias: {
         "@": resolve(__dirname, "src"),

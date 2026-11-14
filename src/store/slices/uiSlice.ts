@@ -9,7 +9,6 @@ import {
 import {
   getTabSessionId,
   getTabSessionName,
-  sessionApi,
   setTabSessionName,
 } from "../../lib/sessionManager";
 import { applyTheme, initialTheme, saveTheme } from "../../themes";
@@ -93,7 +92,6 @@ export const createUiSlice: NotesSlice<UiSliceState> = (set, get) => ({
   setSessionName: (name) => {
     setTabSessionName(name);
     set({ currentSessionName: name });
-    void sessionApi.renameSession(get().currentSessionId, name);
   },
   openSettingsModal: (tab = "theme") =>
     set({ isSettingsModalOpen: true, settingsActiveTab: tab }),

@@ -4,21 +4,21 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 cursor-pointer select-none",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 cursor-pointer select-none",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow hover:opacity-90 active:opacity-95",
+          "border border-[var(--forest)] bg-[var(--forest)] text-[var(--button-text)] font-semibold shadow-sm hover:bg-[var(--primary-hover)] hover:border-[var(--primary-hover)] active:opacity-95",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:opacity-90 active:opacity-95",
+          "border border-[var(--danger)] bg-destructive text-destructive-foreground shadow-sm hover:opacity-90 active:opacity-95",
         outline:
-          "border border-border bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+          "border border-[var(--line)] bg-[var(--surface-muted)] text-[var(--text-primary)] shadow-sm hover:bg-[var(--hover)] hover:border-[var(--line-strong)] hover:text-[var(--ink)]",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-accent hover:text-accent-foreground",
+          "border border-[var(--line)] bg-secondary text-secondary-foreground shadow-sm hover:bg-accent hover:text-accent-foreground",
         ghost:
-          "hover:bg-accent hover:text-accent-foreground active:bg-secondary",
-        link: "text-primary underline-offset-4 hover:underline",
+          "border-0 bg-transparent text-[var(--muted)] hover:bg-[var(--hover)] hover:text-[var(--ink)] active:bg-[var(--selected)]",
+        link: "border-0 bg-transparent text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",

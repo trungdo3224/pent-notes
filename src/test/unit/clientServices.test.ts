@@ -246,6 +246,150 @@ describe("sessionManager & workspaceStorage", () => {
       expect.objectContaining({ method: "DELETE" }),
     );
   });
+
+  it("manages desktop sessions via Electron IPC and restores the last active session on restart", async () => {
+    const createMock = vi.fn().mockResolvedValue({
+      id: "session-new-1",
+      name: "Session 2",
+      createdAt: 100,
+      updatedAt: 100,
+      payload: "null",
+    });
+    const saveMock = vi.fn().mockResolvedValue({ ok: true });
+    const deleteMock = vi.fn().mockResolvedValue({ ok: true });
+    const openWindowMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, sessionId: "session-new-1" });
+
+    window.electronAPI = {
+      isElectron: true,
+      platform: "win32",
+      dialog: { selectFolder: vi.fn() },
+      fs: {
+        scanFolder: vi.fn(),
+        writeFile: vi.fn(),
+        createFile: vi.fn(),
+        createFolder: vi.fn(),
+        renamePath: vi.fn(),
+        deletePath: vi.fn(),
+        readFile: vi.fn(),
+        readDir: vi.fn(),
+        getRawUrl: (p: string) => p,
+      },
+      sessions: {
+        list: vi.fn().mockResolvedValue([]),
+        get: vi.fn(),
+        create: createMock,
+        save: saveMock,
+        delete: deleteMock,
+        openWindow: openWindowMock,
+      },
+    };
+
+    localStorage.setItem("pentnotes_last_session", "session-saved-7");
+    const { getTabSessionId, sessionApi } =
+      await import("../../lib/sessionManager");
+
+    expect(getTabSessionId()).toBe("session-saved-7");
+
+    const created = await sessionApi.createSession();
+    expect(created.id).toBe("session-new-1");
+    expect(createMock).toHaveBeenCalledWith(undefined, undefined);
+
+    await sessionApi.renameSession("session-saved-7", "Pentest Engagement");
+    expect(saveMock).toHaveBeenCalledWith(
+      "session-saved-7",
+      "Pentest Engagement",
+      undefined,
+    );
+
+    sessionApi.openSessionInNewTab();
+    expect(openWindowMock).toHaveBeenCalledWith(undefined);
+    sessionApi.openSessionInNewTab("session-new-1");
+    expect(openWindowMock).toHaveBeenCalledWith("session-new-1");
+
+    await sessionApi.deleteSession("session-saved-7");
+    expect(deleteMock).toHaveBeenCalledWith("session-saved-7");
+    expect(localStorage.getItem("pentnotes_last_session")).toBeNull();
+  });
+
+  it("flushes pending workspace writes to the previous session before switching sessions", async () => {
+    vi.useFakeTimers();
+    const saveMock = vi.fn().mockResolvedValue({ ok: true });
+    window.electronAPI = {
+      isElectron: true,
+      platform: "win32",
+      dialog: { selectFolder: vi.fn() },
+      fs: {
+        scanFolder: vi.fn(),
+        writeFile: vi.fn(),
+        createFile: vi.fn(),
+        createFolder: vi.fn(),
+        renamePath: vi.fn(),
+        deletePath: vi.fn(),
+        readFile: vi.fn(),
+        readDir: vi.fn(),
+        getRawUrl: (p: string) => p,
+      },
+      sessions: {
+        list: vi.fn().mockResolvedValue([]),
+        get: vi.fn().mockResolvedValue({
+          id: "session-old",
+          name: "Old Workspace",
+          createdAt: 1,
+          updatedAt: 2,
+          payload: "null",
+        }),
+        save: saveMock,
+        delete: vi.fn(),
+      },
+    };
+
+    window.history.replaceState({}, "", "/?session=session-old");
+    const { sessionApi } = await import("../../lib/sessionManager");
+    const { workspaceStorage } = await import("../../lib/storage");
+
+    await sessionApi.getSession("session-old");
+    await workspaceStorage.setItem(
+      "pentnotes-workspace-v1",
+      '{"state":{"folders":[{"id":"old-f"}]}}',
+    );
+
+    const originalLocation = window.location;
+    let navigatedTo = "";
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: {
+        get href() {
+          return navigatedTo || "http://localhost/?session=session-old";
+        },
+        set href(val: string) {
+          navigatedTo = val;
+        },
+        search: "?session=session-old",
+        reload: vi.fn(),
+      },
+    });
+
+    try {
+      sessionApi.switchSessionInCurrentTab("session-new");
+      window.dispatchEvent(new Event("pagehide"));
+      await vi.advanceTimersByTimeAsync(200);
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: originalLocation,
+      });
+    }
+
+    expect(navigatedTo).toBe("http://localhost/?session=session-new");
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    expect(saveMock).toHaveBeenCalledWith(
+      "session-old",
+      "Old Workspace",
+      '{"state":{"folders":[{"id":"old-f"}]}}',
+    );
+  });
 });
 
 describe("ollamaClient", () => {

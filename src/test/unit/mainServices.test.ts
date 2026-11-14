@@ -199,6 +199,30 @@ describe("sessionService", () => {
       "Cannot delete the only remaining session.",
     );
   });
+
+  it("creates blank sessions with sequential names, supports cloning via createSession, and preserves payload on name-only saves", async () => {
+    const before = await sessionService.getOrSeedSession("default");
+    const firstBlank = await sessionService.createSession();
+    expect(firstBlank.name).toBe("Session 2");
+    expect(firstBlank.payload).toBe("null");
+
+    const secondBlank = await sessionService.createSession();
+    expect(secondBlank.name).toBe("Session 3");
+    expect(secondBlank.payload).toBe("null");
+
+    const cloned = await sessionService.createSession("Cloned WS", "default");
+    expect(cloned.name).toBe("Cloned WS");
+    expect(cloned.payload).toBe(before.payload);
+
+    await sessionService.saveSession("default", "Renamed Primary", undefined);
+    const reloadedDefault = await sessionService.getOrSeedSession("default");
+    expect(reloadedDefault.name).toBe("Renamed Primary");
+    expect(reloadedDefault.payload).toBe(before.payload);
+
+    await sessionService.deleteSession(firstBlank.id);
+    await sessionService.deleteSession(secondBlank.id);
+    await sessionService.deleteSession(cloned.id);
+  });
 });
 
 describe("ollamaService", () => {

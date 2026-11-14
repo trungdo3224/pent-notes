@@ -94,6 +94,18 @@ export const SessionModal: React.FC = () => {
     }
   };
 
+  const handleCreateNewInNewTab = async () => {
+    try {
+      const newSession = await sessionApi.createSession();
+      sessionApi.openSessionInNewTab(newSession.id);
+      await loadSessionsList();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to create session.",
+      );
+    }
+  };
+
   const handleDuplicateToNewTab = async () => {
     try {
       const newSession = await sessionApi.createSession(
@@ -134,252 +146,274 @@ export const SessionModal: React.FC = () => {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && closeSessionModal()}>
-      <DialogContent className="max-w-xl p-6">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <Layers className="h-5 w-5 text-primary" />
-            <DialogTitle>Session Management</DialogTitle>
+      <DialogContent className="max-w-[640px] w-[92vw] gap-0 overflow-hidden p-0 border-[var(--line-strong)] bg-[var(--surface)]">
+        <DialogHeader className="border-b border-[var(--line)] bg-[var(--sidebar)] px-5 py-4 pr-14 text-left space-y-0">
+          <div className="flex items-start gap-3">
+            <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--forest)_14%,transparent)] text-[var(--forest)] border border-[color-mix(in_srgb,var(--forest)_28%,transparent)]">
+              <Layers className="h-[18px] w-[18px]" />
+            </div>
+            <div className="flex flex-col gap-1 min-w-0">
+              <DialogTitle className="text-[15.5px] font-bold text-[var(--heading)]">
+                Session Management
+              </DialogTitle>
+              <DialogDescription className="text-xs leading-relaxed text-[var(--muted)]">
+                Workspaces are stored on disk in{" "}
+                <code className="rounded border border-[var(--line)] bg-[var(--surface-muted)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--text)]">
+                  data/sessions/*.json
+                </code>
+                . Switch workspaces or open independent sessions in new windows.
+              </DialogDescription>
+            </div>
           </div>
-          <DialogDescription className="text-xs">
-            Workspaces are stored in clean JSON files on disk (
-            <code className="px-1 py-0.5 rounded bg-muted">
-              data/sessions/*.json
-            </code>
-            ). New tabs start in your Default session. You can switch sessions
-            or create new ones anytime.
-          </DialogDescription>
         </DialogHeader>
 
-        {/* Current Active Session Card */}
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary">
-              <Radio className="h-3 w-3 animate-pulse" /> ACTIVE IN THIS TAB
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleCopyLink}
-              className="h-7 gap-1.5 text-xs"
-            >
-              {copiedLink ? (
-                <Check className="h-3 w-3 text-primary" />
+        <div className="flex flex-col gap-4 bg-[var(--paper)] p-5">
+          {/* Current Active Session Card */}
+          <div
+            className="flex flex-col gap-3 rounded-[10px] border border-[color-mix(in_srgb,var(--forest)_35%,transparent)] p-4 shadow-[0_4px_20px_var(--shadow)]"
+            style={{
+              background:
+                "radial-gradient(circle at 100% 0%, var(--glow), transparent 60%), color-mix(in srgb, var(--forest) 6%, var(--surface))",
+            }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.04em] text-[var(--forest)]">
+                <Radio className="h-3 w-3 animate-pulse" /> ACTIVE IN THIS
+                WINDOW
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCopyLink}
+                className="h-7 gap-1.5 text-xs"
+              >
+                {copiedLink ? (
+                  <Check className="h-3 w-3 text-[var(--forest)]" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+                <span>{copiedLink ? "Copied URL!" : "Share URL"}</span>
+              </Button>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              {isRenaming ? (
+                <div className="flex flex-1 items-center gap-2">
+                  <InlineRenameInput
+                    variant="ui"
+                    className="h-8 text-sm bg-[var(--paper)] border-[var(--line-strong)]"
+                    value={draftName}
+                    onChange={setDraftName}
+                    onCommit={() => void handleCommitRename()}
+                    onCancel={() => setIsRenaming(false)}
+                    stopClickPropagation={false}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 px-2.5"
+                    onClick={() => void handleCommitRename()}
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                </div>
               ) : (
-                <Copy className="h-3 w-3" />
+                <div className="flex items-center gap-2 min-w-0">
+                  <h3 className="m-0 truncate text-base font-semibold text-[var(--heading)]">
+                    {currentSessionName}
+                  </h3>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-[var(--muted)] hover:text-[var(--ink)]"
+                    onClick={() => setIsRenaming(true)}
+                    title="Rename current session"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               )}
-              <span>{copiedLink ? "Copied URL!" : "Share URL"}</span>
-            </Button>
+              <span className="font-mono text-[11px] text-[var(--muted)]">
+                ID: {currentSessionId}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleCreateNewSession()}
+                className="h-8 gap-1.5 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Create New Session</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleCreateNewInNewTab()}
+                className="h-8 gap-1.5 text-xs"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>New in New Tab</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleDuplicateToNewTab()}
+                className="h-8 gap-1.5 text-xs"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Duplicate</span>
+              </Button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {isRenaming ? (
-              <div className="flex flex-1 items-center gap-2">
-                <InlineRenameInput
-                  variant="ui"
-                  className="h-8 text-sm"
-                  value={draftName}
-                  onChange={setDraftName}
-                  onCommit={() => void handleCommitRename()}
-                  onCancel={() => setIsRenaming(false)}
-                  stopClickPropagation={false}
+          {error && (
+            <div className="rounded-md border border-[color-mix(in_srgb,var(--danger)_45%,transparent)] bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] px-3 py-2 text-xs text-[var(--danger)]">
+              {error}
+            </div>
+          )}
+
+          {/* Saved Sessions List */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--muted)]">
+                Saved Sessions (
+                <code className="font-mono text-[10.5px] normal-case text-[var(--text)]">
+                  data/sessions/
+                </code>
+                )
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => void loadSessionsList()}
+                disabled={loading}
+                title="Refresh list"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
                 />
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8 px-2.5"
-                  onClick={() => void handleCommitRename()}
-                >
-                  <Check className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-semibold text-foreground">
-                  {currentSessionName}
-                </h3>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                  onClick={() => setIsRenaming(true)}
-                  title="Rename current session"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            )}
-          </div>
-          <span className="text-[11px] text-muted-foreground">
-            ID: {currentSessionId}
-          </span>
+              </Button>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => void handleCreateNewSession()}
-              className="gap-1.5 h-8 text-xs"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Create New Session</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => sessionApi.openSessionInNewTab()}
-              className="gap-1.5 h-8 text-xs"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              <span>New in New Tab</span>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void handleDuplicateToNewTab()}
-              className="gap-1.5 h-8 text-xs"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>Duplicate</span>
-            </Button>
-          </div>
-        </div>
+            <ScrollArea className="h-[220px] rounded-lg border border-[var(--line)] bg-[var(--sidebar)] p-2">
+              {loading && sessions.length === 0 ? (
+                <div className="flex h-36 items-center justify-center gap-2 text-xs text-[var(--muted)]">
+                  <LoaderCircle className="h-4 w-4 animate-spin text-[var(--forest)]" />
+                  <span>Loading saved sessions...</span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {sessions.map((sess) => {
+                    const isCurrent = sess.id === currentSessionId;
+                    const formattedDate = sess.updatedAt
+                      ? new Date(sess.updatedAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          month: "short",
+                          day: "numeric",
+                        })
+                      : "Recent";
 
-        {error && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-            {error}
-          </div>
-        )}
+                    return (
+                      <div
+                        key={sess.id}
+                        className={`flex items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5 transition-all ${
+                          isCurrent
+                            ? "border-[var(--forest)] bg-[color-mix(in_srgb,var(--forest)_11%,var(--surface))] shadow-[inset_3px_0_0_var(--forest)]"
+                            : "border-[var(--line)] bg-[var(--surface)] hover:border-[var(--line-strong)] hover:bg-[var(--hover)]"
+                        }`}
+                      >
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-[13.5px] font-semibold text-[var(--heading)]">
+                              {sess.name}
+                            </span>
+                            {isCurrent && (
+                              <Badge
+                                variant="outline"
+                                className="border-[color-mix(in_srgb,var(--forest)_45%,transparent)] bg-[color-mix(in_srgb,var(--forest)_16%,transparent)] px-1.5 py-0 text-[10px] font-bold uppercase tracking-wide text-[var(--forest)]"
+                              >
+                                Current
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[11.5px] text-[var(--muted)]">
+                            <span>Updated: {formattedDate}</span>
+                            <span>•</span>
+                            <span>{sess.folderCount ?? 0} folders</span>
+                            <span>•</span>
+                            <span>{sess.noteCount ?? 0} notes</span>
+                          </div>
+                        </div>
 
-        {/* Saved Sessions List */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground">
-              SAVED SESSIONS (
-              <code className="text-[11px]">data/sessions/</code>)
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => void loadSessionsList()}
-              disabled={loading}
-              title="Refresh list"
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
-              />
-            </Button>
-          </div>
-
-          <ScrollArea className="h-[210px] rounded-md border border-border bg-card p-2">
-            {loading && sessions.length === 0 ? (
-              <div className="flex h-32 items-center justify-center gap-2 text-xs text-muted-foreground">
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-                <span>Loading saved sessions...</span>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                {sessions.map((sess) => {
-                  const isCurrent = sess.id === currentSessionId;
-                  const formattedDate = sess.updatedAt
-                    ? new Date(sess.updatedAt).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        month: "short",
-                        day: "numeric",
-                      })
-                    : "Recent";
-
-                  return (
-                    <div
-                      key={sess.id}
-                      className={`flex items-center justify-between gap-3 rounded-md border p-2.5 transition-colors ${
-                        isCurrent
-                          ? "border-primary bg-primary/10"
-                          : "border-border bg-card hover:bg-muted/40"
-                      }`}
-                    >
-                      <div className="flex flex-col gap-0.5 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {sess.name}
-                          </span>
-                          {isCurrent && (
-                            <Badge
-                              variant="default"
-                              className="text-[10px] px-1.5 py-0"
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {!isCurrent && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1 px-2.5 text-xs"
+                              onClick={() =>
+                                sessionApi.switchSessionInCurrentTab(sess.id)
+                              }
+                              title="Switch to this session in this tab"
                             >
-                              Current
-                            </Badge>
+                              <FolderOpen className="h-3 w-3" />
+                              <span>Switch</span>
+                            </Button>
                           )}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <span>Updated: {formattedDate}</span>
-                          <span>•</span>
-                          <span>{sess.folderCount ?? 0} folders</span>
-                          <span>•</span>
-                          <span>{sess.noteCount ?? 0} notes</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        {!isCurrent && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-7 px-2 text-xs gap-1"
-                            onClick={() =>
-                              sessionApi.switchSessionInCurrentTab(sess.id)
-                            }
-                            title="Switch to this session in this tab"
-                          >
-                            <FolderOpen className="h-3 w-3" />
-                            <span>Switch</span>
-                          </Button>
-                        )}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                          onClick={() =>
-                            sessionApi.openSessionInNewTab(sess.id)
-                          }
-                          title="Open this session in a new browser tab"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </Button>
-                        {sessions.length > 1 && (
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                            className="h-7 w-7 text-[var(--muted)] hover:text-[var(--ink)]"
                             onClick={() =>
-                              void handleDeleteSession(sess.id, sess.name)
+                              sessionApi.openSessionInNewTab(sess.id)
                             }
-                            title="Delete session"
+                            title="Open this session in a new browser tab"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <ExternalLink className="h-3.5 w-3.5" />
                           </Button>
-                        )}
+                          {sessions.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-[var(--muted)] hover:bg-[rgba(235,107,107,0.15)] hover:text-[var(--danger)]"
+                              onClick={() =>
+                                void handleDeleteSession(sess.id, sess.name)
+                              }
+                              title="Delete session"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </ScrollArea>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
         </div>
 
-        <DialogFooter className="mt-2">
-          <Button variant="outline" onClick={closeSessionModal}>
+        <DialogFooter className="border-t border-[var(--line)] bg-[var(--sidebar)] px-5 py-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={closeSessionModal}
+          >
             Close
           </Button>
         </DialogFooter>

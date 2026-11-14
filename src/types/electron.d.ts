@@ -55,12 +55,19 @@ export interface ElectronAPI {
   sessions: {
     list: () => Promise<ElectronSessionInfo[]>;
     get: (sessionId: string) => Promise<ElectronSessionData>;
+    create?: (
+      name?: string,
+      cloneFromId?: string,
+    ) => Promise<ElectronSessionData>;
     save: (
       sessionId: string,
       name: string | undefined,
-      payload: string,
+      payload?: string,
     ) => Promise<{ ok: boolean }>;
     delete: (sessionId: string) => Promise<{ ok: boolean }>;
+    openWindow?: (
+      sessionId?: string,
+    ) => Promise<{ ok: boolean; sessionId: string }>;
   };
   window?: {
     setTitleBarOverlay: (options: {

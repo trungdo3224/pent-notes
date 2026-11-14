@@ -105,12 +105,29 @@ function registerIpcHandlers() {
     return await sessionService.getOrSeedSession(sessionId);
   });
 
+  ipcMain.handle("sessions:create", async (_, { name, cloneFromId } = {}) => {
+    return await sessionService.createSession(name, cloneFromId);
+  });
+
   ipcMain.handle("sessions:save", async (_, sessionId, name, payload) => {
     return await sessionService.saveSession(sessionId, name, payload);
   });
 
   ipcMain.handle("sessions:delete", async (_, sessionId) => {
     return await sessionService.deleteSession(sessionId);
+  });
+
+  ipcMain.handle("sessions:open-window", async (_, sessionId) => {
+    let targetId =
+      typeof sessionId === "string" && sessionId.trim()
+        ? sessionId.trim()
+        : null;
+    if (!targetId || targetId === "new") {
+      const created = await sessionService.createSession();
+      targetId = created.id;
+    }
+    createWindow(targetId);
+    return { ok: true, sessionId: targetId };
   });
 
   // Native Dialog handlers
@@ -187,7 +204,24 @@ function getAppIconPath() {
   return undefined;
 }
 
-function createWindow() {
+function isInternalAppUrl(targetUrl) {
+  if (targetUrl.startsWith("file://")) {
+    return true;
+  }
+  if (process.env.ELECTRON_RENDERER_URL) {
+    try {
+      return (
+        new URL(targetUrl).origin ===
+        new URL(process.env.ELECTRON_RENDERER_URL).origin
+      );
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+function createWindow(sessionId) {
   const isWindows = process.platform === "win32";
   const isMac = process.platform === "darwin";
   const appIcon = getAppIconPath();
@@ -227,16 +261,31 @@ function createWindow() {
     },
   });
 
-  // Open external web links in OS default browser
+  // Route internal session links to configured BrowserWindows; open external links in OS browser
   mainWindow.webContents.setWindowOpenHandler((details) => {
+    if (isInternalAppUrl(details.url)) {
+      try {
+        const parsed = new URL(details.url);
+        const requestedSession = parsed.searchParams.get("session");
+        if (requestedSession === "new" || !requestedSession) {
+          void sessionService.createSession().then((created) => {
+            createWindow(created.id);
+          });
+        } else {
+          createWindow(requestedSession);
+        }
+      } catch {
+        createWindow();
+      }
+      return { action: "deny" };
+    }
     if (
       details.url.startsWith("http://") ||
       details.url.startsWith("https://")
     ) {
       shell.openExternal(details.url);
-      return { action: "deny" };
     }
-    return { action: "allow" };
+    return { action: "deny" };
   });
 
   mainWindow.webContents.on(
@@ -256,10 +305,17 @@ function createWindow() {
 
   // In development, load the Vite dev server URL automatically injected by electron-vite
   if (process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL);
+    const targetUrl = new URL(process.env.ELECTRON_RENDERER_URL);
+    if (sessionId) {
+      targetUrl.searchParams.set("session", sessionId);
+    }
+    mainWindow.loadURL(targetUrl.toString());
   } else {
     // In production, load the built HTML
-    mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
+    mainWindow.loadFile(
+      join(__dirname, "../renderer/index.html"),
+      sessionId ? { query: { session: sessionId } } : undefined,
+    );
   }
 }
 
@@ -270,6 +326,10 @@ app.commandLine.appendSwitch("disable-breakpad");
 app.commandLine.appendSwitch("disable-component-update");
 
 app.whenReady().then(() => {
+  if (app.isPackaged && !process.env.PENTNOTES_DATA_DIR) {
+    sessionService.setDataDir(join(app.getPath("userData"), "data"));
+  }
+
   if (process.platform === "win32") {
     app.setAppUserModelId("com.pentnotes.app");
   }
