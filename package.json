@@ -11,7 +11,8 @@
       "buildResources": "resources"
     },
     "win": {
-      "icon": "resources/icon.ico"
+      "icon": "resources/icon.ico",
+      "target": "nsis"
     },
     "mac": {
       "icon": "resources/icon.png"
@@ -25,6 +26,7 @@
     "dev:electron": "electron-vite dev",
     "build:electron": "electron-vite build",
     "preview:electron": "electron-vite preview",
+    "package": "electron-builder --win",
     "start": "electron-vite dev",
     "test": "tsc -b && eslint src && vitest run",
     "test:unit": "vitest run",
